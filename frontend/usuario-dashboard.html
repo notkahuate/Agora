@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Usuario - SafetyDocs</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container">
+      <div class="header-content">
+        <div class="logo">
+          <div class="logo-icon"><img src="./img/Imagen1.png" alt=""></div>
+          <span>SafetyDocs</span>
+        </div>
+        <div class="user-info">
+          <div>
+            <div style="font-weight: 600; font-size: 14px;" id="userName"></div>
+            <div style="font-size: 12px; color: var(--text-secondary);" id="userCompany"></div>
+          </div>
+          <div class="user-avatar" id="userAvatar"></div>
+          <button class="btn btn-secondary" onclick="logout()">Cerrar Sesión</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="dashboard">
+    <div class="container">
+      <div class="dashboard-header">
+        <h1>Mi Panel de Documentos</h1>
+        <p>Gestiona y sube tus documentos de seguridad laboral</p>
+      </div>
+
+      <!-- Estadísticas -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-header">
+            <div>
+              <div class="stat-title">Documentos Pendientes</div>
+            </div>
+            <div class="stat-icon" style="background-color: #fef3c7; color: #92400e;">⚠️</div>
+          </div>
+          <div class="stat-value">3</div>
+          <div class="stat-description">Requieren atención urgente</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <div>
+              <div class="stat-title">Documentos Completados</div>
+            </div>
+            <div class="stat-icon" style="background-color: #d1fae5; color: #065f46;">✓</div>
+          </div>
+          <div class="stat-value">12</div>
+          <div class="stat-description">Este mes</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <div>
+              <div class="stat-title">Progreso Mensual</div>
+            </div>
+            <div class="stat-icon" style="background-color: #dbeafe; color: #1e40af;">📊</div>
+          </div>
+          <div class="stat-value">80%</div>
+          <div class="stat-description">12 de 15 documentos</div>
+        </div>
+      </div>
+
+      <!-- Alerta de documentos pendientes -->
+      <div class="alert alert-warning">
+        <span class="alert-icon">⚠️</span>
+        <div>
+          <strong>Documentos Pendientes:</strong> Tienes 3 documentos que deben ser subidos antes del 31 de Diciembre.
+        </div>
+      </div>
+
+      <!-- Progreso del mes -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Progreso del Mes</h2>
+        </div>
+        <div class="progress-container">
+          <div class="progress-header">
+            <span>Documentos Completados</span>
+            <span><strong>12 / 15</strong></span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: 80%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Documentos Pendientes -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Documentos Pendientes por Subir</h2>
+          <span class="badge badge-warning">3 pendientes</span>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Documento</th>
+                <th>Tipo</th>
+                <th>Fecha Límite</th>
+                <th>Prioridad</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Certificado de Capacitación en Seguridad</strong></td>
+                <td>Mensual</td>
+                <td>31 Dic 2024</td>
+                <td><span class="badge badge-danger">Alta</span></td>
+                <td><button class="btn btn-primary" onclick="uploadDocument('cert-seguridad')">Subir</button></td>
+              </tr>
+              <tr>
+                <td><strong>Reporte de Inspección de EPP</strong></td>
+                <td>Mensual</td>
+                <td>31 Dic 2024</td>
+                <td><span class="badge badge-warning">Media</span></td>
+                <td><button class="btn btn-primary" onclick="uploadDocument('inspeccion-epp')">Subir</button></td>
+              </tr>
+              <tr>
+                <td><strong>Registro de Incidentes</strong></td>
+                <td>Mensual</td>
+                <td>31 Dic 2024</td>
+                <td><span class="badge badge-warning">Media</span></td>
+                <td><button class="btn btn-primary" onclick="uploadDocument('registro-incidentes')">Subir</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Historial de Documentos -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Historial de Documentos Subidos</h2>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Documento</th>
+                <th>Fecha de Subida</th>
+                <th>Estado</th>
+                <th>Validado Por</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Plan de Emergencia</strong></td>
+                <td>15 Dic 2024</td>
+                <td><span class="badge badge-success">Aprobado</span></td>
+                <td>Auditor Principal</td>
+              </tr>
+              <tr>
+                <td><strong>Matriz de Riesgos</strong></td>
+                <td>10 Dic 2024</td>
+                <td><span class="badge badge-success">Aprobado</span></td>
+                <td>Auditor Principal</td>
+              </tr>
+              <tr>
+                <td><strong>Certificado Médico Ocupacional</strong></td>
+                <td>5 Dic 2024</td>
+                <td><span class="badge badge-success">Aprobado</span></td>
+                <td>Auditor Principal</td>
+              </tr>
+              <tr>
+                <td><strong>Registro de Capacitaciones</strong></td>
+                <td>1 Dic 2024</td>
+                <td><span class="badge badge-success">Aprobado</span></td>
+                <td>Auditor Principal</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="auth.js"></script>
+  <script src="Js/Usuario.js"></script>
+</body>
+</html>

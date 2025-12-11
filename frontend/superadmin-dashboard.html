@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Super Admin - SafetyDocs</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/Super_admin.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container">
+      <div class="header-content">
+        <div class="logo">
+          <div class="logo-icon"><img src="./img/Imagen1.png" alt=""></div>
+          <span>SafetyDocs</span>
+        </div>
+        <div class="user-info">
+          <div>
+            <div style="font-weight: 600; font-size: 14px;" id="userName"></div>
+            <div style="font-size: 12px; color: var(--text-secondary);" id="userCompany"></div>
+          </div>
+          <div class="user-avatar" id="userAvatar"></div>
+          <button class="btn btn-secondary" onclick="logout()">Cerrar Sesión</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="dashboard">
+    <div class="container">
+      <div class="dashboard-header">
+        <h1>Panel de Administración</h1>
+        <p>Gestiona los documentos y usuarios de tu empresa</p>
+      </div>
+
+      <!-- Estadísticas -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-header">
+            <div>
+              <div class="stat-title">Total Usuarios</div>
+            </div>
+            <div class="stat-icon" style="background-color: #dbeafe; color: #1e40af;">👥</div>
+          </div>
+          <div class="stat-value">24</div>
+          <div class="stat-description">Usuarios activos</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <div>
+              <div class="stat-title">Documentos Pendientes</div>
+            </div>
+            <div class="stat-icon" style="background-color: #fef3c7; color: #92400e;">⚠️</div>
+          </div>
+          <div class="stat-value">18</div>
+          <div class="stat-description">Requieren atención</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <div>
+              <div class="stat-title">Cumplimiento</div>
+            </div>
+            <div class="stat-icon" style="background-color: #d1fae5; color: #065f46;">📊</div>
+          </div>
+          <div class="stat-value">85%</div>
+          <div class="stat-description">Promedio de la empresa</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <div>
+              <div class="stat-title">Docs. Este Mes</div>
+            </div>
+            <div class="stat-icon" style="background-color: #e0e7ff; color: #3730a3;">📄</div>
+          </div>
+          <div class="stat-value">156</div>
+          <div class="stat-description">Documentos subidos</div>
+        </div>
+      </div>
+
+      <!-- Estado de Secciones SG-SST -->
+      <div class="section-header" style="margin-top: 40px; margin-bottom: 20px;">
+        <h2>Estado de Secciones SG-SST</h2>
+        <p style="color: var(--text-secondary); margin-top: 8px;">Visualiza el progreso de cada área del Sistema de Gestión de Seguridad y Salud</p>
+      </div>
+
+      <div class="sections-grid">
+        <!-- Sección I: PLANEAR -->
+        <div class="section-card" onclick="openSectionDetail('planear')" style="cursor: pointer;">
+          <div class="section-card-header">
+            <h3>I. PLANEAR</h3>
+            <span class="section-percentage">10%</span>
+          </div>
+          <div class="section-progress-container">
+            <div class="section-progress-bar">
+              <div class="section-progress-fill" style="width: 85%;"></div>
+            </div>
+            <div class="section-progress-text">
+              <span style="font-weight: 600;">8.5/10</span>
+              <span style="color: var(--text-secondary); font-size: 12px;">Puntos alcanzados</span>
+            </div>
+          </div>
+          <div class="section-subsections">
+            <div class="subsection-item">
+              <span>Recursos Financieros</span>
+              <span class="badge badge-success">4/4</span>
+            </div>
+            <div class="subsection-item">
+              <span>Capacitación SG-SST</span>
+              <span class="badge badge-warning">6/6</span>
+            </div>
+          </div>
+          <button class="btn btn-secondary" style="width: 100%; margin-top: 12px; font-size: 13px;">Ver Detalles →</button>
+        </div>
+
+        <!-- Sección II.A: GESTIÓN DE LA SALUD -->
+        <div class="section-card" onclick="openSectionDetail('salud')" style="cursor: pointer;">
+          <div class="section-card-header">
+            <h3>II.A GESTIÓN DE LA SALUD</h3>
+            <span class="section-percentage">20%</span>
+          </div>
+          <div class="section-progress-container">
+            <div class="section-progress-bar">
+              <div class="section-progress-fill" style="width: 70%;"></div>
+            </div>
+            <div class="section-progress-text">
+              <span style="font-weight: 600;">14/20</span>
+              <span style="color: var(--text-secondary); font-size: 12px;">Puntos alcanzados</span>
+            </div>
+          </div>
+          <div class="section-subsections">
+            <div class="subsection-item">
+              <span>Condiciones de Salud</span>
+              <span class="badge badge-warning">9/9</span>
+            </div>
+            <div class="subsection-item">
+              <span>Registro de Enfermedades</span>
+              <span class="badge badge-danger">3/5</span>
+            </div>
+          </div>
+          <button class="btn btn-secondary" style="width: 100%; margin-top: 12px; font-size: 13px;">Ver Detalles →</button>
+        </div>
+
+        <!-- Sección II.B: GESTIÓN DE PELIGROS Y RIESGOS -->
+        <div class="section-card" onclick="openSectionDetail('riesgos')" style="cursor: pointer;">
+          <div class="section-card-header">
+            <h3>II.B GESTIÓN DE PELIGROS Y RIESGOS</h3>
+            <span class="section-percentage">30%</span>
+          </div>
+          <div class="section-progress-container">
+            <div class="section-progress-bar">
+              <div class="section-progress-fill" style="width: 60%;"></div>
+            </div>
+            <div class="section-progress-text">
+              <span style="font-weight: 600;">18/30</span>
+              <span style="color: var(--text-secondary); font-size: 12px;">Puntos alcanzados</span>
+            </div>
+          </div>
+          <div class="section-subsections">
+            <div class="subsection-item">
+              <span>Identificación de Peligros</span>
+              <span class="badge badge-warning">11/15</span>
+            </div>
+            <div class="subsection-item">
+              <span>Medidas de Prevención</span>
+              <span class="badge badge-danger">15/15</span>
+            </div>
+          </div>
+          <button class="btn btn-secondary" style="width: 100%; margin-top: 12px; font-size: 13px;">Ver Detalles →</button>
+        </div>
+
+        <!-- Sección III: VERIFICAR -->
+        <div class="section-card" onclick="openSectionDetail('verificar')" style="cursor: pointer;">
+          <div class="section-card-header">
+            <h3>III. VERIFICAR</h3>
+            <span class="section-percentage">5%</span>
+          </div>
+          <div class="section-progress-container">
+            <div class="section-progress-bar">
+              <div class="section-progress-fill" style="width: 100%;"></div>
+            </div>
+            <div class="section-progress-text">
+              <span style="font-weight: 600;">5/5</span>
+              <span style="color: var(--text-secondary); font-size: 12px;">Puntos alcanzados</span>
+            </div>
+          </div>
+          <div class="section-subsections">
+            <div class="subsection-item">
+              <span>Gestión y Resultados SG-SST</span>
+              <span class="badge badge-success">5/5</span>
+            </div>
+          </div>
+          <button class="btn btn-secondary" style="width: 100%; margin-top: 12px; font-size: 13px;">Ver Detalles →</button>
+        </div>
+
+        <!-- Sección IV: ACTUAR -->
+        <div class="section-card" onclick="openSectionDetail('actuar')" style="cursor: pointer;">
+          <div class="section-card-header">
+            <h3>IV. ACTUAR</h3>
+            <span class="section-percentage">10%</span>
+          </div>
+          <div class="section-progress-container">
+            <div class="section-progress-bar">
+              <div class="section-progress-fill" style="width: 90%;"></div>
+            </div>
+            <div class="section-progress-text">
+              <span style="font-weight: 600;">9/10</span>
+              <span style="color: var(--text-secondary); font-size: 12px;">Puntos alcanzados</span>
+            </div>
+          </div>
+          <div class="section-subsections">
+            <div class="subsection-item">
+              <span>Acciones Preventivas y Correctivas</span>
+              <span class="badge badge-warning">10/10</span>
+            </div>
+          </div>
+          <button class="btn btn-secondary" style="width: 100%; margin-top: 12px; font-size: 13px;">Ver Detalles →</button>
+        </div>
+
+        <!-- Sección GESTION INTEGRAL -->
+        <div class="section-card" onclick="openSectionDetail('integral')" style="cursor: pointer;">
+          <div class="section-card-header">
+            <h3>GESTION INTEGRAL DEL SG-SST</h3>
+            <span class="section-percentage">15%</span>
+          </div>
+          <div class="section-progress-container">
+            <div class="section-progress-bar">
+              <div class="section-progress-fill" style="width: 75%;"></div>
+            </div>
+            <div class="section-progress-text">
+              <span style="font-weight: 600;">11.25/15</span>
+              <span style="color: var(--text-secondary); font-size: 12px;">Puntos alcanzados</span>
+            </div>
+          </div>
+          <div class="section-subsections">
+            <div class="subsection-item">
+              <span>Política y Objetivos</span>
+              <span class="badge badge-success">2/2</span>
+            </div>
+            <div class="subsection-item">
+              <span>Evaluación y Documentación</span>
+              <span class="badge badge-warning">13/13</span>
+            </div>
+          </div>
+          <button class="btn btn-secondary" style="width: 100%; margin-top: 12px; font-size: 13px;">Ver Detalles →</button>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs" style="margin-top: 40px;">
+        <button class="tab active" onclick="switchTab('usuarios')">Usuarios</button>
+        <button class="tab" onclick="switchTab('documentos')">Documentos Recientes</button>
+        <button class="tab" onclick="switchTab('historial')">Historial Completo</button>
+      </div>
+
+      <!-- Tab: Usuarios -->
+      <div id="tab-usuarios" class="tab-content active">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Estado de Usuarios</h2>
+            <button class="btn btn-primary">+ Agregar Usuario</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Usuario</th>
+                  <th>Departamento</th>
+                  <th>Docs. Pendientes</th>
+                  <th>Progreso</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                      <div class="user-avatar" style="width: 32px; height: 32px; font-size: 14px;">JP</div>
+                      <div>
+                        <div style="font-weight: 600;">Juan Pérez</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">juan.perez@empresa.com</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>Operaciones</td>
+                  <td><span class="badge badge-warning">3</span></td>
+                  <td>
+                    <div class="progress-bar" style="width: 120px;">
+                      <div class="progress-fill" style="width: 80%;"></div>
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-secondary);">80%</span>
+                  </td>
+                  <td><span class="badge badge-success">Activo</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                      <div class="user-avatar" style="width: 32px; height: 32px; font-size: 14px;">AL</div>
+                      <div>
+                        <div style="font-weight: 600;">Ana López</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">ana.lopez@empresa.com</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>Seguridad</td>
+                  <td><span class="badge badge-success">0</span></td>
+                  <td>
+                    <div class="progress-bar" style="width: 120px;">
+                      <div class="progress-fill" style="width: 100%;"></div>
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-secondary);">100%</span>
+                  </td>
+                  <td><span class="badge badge-success">Activo</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                      <div class="user-avatar" style="width: 32px; height: 32px; font-size: 14px;">CM</div>
+                      <div>
+                        <div style="font-weight: 600;">Carlos Martínez</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">carlos.martinez@empresa.com</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>Mantenimiento</td>
+                  <td><span class="badge badge-danger">5</span></td>
+                  <td>
+                    <div class="progress-bar" style="width: 120px;">
+                      <div class="progress-fill" style="width: 60%;"></div>
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-secondary);">60%</span>
+                  </td>
+                  <td><span class="badge badge-warning">Atrasado</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                      <div class="user-avatar" style="width: 32px; height: 32px; font-size: 14px;">LS</div>
+                      <div>
+                        <div style="font-weight: 600;">Laura Sánchez</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">laura.sanchez@empresa.com</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>Recursos Humanos</td>
+                  <td><span class="badge badge-warning">2</span></td>
+                  <td>
+                    <div class="progress-bar" style="width: 120px;">
+                      <div class="progress-fill" style="width: 90%;"></div>
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-secondary);">90%</span>
+                  </td>
+                  <td><span class="badge badge-success">Activo</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Documentos Recientes -->
+      <div id="tab-documentos" class="tab-content">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Documentos Recientes</h2>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Documento</th>
+                  <th>Usuario</th>
+                  <th>Fecha</th>
+                  <th>Tipo</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Plan de Emergencia</strong></td>
+                  <td>Juan Pérez</td>
+                  <td>20 Dic 2024</td>
+                  <td><span class="badge badge-info">Mensual</span></td>
+                  <td><span class="badge badge-success">Aprobado</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Certificado Médico</strong></td>
+                  <td>Ana López</td>
+                  <td>19 Dic 2024</td>
+                  <td><span class="badge badge-warning">Anual</span></td>
+                  <td><span class="badge badge-success">Aprobado</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Inspección de EPP</strong></td>
+                  <td>Carlos Martínez</td>
+                  <td>18 Dic 2024</td>
+                  <td><span class="badge badge-info">Mensual</span></td>
+                  <td><span class="badge badge-warning">En Revisión</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Matriz de Riesgos</strong></td>
+                  <td>Laura Sánchez</td>
+                  <td>17 Dic 2024</td>
+                  <td><span class="badge badge-info">Mensual</span></td>
+                  <td><span class="badge badge-success">Aprobado</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Historial -->
+      <div id="tab-historial" class="tab-content">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Historial Completo de Documentos</h2>
+            <button class="btn btn-secondary">Exportar Reporte</button>
+          </div>
+          <div style="margin-bottom: 20px; display: flex; gap: 12px;">
+            <input type="text" class="form-control" placeholder="Buscar documentos..." style="max-width: 300px;">
+            <select class="form-control" style="max-width: 200px;">
+              <option>Todos los estados</option>
+              <option>Aprobado</option>
+              <option>En Revisión</option>
+              <option>Rechazado</option>
+            </select>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Documento</th>
+                  <th>Usuario</th>
+                  <th>Fecha</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>#1245</td>
+                  <td><strong>Plan de Emergencia</strong></td>
+                  <td>Juan Pérez</td>
+                  <td>20 Dic 2024</td>
+                  <td><span class="badge badge-success">Aprobado</span></td>
+                 <td>
+                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">Ver</button>
+                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px; margin-left: 6px;">Eliminar</button>
+                  </td>
+
+                </tr>
+                <tr>
+                  <td>#1244</td>
+                  <td><strong>Certificado Médico</strong></td>
+                  <td>Ana López</td>
+                  <td>19 Dic 2024</td>
+                  <td><span class="badge badge-success">Aprobado</span></td>
+                  <td>
+                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">Ver</button>
+                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px; margin-left: 6px;">Eliminar</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td>#1243</td>
+                  <td><strong>Inspección de EPP</strong></td>
+                  <td>Carlos Martínez</td>
+                  <td>18 Dic 2024</td>
+                  <td><span class="badge badge-warning">En Revisión</span></td>
+                  <td>
+                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">Ver</button>
+                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px; margin-left: 6px;">Eliminar</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+
+  <script src="Js/Super_Admin.js"></script>
+  <script>
+    // Function to handle section detail view
+    function openSectionDetail(section) {
+      console.log('Abriendo sección:', section);
+      // This can be expanded to show a modal or navigate to a detail page
+      alert('Detalle de sección: ' + section);
+    }
+  </script>
+</body>
+</html>

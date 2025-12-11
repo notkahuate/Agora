@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Auditor - SafetyDocs</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container">
+      <div class="header-content">
+        <div class="logo">
+          <div class="logo-icon">SD</div>
+          <span>SafetyDocs</span>
+        </div>
+        <div class="user-info">
+          <div>
+            <div style="font-weight: 600; font-size: 14px;" id="userName"></div>
+            <div style="font-size: 12px; color: var(--text-secondary);">Auditor del Sistema</div>
+          </div>
+          <div class="user-avatar" id="userAvatar"></div>
+          <button class="btn btn-secondary" onclick="logout()">Cerrar Sesión</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="dashboard">
+    <div class="container">
+      <div class="dashboard-header">
+        <h1>Panel de Auditoría</h1>
+        <p>Supervisa y valida documentos de todas las empresas</p>
+      </div>
+
+      <!-- Estadísticas Globales -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-header">
+            <div>
+              <div class="stat-title">Total Empresas</div>
+            </div>
+            <div class="stat-icon" style="background-color: #e0e7ff; color: #3730a3;">🏢</div>
+          </div>
+          <div class="stat-value">8</div>
+          <div class="stat-description">Empresas registradas</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <div>
+              <div class="stat-title">Docs. Pendientes</div>
+            </div>
+            <div class="stat-icon" style="background-color: #fef3c7; color: #92400e;">⏳</div>
+          </div>
+          <div class="stat-value">42</div>
+          <div class="stat-description">Requieren revisión</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <div>
+              <div class="stat-title">Docs. Revisados</div>
+            </div>
+            <div class="stat-icon" style="background-color: #d1fae5; color: #065f46;">✓</div>
+          </div>
+          <div class="stat-value">328</div>
+          <div class="stat-description">Este mes</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <div>
+              <div class="stat-title">Cumplimiento Global</div>
+            </div>
+            <div class="stat-icon" style="background-color: #dbeafe; color: #1e40af;">📊</div>
+          </div>
+          <div class="stat-value">82%</div>
+          <div class="stat-description">Promedio del sistema</div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('empresas')">Empresas</button>
+        <button class="tab" onclick="switchTab('documentos')">Documentos por Revisar</button>
+        <button class="tab" onclick="switchTab('historial')">Historial Global</button>
+      </div>
+
+      <!-- Tab: Empresas -->
+      <div id="tab-empresas" class="tab-content active">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Estado de Empresas</h2>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Empresa</th>
+                  <th>Usuarios</th>
+                  <th>Docs. Pendientes</th>
+                  <th>Cumplimiento</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <div>
+                      <div style="font-weight: 600;">Constructora ABC</div>
+                      <div style="font-size: 12px; color: var(--text-secondary);">Construcción</div>
+                    </div>
+                  </td>
+                  <td>24</td>
+                  <td><span class="badge badge-warning">18</span></td>
+                  <td>
+                    <div class="progress-bar" style="width: 100px;">
+                      <div class="progress-fill" style="width: 85%;"></div>
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-secondary);">85%</span>
+                  </td>
+                  <td><span class="badge badge-success">Al día</span></td>
+                  <td><button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">Ver Detalles</button></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div>
+                      <div style="font-weight: 600;">Minera del Sur</div>
+                      <div style="font-size: 12px; color: var(--text-secondary);">Minería</div>
+                    </div>
+                  </td>
+                  <td>45</td>
+                  <td><span class="badge badge-danger">32</span></td>
+                  <td>
+                    <div class="progress-bar" style="width: 100px;">
+                      <div class="progress-fill" style="width: 65%;"></div>
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-secondary);">65%</span>
+                  </td>
+                  <td><span class="badge badge-danger">Atrasado</span></td>
+                  <td><button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">Ver Detalles</button></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div>
+                      <div style="font-weight: 600;">Industrias XYZ</div>
+                      <div style="font-size: 12px; color: var(--text-secondary);">Manufactura</div>
+                    </div>
+                  </td>
+                  <td>32</td>
+                  <td><span class="badge badge-success">5</span></td>
+                  <td>
+                    <div class="progress-bar" style="width: 100px;">
+                      <div class="progress-fill" style="width: 95%;"></div>
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-secondary);">95%</span>
+                  </td>
+                  <td><span class="badge badge-success">Excelente</span></td>
+                  <td><button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">Ver Detalles</button></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div>
+                      <div style="font-weight: 600;">Transportes Rápidos</div>
+                      <div style="font-size: 12px; color: var(--text-secondary);">Logística</div>
+                    </div>
+                  </td>
+                  <td>18</td>
+                  <td><span class="badge badge-warning">12</span></td>
+                  <td>
+                    <div class="progress-bar" style="width: 100px;">
+                      <div class="progress-fill" style="width: 78%;"></div>
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-secondary);">78%</span>
+                  </td>
+                  <td><span class="badge badge-warning">Regular</span></td>
+                  <td><button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">Ver Detalles</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Documentos por Revisar -->
+      <div id="tab-documentos" class="tab-content">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Documentos Pendientes de Revisión</h2>
+            <span class="badge badge-warning">42 pendientes</span>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Documento</th>
+                  <th>Empresa</th>
+                  <th>Usuario</th>
+                  <th>Fecha Subida</th>
+                  <th>Prioridad</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Certificado de Capacitación</strong></td>
+                  <td>Constructora ABC</td>
+                  <td>Juan Pérez</td>
+                  <td>20 Dic 2024</td>
+                  <td><span class="badge badge-danger">Alta</span></td>
+                  <td>
+                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="reviewDocument('approve')">Aprobar</button>
+                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px; margin-left: 4px;" onclick="reviewDocument('reject')">Rechazar</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Inspección de Equipos</strong></td>
+                  <td>Minera del Sur</td>
+                  <td>Pedro González</td>
+                  <td>19 Dic 2024</td>
+                  <td><span class="badge badge-danger">Alta</span></td>
+                  <td>
+                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="reviewDocument('approve')">Aprobar</button>
+                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px; margin-left: 4px;" onclick="reviewDocument('reject')">Rechazar</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Matriz de Riesgos</strong></td>
+                  <td>Industrias XYZ</td>
+                  <td>María Fernández</td>
+                  <td>18 Dic 2024</td>
+                  <td><span class="badge badge-warning">Media</span></td>
+                  <td>
+                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="reviewDocument('approve')">Aprobar</button>
+                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px; margin-left: 4px;" onclick="reviewDocument('reject')">Rechazar</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Plan de Emergencia</strong></td>
+                  <td>Transportes Rápidos</td>
+                  <td>Luis Torres</td>
+                  <td>17 Dic 2024</td>
+                  <td><span class="badge badge-warning">Media</span></td>
+                  <td>
+                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="reviewDocument('approve')">Aprobar</button>
+                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px; margin-left: 4px;" onclick="reviewDocument('reject')">Rechazar</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Historial Global -->
+      <div id="tab-historial" class="tab-content">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Historial Global de Documentos</h2>
+            <button class="btn btn-secondary">Exportar Reporte</button>
+          </div>
+          <div style="margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
+            <input type="text" class="form-control" placeholder="Buscar documentos..." style="max-width: 300px;">
+            <select class="form-control" style="max-width: 200px;">
+              <option>Todas las empresas</option>
+              <option>Constructora ABC</option>
+              <option>Minera del Sur</option>
+              <option>Industrias XYZ</option>
+              <option>Transportes Rápidos</option>
+            </select>
+            <select class="form-control" style="max-width: 200px;">
+              <option>Todos los estados</option>
+              <option>Aprobado</option>
+              <option>En Revisión</option>
+              <option>Rechazado</option>
+            </select>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Documento</th>
+                  <th>Empresa</th>
+                  <th>Usuario</th>
+                  <th>Fecha</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>#2456</td>
+                  <td><strong>Plan de Emergencia</strong></td>
+                  <td>Constructora ABC</td>
+                  <td>Juan Pérez</td>
+                  <td>20 Dic 2024</td>
+                  <td><span class="badge badge-success">Aprobado</span></td>
+                  <td><button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">Ver</button></td>
+                </tr>
+                <tr>
+                  <td>#2455</td>
+                  <td><strong>Certificado Médico</strong></td>
+                  <td>Minera del Sur</td>
+                  <td>Pedro González</td>
+                  <td>19 Dic 2024</td>
+                  <td><span class="badge badge-success">Aprobado</span></td>
+                  <td><button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">Ver</button></td>
+                </tr>
+                <tr>
+                  <td>#2454</td>
+                  <td><strong>Inspección de EPP</strong></td>
+                  <td>Industrias XYZ</td>
+                  <td>María Fernández</td>
+                  <td>18 Dic 2024</td>
+                  <td><span class="badge badge-danger">Rechazado</span></td>
+                  <td><button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">Ver</button></td>
+                </tr>
+                <tr>
+                  <td>#2453</td>
+                  <td><strong>Matriz de Riesgos</strong></td>
+                  <td>Transportes Rápidos</td>
+                  <td>Luis Torres</td>
+                  <td>17 Dic 2024</td>
+                  <td><span class="badge badge-success">Aprobado</span></td>
+                  <td><button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">Ver</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="auth.js"></script>
+  <script src="Js/Auditor.js"></script>
+</body>
+</html>
