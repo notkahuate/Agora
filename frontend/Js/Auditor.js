@@ -1,31 +1,19 @@
-// Verificar autenticación
-const checkAuth = () => {
-  // Simulación de autenticación
-  return { name: "John Doe" }
-}
+const checkAuth = () => ({ name: "Alex Auditor" })
 
 const user = checkAuth()
 
-if (user) {
-  document.getElementById("userName").textContent = user.name
+if (user && document.getElementById("userAvatar")) {
   document.getElementById("userAvatar").textContent = user.name.charAt(0)
 }
 
-// Función para cambiar entre tabs
-function switchTab(tabName) {
-  // Remover clase active de todos los tabs
-  document.querySelectorAll(".tab").forEach((tab) => {
-    tab.classList.remove("active")
-  })
+function switchTab(tabName, evt) {
+  document.querySelectorAll(".pill").forEach((tab) => tab.classList.remove("is-active"))
+  document.querySelectorAll(".tab-content").forEach((content) => content.classList.remove("active"))
 
-  // Ocultar todo el contenido
-  document.querySelectorAll(".tab-content").forEach((content) => {
-    content.classList.remove("active")
-  })
-
-  // Activar el tab seleccionado
-  event.target.classList.add("active")
-  document.getElementById("tab-" + tabName).classList.add("active")
+  const trigger = evt?.currentTarget || document.querySelector(`[data-tab="${tabName}"]`)
+  if (trigger) trigger.classList.add("is-active")
+  const panel = document.getElementById("tab-" + tabName)
+  if (panel) panel.classList.add("active")
 }
 
 // Función para revisar documentos

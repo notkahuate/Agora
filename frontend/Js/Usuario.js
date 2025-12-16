@@ -1,12 +1,8 @@
-// Importar la función checkAuth
-import { checkAuth } from "./auth.js"
+const checkAuth = () => ({ name: "Usuario Safety", company: "Mi Empresa" })
 
-// Verificar autenticación
 const user = checkAuth()
 
-if (user) {
-  document.getElementById("userName").textContent = user.name
-  document.getElementById("userCompany").textContent = user.company
+if (user && document.getElementById("userAvatar")) {
   document.getElementById("userAvatar").textContent = user.name.charAt(0)
 }
 

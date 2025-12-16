@@ -1,12 +1,9 @@
-const checkAuth = () => {
-  return { name: "John Doe" }
-}
+const checkAuth = () => ({ name: "John Doe" })
 
 const user = checkAuth()
-
 if (user) {
-  document.getElementById("userName").textContent = user.name
-  document.getElementById("userAvatar").textContent = user.name.charAt(0)
+  const avatar = document.getElementById("userAvatar")
+  if (avatar) avatar.textContent = user.name.charAt(0).toUpperCase()
 }
 
 // Obtener ID de empresa de la URL
@@ -90,17 +87,14 @@ function loadEmpresaData() {
 }
 
 // Función para cambiar entre tabs
-function switchTab(tabName) {
-  document.querySelectorAll(".tab").forEach((tab) => {
-    tab.classList.remove("active")
-  })
+function switchTab(tabName, evt) {
+  document.querySelectorAll(".pill").forEach((pill) => pill.classList.remove("is-active"))
+  document.querySelectorAll(".tab-content").forEach((content) => content.classList.remove("active"))
 
-  document.querySelectorAll(".tab-content").forEach((content) => {
-    content.classList.remove("active")
-  })
-
-  event.target.classList.add("active")
-  document.getElementById("tab-" + tabName).classList.add("active")
+  const target = evt?.target
+  if (target) target.classList.add("is-active")
+  const panel = document.getElementById("tab-" + tabName)
+  if (panel) panel.classList.add("active")
 }
 
 // Función para volver al dashboard del auditor
