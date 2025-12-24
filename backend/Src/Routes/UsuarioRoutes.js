@@ -11,9 +11,11 @@ router.post(
   [
     body('nombre').isString().isLength({ min: 2 }),
     body('email').isEmail(),
-    body('password').isLength({ min: 6 })
+    body('password').isLength({ min: 6 }),
+    body('rol').optional().isIn(['usuario', 'super_admin', 'manager']),
+    body('empresa_id').optional().isInt()
   ],
-  controller.crearUsuario
+  controller.crearUsuarioPublico
 );
 
 // 2) Creación por admin (protegido)
@@ -30,6 +32,9 @@ router.post(
   ],
   controller.crearUsuario
 );
+
+
+
 
 // proteger las demás rutas (listar, obtener, actualizar, eliminar)
 router.get('/', authenticate, authorize('super_admin'), controller.listarUsuarios); // solo admin lista

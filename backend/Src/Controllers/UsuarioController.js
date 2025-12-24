@@ -4,6 +4,64 @@ const { validationResult } = require('express-validator');
 const Usuario = require('../Models/UsuarioModel'); // asegúrate del path y nombre
 const SALT_ROUNDS = parseInt(process.env.SALT_ROUNDS || '10', 10);
 
+
+exports.crearUsuarioPublico = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const body = req.body || {};
+    const { nombre, email, password } = body;
+
+    if (!nombre || !email || !password) {
+      return res.status(400).json({
+        message: 'nombre, email y password son obligatorios'
+      });
+    }
+
+    // Verificar si ya existe email
+    const existente = await Usuario.obtenerUsuarioPorEmail(email);
+    if (existente) {
+      return res.status(409).json({ message: 'El email ya está en uso' });
+    }
+
+    // Valores forzados (seguridad)
+    const rol = 'usuario';
+    const activo = true;
+    const empresa_id = null;
+
+    const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
+
+    const nuevo = await Usuario.crearUsuario({
+      nombre,
+      email,
+      password_hash,
+      rol,
+      empresa_id,
+      activo
+    });
+
+    // Nunca devolver el hash
+    delete nuevo.password_hash;
+
+    return res.status(201).json(nuevo);
+  } catch (err) {
+    console.error('crearUsuarioPublico error:', err);
+
+    if (err.code === '23505') {
+      return res.status(409).json({ message: 'Email ya en uso' });
+    }
+
+    return res.status(500).json({
+      message: 'Error al crear usuario',
+      error: err.message
+    });
+  }
+};
+
+
 exports.crearUsuario = async (req, res) => {
   try {
     // si usas express-validator en la ruta, revisa errores:
