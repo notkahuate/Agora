@@ -23,11 +23,13 @@ const getEmpresaById = async (id) => {
 };
 
 const updateEmpresa = async (id, fields = {}) => {
-  // Construir query dinámica y parámetros
+  // Construir query dinámica y parámetros con whitelist
   const setClauses = [];
   const values = [];
   let idx = 1;
+  const allowed = new Set(['nombre', 'rut', 'sector', 'ubicacion', 'email', 'telefono', 'activa']);
   for (const [key, value] of Object.entries(fields)) {
+    if (!allowed.has(key)) continue;
     setClauses.push(`${key} = $${idx}`);
     values.push(value);
     idx++;

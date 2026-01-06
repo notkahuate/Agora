@@ -28,8 +28,9 @@ const obtenerUsuarioPorEmail = async (email) => {
 };
 
 const actualizarUsuario = async (id, campos = {}) => {
-  // Construye actualización dinámica (no actualizar password_hash si no viene)
-  const keys = Object.keys(campos);
+  // Construye actualización dinámica con whitelist de campos permitidos
+  const allowed = new Set(['nombre', 'email', 'password_hash', 'rol', 'empresa_id', 'activo']);
+  const keys = Object.keys(campos).filter((key) => allowed.has(key));
   if (keys.length === 0) return await obtenerUsuarioPorId(id);
 
   const set = [];

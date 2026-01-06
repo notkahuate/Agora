@@ -18,13 +18,30 @@ const listarDocumentos = async () => {
   return rows;
 };
 
+const listarDocumentosPorUsuario = async (usuario_id) => {
+  const { rows } = await pool.query(
+    `SELECT * FROM documentos_subidos WHERE usuario_id = $1 ORDER BY fecha_subida DESC;`,
+    [usuario_id]
+  );
+  return rows;
+};
+
+const listarDocumentosPorEmpresa = async (empresa_id) => {
+  const { rows } = await pool.query(
+    `SELECT * FROM documentos_subidos WHERE empresa_id = $1 ORDER BY fecha_subida DESC;`,
+    [empresa_id]
+  );
+  return rows;
+};
+
 const obtenerDocumentoPorId = async (id) => {
   const { rows } = await pool.query(`SELECT * FROM documentos_subidos WHERE id = $1;`, [id]);
   return rows[0];
 };
 
 const actualizarDocumento = async (id, campos = {}) => {
-  const keys = Object.keys(campos);
+  const allowed = new Set(['tipo_documento_id', 'empresa_id', 'nombre_archivo', 'ruta_archivo', 'comentarios']);
+  const keys = Object.keys(campos).filter((key) => allowed.has(key));
   if (keys.length === 0) return await obtenerDocumentoPorId(id);
 
   const set = [];
@@ -72,6 +89,8 @@ const validarDocumento = async (id, { estado, validado_por, comentarios }) => {
 module.exports = {
   crearDocumento,
   listarDocumentos,
+  listarDocumentosPorUsuario,
+  listarDocumentosPorEmpresa,
   obtenerDocumentoPorId,
   actualizarDocumento,
   eliminarDocumento,
