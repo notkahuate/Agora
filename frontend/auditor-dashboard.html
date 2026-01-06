@@ -55,10 +55,10 @@
         </div>
 
         <div class="kpi-grid">
-          <div class="kpi-card"><div class="kpi-icon"><i data-lucide="building-2" class="icon"></i></div><div class="kpi-value">8</div><div class="kpi-label">Empresas</div><div class="delta">Neutral</div></div>
-          <div class="kpi-card"><div class="kpi-icon"><i data-lucide="hourglass" class="icon"></i></div><div class="kpi-value">42</div><div class="kpi-label">Pendientes</div><div class="delta down">▼ SLA 18h</div></div>
-          <div class="kpi-card"><div class="kpi-icon"><i data-lucide="check-circle-2" class="icon"></i></div><div class="kpi-value">328</div><div class="kpi-label">Revisados mes</div><div class="delta up">▲ +12%</div></div>
-          <div class="kpi-card"><div class="kpi-icon"><i data-lucide="bar-chart-3" class="icon"></i></div><div class="kpi-value">82%</div><div class="kpi-label">Cumplimiento</div><div class="delta">Estable</div></div>
+          <div class="kpi-card"><div class="kpi-icon"><i data-lucide="building-2" class="icon"></i></div><div class="kpi-value" id="kpiEmpresas">-</div><div class="kpi-label">Empresas</div><div class="delta" id="kpiEmpresasDetalle">-</div></div>
+          <div class="kpi-card"><div class="kpi-icon"><i data-lucide="hourglass" class="icon"></i></div><div class="kpi-value" id="kpiPendientes">-</div><div class="kpi-label">Pendientes</div><div class="delta down">▼ SLA 18h</div></div>
+          <div class="kpi-card"><div class="kpi-icon"><i data-lucide="check-circle-2" class="icon"></i></div><div class="kpi-value" id="kpiRevisados">-</div><div class="kpi-label">Revisados mes</div><div class="delta up">▲ +12%</div></div>
+          <div class="kpi-card"><div class="kpi-icon"><i data-lucide="bar-chart-3" class="icon"></i></div><div class="kpi-value" id="kpiCumplimiento">-</div><div class="kpi-label">Cumplimiento</div><div class="delta" id="kpiCumplimientoDetalle">-</div></div>
         </div>
 
         <div class="grid-2" style="margin-top:18px;">
@@ -68,14 +68,12 @@
                 <div class="card-title">Empresas en riesgo</div>
                 <div class="card-subtitle">Priorizar las que bajaron cumplimiento.</div>
               </div>
-              <span class="badge badge-danger">4 críticas</span>
+              <span class="badge badge-danger" id="badgeEmpresasRiesgo">-</span>
             </div>
-            <div class="list">
-              <div class="list-item"><span>Minera del Sur</span><span class="badge badge-danger">65%</span></div>
-              <div class="list-item"><span>Transportes Rápidos</span><span class="badge badge-warning">78%</span></div>
-              <div class="list-item"><span>Constructora ABC</span><span class="badge badge-warning">85%</span></div>
-              <div class="list-item"><span>Servicios Andinos</span><span class="badge badge-info">En revisión</span></div>
-            </div>
+            <div class="list" id="listaEmpresasRiesgo"></div>
+
+
+</div>
           </div>
 
           <div class="card">
@@ -84,16 +82,12 @@
                 <div class="card-title">Cola prioritaria</div>
                 <div class="card-subtitle">Documentos de alta prioridad.</div>
               </div>
-              <span class="badge badge-warning">42 en cola</span>
+              <span class="badge badge-warning" id="badgeCola">-</span>
             </div>
             <div class="table-container">
               <table>
                 <thead><tr><th>Documento</th><th>Empresa</th><th>Prioridad</th><th>Fecha</th><th>Acción</th></tr></thead>
-                <tbody>
-                  <tr><td>Certificado de Capacitación</td><td>Constructora ABC</td><td><span class="badge badge-danger">Alta</span></td><td>20 Dic</td><td><button class="btn btn-primary" style="padding:8px 12px;" onclick="reviewDocument('approve')">Revisar</button></td></tr>
-                  <tr><td>Inspección de Equipos</td><td>Minera del Sur</td><td><span class="badge badge-danger">Alta</span></td><td>19 Dic</td><td><button class="btn btn-secondary" style="padding:8px 12px;" onclick="reviewDocument('reject')">Rechazar</button></td></tr>
-                  <tr><td>Matriz de Riesgos</td><td>Industrias XYZ</td><td><span class="badge badge-warning">Media</span></td><td>18 Dic</td><td><button class="btn btn-secondary" style="padding:8px 12px;" onclick="reviewDocument('approve')">Aprobar</button></td></tr>
-                </tbody>
+                <tbody id="tablaColaPrioritaria"></tbody>
               </table>
             </div>
           </div>
@@ -116,12 +110,7 @@
             <div class="table-container">
               <table>
                 <thead><tr><th>Empresa</th><th>Usuarios</th><th>Docs. pendientes</th><th>Cumplimiento</th><th>Estado</th><th>Acciones</th></tr></thead>
-                <tbody>
-                  <tr><td>Constructora ABC</td><td>24</td><td><span class="badge badge-warning">18</span></td><td><div class="progress-bar" style="width:100px;"><div class="progress-fill" style="width:85%;"></div></div></td><td><span class="badge badge-success">Al día</span></td><td><button class="btn btn-secondary" style="padding:6px 12px;">Ver</button></td></tr>
-                  <tr><td>Minera del Sur</td><td>45</td><td><span class="badge badge-danger">32</span></td><td><div class="progress-bar" style="width:100px;"><div class="progress-fill" style="width:65%;"></div></div></td><td><span class="badge badge-danger">Atrasado</span></td><td><button class="btn btn-secondary" style="padding:6px 12px;">Ver</button></td></tr>
-                  <tr><td>Industrias XYZ</td><td>32</td><td><span class="badge badge-success">5</span></td><td><div class="progress-bar" style="width:100px;"><div class="progress-fill" style="width:95%;"></div></div></td><td><span class="badge badge-success">Excelente</span></td><td><button class="btn btn-secondary" style="padding:6px 12px;">Ver</button></td></tr>
-                  <tr><td>Transportes Rápidos</td><td>18</td><td><span class="badge badge-warning">12</span></td><td><div class="progress-bar" style="width:100px;"><div class="progress-fill" style="width:78%;"></div></div></td><td><span class="badge badge-warning">Regular</span></td><td><button class="btn btn-secondary" style="padding:6px 12px;">Ver</button></td></tr>
-                </tbody>
+                <tbody id="tablaEmpresas"></tbody>
               </table>
             </div>
           </div>
@@ -130,11 +119,7 @@
             <div class="table-container">
               <table>
                 <thead><tr><th>Documento</th><th>Empresa</th><th>Usuario</th><th>Fecha</th><th>Prioridad</th><th>Acciones</th></tr></thead>
-                <tbody>
-                  <tr><td>Certificado de Capacitación</td><td>Constructora ABC</td><td>Juan Pérez</td><td>20 Dic 2024</td><td><span class="badge badge-danger">Alta</span></td><td><button class="btn btn-primary" style="padding:6px 12px;" onclick="reviewDocument('approve')">Aprobar</button></td></tr>
-                  <tr><td>Inspección de Equipos</td><td>Minera del Sur</td><td>Pedro González</td><td>19 Dic 2024</td><td><span class="badge badge-danger">Alta</span></td><td><button class="btn btn-secondary" style="padding:6px 12px;" onclick="reviewDocument('reject')">Rechazar</button></td></tr>
-                  <tr><td>Matriz de Riesgos</td><td>Industrias XYZ</td><td>María Fernández</td><td>18 Dic 2024</td><td><span class="badge badge-warning">Media</span></td><td><button class="btn btn-secondary" style="padding:6px 12px;" onclick="reviewDocument('approve')">Aprobar</button></td></tr>
-                </tbody>
+                <tbody id="tablaDocumentos"></tbody>
               </table>
             </div>
           </div>
@@ -143,12 +128,7 @@
             <div class="table-container">
               <table>
                 <thead><tr><th>ID</th><th>Documento</th><th>Empresa</th><th>Usuario</th><th>Fecha</th><th>Estado</th><th>Acciones</th></tr></thead>
-                <tbody>
-                  <tr><td>#2456</td><td>Plan de Emergencia</td><td>Constructora ABC</td><td>Juan Pérez</td><td>20 Dic 2024</td><td><span class="badge badge-success">Aprobado</span></td><td><button class="btn btn-secondary" style="padding:6px 12px;">Ver</button></td></tr>
-                  <tr><td>#2455</td><td>Certificado Médico</td><td>Minera del Sur</td><td>Pedro González</td><td>19 Dic 2024</td><td><span class="badge badge-success">Aprobado</span></td><td><button class="btn btn-secondary" style="padding:6px 12px;">Ver</button></td></tr>
-                  <tr><td>#2454</td><td>Inspección de EPP</td><td>Industrias XYZ</td><td>María Fernández</td><td>18 Dic 2024</td><td><span class="badge badge-danger">Rechazado</span></td><td><button class="btn btn-secondary" style="padding:6px 12px;">Ver</button></td></tr>
-                  <tr><td>#2453</td><td>Matriz de Riesgos</td><td>Transportes Rápidos</td><td>Luis Torres</td><td>17 Dic 2024</td><td><span class="badge badge-success">Aprobado</span></td><td><button class="btn btn-secondary" style="padding:6px 12px;">Ver</button></td></tr>
-                </tbody>
+                <tbody id="tablaHistorial"></tbody>
               </table>
             </div>
           </div>
@@ -162,10 +142,7 @@
             </div>
             <button class="btn btn-secondary">Ver todo</button>
           </div>
-          <div class="timeline">
-            <div class="timeline-item"><div class="timeline-dot"></div><div><strong>Revisión completada</strong> Plan de Emergencia - ABC <br><span style="color:var(--muted); font-size:13px;">Hace 5 min</span></div></div>
-            <div class="timeline-item"><div class="timeline-dot"></div><div><strong>Observación agregada</strong> Matriz de Riesgos - XYZ <br><span style="color:var(--muted); font-size:13px;">Hace 1 h</span></div></div>
-            <div class="timeline-item"><div class="timeline-dot"></div><div><strong>Usuario asignado</strong> Auditor junior a Minera del Sur <br><span style="color:var(--muted); font-size:13px;">Hace 3 h</span></div></div>
+          <div class="timeline" id="timelineAuditor"></div>
           </div>
         </div>
       </div>

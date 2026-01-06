@@ -46,12 +46,12 @@
         </div>
 
         <div class="kpi-grid">
-          <div class="kpi-card"><div class="kpi-icon"><i data-lucide="alert-triangle" class="icon"></i></div><div class="kpi-value">3</div><div class="kpi-label">Pendientes</div><div class="delta down">▼ Vence 31 Dic</div></div>
-          <div class="kpi-card"><div class="kpi-icon"><i data-lucide="check-circle-2" class="icon"></i></div><div class="kpi-value">12</div><div class="kpi-label">Completados mes</div><div class="delta up">▲ +4</div></div>
-          <div class="kpi-card"><div class="kpi-icon"><i data-lucide="bar-chart-3" class="icon"></i></div><div class="kpi-value">80%</div><div class="kpi-label">Progreso mensual</div><div class="delta">12 de 15</div></div>
+          <div class="kpi-card"><div class="kpi-icon"><i data-lucide="alert-triangle" class="icon"></i></div><div class="kpi-value" id="kpiPendientes">-</div><div class="kpi-label">Pendientes</div><div class="delta" id="kpiPendientesDetalle">-</div></div>
+          <div class="kpi-card"><div class="kpi-icon"><i data-lucide="check-circle-2" class="icon"></i></div><div class="kpi-value" id="kpiCompletados">-</div><div class="kpi-label">Completados</div><div class="delta up">▲ +4</div></div>
+          <div class="kpi-card"><div class="kpi-icon"><i data-lucide="bar-chart-3" class="icon"></i></div><div class="kpi-value" id="kpiProgreso">-</div><div class="kpi-label">Progreso</div><div class="delta" id="kpiProgresoDetalle">-</div></div>
         </div>
 
-        <div class="alert" style="margin-top:18px;">
+        <div class="alert" style="margin-top:18px;" id="alertPendientes">
           <strong>Atención:</strong> Tienes 3 documentos que deben subirse antes del 31 de diciembre.
         </div>
 
@@ -62,8 +62,8 @@
               <div class="card-subtitle">Mantén tu cumplimiento arriba del 95%.</div>
             </div>
           </div>
-          <div class="progress-bar"><div class="progress-fill" style="width:80%;"></div></div>
-          <div style="margin-top:8px; color:var(--muted); font-size:13px;">12 / 15 documentos completados</div>
+          <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%;"></div></div>
+          <div style="margin-top:8px; color:var(--muted); font-size:13px;" id="progressDetalle">-</div>
         </div>
 
         <div class="card" style="margin-top:18px;">
@@ -72,16 +72,12 @@
               <div class="card-title">Documentos pendientes</div>
               <div class="card-subtitle">Sube los archivos requeridos.</div>
             </div>
-            <span class="badge badge-warning">3 pendientes</span>
+            <span class="badge badge-warning" id="badgePendientes">-</span>
           </div>
           <div class="table-container">
             <table>
               <thead><tr><th>Documento</th><th>Tipo</th><th>Fecha límite</th><th>Prioridad</th><th>Acción</th></tr></thead>
-              <tbody>
-                <tr><td>Certificado de Capacitación en Seguridad</td><td>Mensual</td><td>31 Dic 2024</td><td><span class="badge badge-danger">Alta</span></td><td><button class="btn btn-primary" onclick="uploadDocument('cert-seguridad')">Subir</button></td></tr>
-                <tr><td>Reporte de Inspección de EPP</td><td>Mensual</td><td>31 Dic 2024</td><td><span class="badge badge-warning">Media</span></td><td><button class="btn btn-primary" onclick="uploadDocument('inspeccion-epp')">Subir</button></td></tr>
-                <tr><td>Registro de Incidentes</td><td>Mensual</td><td>31 Dic 2024</td><td><span class="badge badge-warning">Media</span></td><td><button class="btn btn-primary" onclick="uploadDocument('registro-incidentes')">Subir</button></td></tr>
-              </tbody>
+              <tbody id="tablaPendientes"></tbody>
             </table>
           </div>
         </div>
@@ -96,12 +92,7 @@
           <div class="table-container">
             <table>
               <thead><tr><th>Documento</th><th>Fecha de subida</th><th>Estado</th><th>Validado por</th></tr></thead>
-              <tbody>
-                <tr><td>Plan de Emergencia</td><td>15 Dic 2024</td><td><span class="badge badge-success">Aprobado</span></td><td>Auditor Principal</td></tr>
-                <tr><td>Matriz de Riesgos</td><td>10 Dic 2024</td><td><span class="badge badge-success">Aprobado</span></td><td>Auditor Principal</td></tr>
-                <tr><td>Certificado Médico Ocupacional</td><td>5 Dic 2024</td><td><span class="badge badge-success">Aprobado</span></td><td>Auditor Principal</td></tr>
-                <tr><td>Registro de Capacitaciones</td><td>1 Dic 2024</td><td><span class="badge badge-success">Aprobado</span></td><td>Auditor Principal</td></tr>
-              </tbody>
+              <tbody id="tablaHistorial"></tbody>
             </table>
           </div>
         </div>
