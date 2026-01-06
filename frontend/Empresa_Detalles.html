@@ -37,7 +37,7 @@
       <div class="content">
         <div class="page-header">
           <div>
-            <h1 class="page-title" id="empresaNombre">Constructora ABC</h1>
+            <h1 class="page-title" id="empresaNombre">-</h1>
             <p class="page-subtitle">Perfil, cumplimiento y documentos clave.</p>
           </div>
           <div class="actions-row">
@@ -49,11 +49,11 @@
         <div class="grid-3" style="margin-bottom:18px;">
           <div class="card">
             <div class="card-title" style="margin-bottom:6px;">Razón Social</div>
-            <div id="empresaRazonSocial" style="font-weight:700;">Constructora ABC S.A.C</div>
+            <div id="empresaRazonSocial" style="font-weight:700;">-</div>
           </div>
           <div class="card">
             <div class="card-title" style="margin-bottom:6px;">RUC / NIT</div>
-            <div id="empresaRuc" style="font-weight:700;">20123456789</div>
+            <div id="empresaRuc" style="font-weight:700;">-</div>
           </div>
           <div class="card">
             <div class="card-title" style="margin-bottom:6px;">Sector</div>
@@ -61,15 +61,15 @@
           </div>
           <div class="card">
             <div class="card-title" style="margin-bottom:6px;">Empleados</div>
-            <div id="empresaEmpleados" style="font-weight:700;">24</div>
+            <div id="empresaEmpleados" style="font-weight:700;">-</div>
           </div>
           <div class="card">
             <div class="card-title" style="margin-bottom:6px;">Fecha registro</div>
-            <div id="empresaFecha" style="font-weight:700;">15 Mar 2022</div>
+            <div id="empresaFecha" style="font-weight:700;">-</div>
           </div>
           <div class="card">
             <div class="card-title" style="margin-bottom:6px;">Estado</div>
-            <div id="empresaEstado" style="font-weight:700; color:var(--accent);">Activa</div>
+            <div id="empresaEstado" style="font-weight:700; color:var(--accent);">-</div>
           </div>
         </div>
 
@@ -97,13 +97,7 @@
             <div class="table-container">
               <table>
                 <thead><tr><th>Documento</th><th>Tipo</th><th>Usuario</th><th>Fecha subida</th><th>Estado</th><th>Acciones</th></tr></thead>
-                <tbody id="tablaDocumentosSubidos">
-                  <tr><td>Plan de Emergencia 2024</td><td><span class="badge badge-info">Plan</span></td><td>Juan Pérez</td><td>20 Dic 2024</td><td><span class="badge badge-success">Aprobado</span></td><td><button class="btn btn-secondary" style="padding:6px 12px;">Ver</button></td></tr>
-                  <tr><td>Certificado de Capacitación SST</td><td><span class="badge badge-info">Certificado</span></td><td>María Fernández</td><td>19 Dic 2024</td><td><span class="badge badge-success">Aprobado</span></td><td><button class="btn btn-secondary" style="padding:6px 12px;">Ver</button></td></tr>
-                  <tr><td>Inspección de Equipos de Protección</td><td><span class="badge badge-info">Inspección</span></td><td>Luis Torres</td><td>18 Dic 2024</td><td><span class="badge badge-warning">En revisión</span></td><td><button class="btn btn-secondary" style="padding:6px 12px;">Ver</button></td></tr>
-                  <tr><td>Matriz de Identificación de Peligros</td><td><span class="badge badge-info">Matriz</span></td><td>Carlos López</td><td>17 Dic 2024</td><td><span class="badge badge-success">Aprobado</span></td><td><button class="btn btn-secondary" style="padding:6px 12px;">Ver</button></td></tr>
-                  <tr><td>Reporte de Incidentes</td><td><span class="badge badge-info">Reporte</span></td><td>Pedro González</td><td>16 Dic 2024</td><td><span class="badge badge-danger">Rechazado</span></td><td><button class="btn btn-secondary" style="padding:6px 12px;">Ver</button></td></tr>
-                </tbody>
+                <tbody id="tablaDocumentosSubidos"></tbody>
               </table>
             </div>
           </div>
@@ -112,12 +106,7 @@
             <div class="table-container">
               <table>
                 <thead><tr><th>Documento</th><th>Tipo</th><th>Periodicidad</th><th>Fecha límite</th><th>Requerido por</th><th>Prioridad</th></tr></thead>
-                <tbody id="tablaDocumentosPendientes">
-                  <tr><td>Charla de Seguridad Mensual</td><td><span class="badge badge-danger">Charla</span></td><td>Mensual</td><td>31 Dic 2024</td><td>Área de Seguridad</td><td><span class="badge badge-danger">Urgente</span></td></tr>
-                  <tr><td>Reporte de Auditoria Interna</td><td><span class="badge badge-info">Reporte</span></td><td>Trimestral</td><td>31 Dic 2024</td><td>Dirección</td><td><span class="badge badge-danger">Urgente</span></td></tr>
-                  <tr><td>Actualización de Matriz IPER</td><td><span class="badge badge-info">Matriz</span></td><td>Anual</td><td>30 Ago 2025</td><td>Profesional SST</td><td><span class="badge badge-warning">Media</span></td></tr>
-                  <tr><td>Registros de Accidentes</td><td><span class="badge badge-info">Registro</span></td><td>Mensual</td><td>31 Dic 2024</td><td>Área de Seguridad</td><td><span class="badge badge-danger">Urgente</span></td></tr>
-                </tbody>
+                <tbody id="tablaDocumentosPendientes"></tbody>
               </table>
             </div>
           </div>
@@ -126,12 +115,7 @@
             <div class="table-container">
               <table>
                 <thead><tr><th>Nombre</th><th>Correo</th><th>Cargo</th><th>Documentos subidos</th><th>Última actividad</th><th>Estado</th></tr></thead>
-                <tbody id="tablaUsuariosEmpresa">
-                  <tr><td>Juan Pérez</td><td>juan.perez@constructora.com</td><td>Supervisor de Seguridad</td><td><span class="badge badge-success">32</span></td><td>20 Dic 2024</td><td><span class="badge badge-success">Activo</span></td></tr>
-                  <tr><td>María Fernández</td><td>maria.fernandez@constructora.com</td><td>Coordinadora SST</td><td><span class="badge badge-success">28</span></td><td>19 Dic 2024</td><td><span class="badge badge-success">Activo</span></td></tr>
-                  <tr><td>Luis Torres</td><td>luis.torres@constructora.com</td><td>Técnico de Seguridad</td><td><span class="badge badge-warning">15</span></td><td>18 Dic 2024</td><td><span class="badge badge-success">Activo</span></td></tr>
-                  <tr><td>Carlos López</td><td>carlos.lopez@constructora.com</td><td>Inspector</td><td><span class="badge badge-success">24</span></td><td>20 Dic 2024</td><td><span class="badge badge-success">Activo</span></td></tr>
-                </tbody>
+                <tbody id="tablaUsuariosEmpresa"></tbody>
               </table>
             </div>
           </div>
@@ -144,10 +128,7 @@
               <div class="card-subtitle">Registro de cambios en esta empresa.</div>
             </div>
           </div>
-          <div class="timeline">
-            <div class="timeline-item"><div class="timeline-dot"></div><div><strong>Documento aprobado</strong> Matriz de Riesgos <br><span style="color:var(--muted); font-size:13px;">Hace 2 h</span></div></div>
-            <div class="timeline-item"><div class="timeline-dot"></div><div><strong>Observación</strong> Reporte de incidentes requiere ajustes <br><span style="color:var(--muted); font-size:13px;">Hace 4 h</span></div></div>
-            <div class="timeline-item"><div class="timeline-dot"></div><div><strong>Usuario añadido</strong> Inspector de obra <br><span style="color:var(--muted); font-size:13px;">Hace 6 h</span></div></div>
+          <div class="timeline" id="timelineEmpresa"></div>
           </div>
         </div>
       </div>
@@ -157,6 +138,6 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script>lucide.createIcons();</script>
   <script src="auth.js"></script>
-  <script src="js/Empresa_Detalle.js"></script>
+  <script src="Js/Empresa_Detalle.js"></script>
 </body>
 </html>
