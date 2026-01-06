@@ -1,27 +1,45 @@
-const checkAuth = () => ({ name: "Usuario Safety", company: "Mi Empresa" })
+const user = window.Auth?.requireAuth(['usuario'])
 
-const user = checkAuth()
-
-if (user && document.getElementById("userAvatar")) {
-  document.getElementById("userAvatar").textContent = user.name.charAt(0)
+if (user && document.getElementById('userAvatar')) {
+  document.getElementById('userAvatar').textContent = user.nombre
+    ? user.nombre.charAt(0)
+    : user.email.charAt(0)
 }
 
-// Función para simular subida de documento
+// Subida de documento (sin archivo físico, solo metadatos)
 function uploadDocument(docType) {
-  const input = document.createElement("input")
-  input.type = "file"
-  input.accept = ".pdf,.doc,.docx,.jpg,.png"
+  if (!user) return
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.pdf,.doc,.docx,.jpg,.png'
 
-  input.onchange = (e) => {
+  input.onchange = async (e) => {
     const file = e.target.files[0]
-    if (file) {
-      // Simular subida
-      alert(`Documento "${file.name}" subido exitosamente.\n\nEste documento será revisado por el auditor.`)
+    if (!file) return
 
-      // En una aplicación real, aquí se enviaría el archivo al servidor
-      console.log("[v0] Documento a subir:", file.name, "Tipo:", docType)
-    }
+    const tipoId = prompt('Ingresa el ID del tipo de documento:')
+    if (!tipoId) return
+
+    try {
+      const response = await window.Auth.apiFetch('/api/documentos', {
+        method: 'POST',
+        body: JSON.stringify({
+          tipo_documento_id: Number(tipoId),
+          nombre_archivo: file.name,
+          comentarios: `Carga desde UI: ${docType || 'manual'}`
+        })
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        alert(data.message || 'Error al subir documento')
+        return
+      }
+
+      alert(`Documento "${file.name}" subido. Queda en revisión.`)
+      } catch (error) {
+    console.error('Error al cargar documentos:', error)
   }
-
-  input.click()
 }
+
+document.addEventListener('DOMContentLoaded', loadDocumentos)
