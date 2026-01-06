@@ -60,56 +60,65 @@ exports.crearUsuarioPublico = async (req, res) => {
     });
   }
 };
-
-
 exports.crearUsuario = async (req, res) => {
   try {
-    // si usas express-validator en la ruta, revisa errores:
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const body = req.body || {};
-    let { nombre, email, password, rol, empresa_id, activo } = body;
+    const { nombre, email, password, activo } = req.body;
 
     if (!nombre || !email || !password) {
-      return res.status(400).json({ message: 'nombre, email y password son obligatorios' });
+      return res.status(400).json({
+        message: 'nombre, email y password son obligatorios'
+      });
     }
 
-    // Verificar si ya existe email
+    // Usuario autenticado (super admin)
+    const requester = req.user;
+
+    if (!requester || requester.rol !== 'super_admin') {
+      return res.status(403).json({ message: 'No autorizado' });
+    }
+
+    // Verificar email existente
     const existente = await Usuario.obtenerUsuarioPorEmail(email);
-    if (existente) return res.status(409).json({ message: 'El email ya está en uso' });
-
-    // Seguridad: solo super_admin puede crear usuarios.
-    const requester = req.user; // viene del middleware authenticate si se usa
-    const isAdmin = requester && requester.rol === 'super_admin';
-    if (!isAdmin) {
-      return res.status(403).json({ message: 'No autorizado para crear usuarios' });
+    if (existente) {
+      return res.status(409).json({ message: 'El email ya está en uso' });
     }
 
-    // Si admin no pasa rol, por defecto 'usuario'
-    rol = rol || 'usuario';
-    // activo si no viene, por defecto true
-    activo = typeof activo === 'boolean' ? activo : true;
-    empresa_id = empresa_id || null;
+    // 🔐 VALORES FORZADOS
+    const rol = 'usuario';
+    const empresa_id = requester.empresa_id;
+    const activoFinal = typeof activo === 'boolean' ? activo : true;
 
     const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
 
-    const nuevo = await Usuario.crearUsuario({ nombre, email, password_hash, rol, empresa_id, activo });
-    // no devolver password_hash
-    return res.status(201).json(nuevo);
+    const nuevoUsuario = await Usuario.crearUsuario({
+      nombre,
+      email,
+      password_hash,
+      rol,
+      empresa_id,
+      activo: activoFinal
+    });
+
+    return res.status(201).json(nuevoUsuario);
+
   } catch (err) {
     console.error('crearUsuario error:', err);
-    if (err.code === '23503') { // foreign_key_violation (empresa_id)
-      return res.status(400).json({ message: 'empresa_id inválida' });
-    }
-    if (err.code === '23505') { // unique_violation
+
+    if (err.code === '23505') {
       return res.status(409).json({ message: 'Email ya en uso' });
     }
-    return res.status(500).json({ message: 'Error al crear usuario', error: err.message });
+
+    return res.status(500).json({
+      message: 'Error al crear usuario'
+    });
   }
 };
+
 exports.listarUsuarios = async (req, res) => {
   try {
     const usuarios = await Usuario.listarUsuarios();

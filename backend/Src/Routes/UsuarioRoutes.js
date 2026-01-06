@@ -30,7 +30,7 @@ router.post(
 );
 
 
-
+router.post('/registro',controller.crearUsuarioPublico); // ruta pública para registro
 
 // proteger las demás rutas (listar, obtener, actualizar, eliminar)
 router.get('/', authenticate, authorize('super_admin'), controller.listarUsuarios); // solo super_admin lista
