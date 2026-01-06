@@ -81,25 +81,18 @@ exports.crearUsuario = async (req, res) => {
     const existente = await Usuario.obtenerUsuarioPorEmail(email);
     if (existente) return res.status(409).json({ message: 'El email ya está en uso' });
 
-    // Seguridad: si la llamada viene de un usuario autenticado (req.user) y es admin,
-    // permite asignar rol/empresa/activo según lo mande el admin.
-    // Si no hay req.user (registro público) o no es admin, forzar rol por defecto.
+    // Seguridad: solo super_admin puede crear usuarios.
     const requester = req.user; // viene del middleware authenticate si se usa
-    const isAdmin = requester && requester.rol === 'admin';
-
+    const isAdmin = requester && requester.rol === 'super_admin';
     if (!isAdmin) {
-      // restricción: no permitir que un cliente normal establezca rol/activo/empresa_id
-      rol = 'usuario';
-      activo = true;
-      // empresa_id: podrías permitir asignar si quieres, pero normalmente null
-      empresa_id = null;
-    } else {
-      // Si admin no pasa rol, por defecto 'usuario'
-      rol = rol || 'usuario';
-      // activo si no viene, por defecto true
-      activo = typeof activo === 'boolean' ? activo : true;
-      empresa_id = empresa_id || null;
+      return res.status(403).json({ message: 'No autorizado para crear usuarios' });
     }
+
+    // Si admin no pasa rol, por defecto 'usuario'
+    rol = rol || 'usuario';
+    // activo si no viene, por defecto true
+    activo = typeof activo === 'boolean' ? activo : true;
+    empresa_id = empresa_id || null;
 
     const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
 
@@ -130,6 +123,13 @@ exports.listarUsuarios = async (req, res) => {
 exports.obtenerUsuario = async (req, res) => {
   try {
     const id = req.params.id;
+    const requester = req.user;
+    const isAdmin = requester && requester.rol === 'super_admin';
+    const isSelf = requester && String(requester.id) === String(id);
+    if (!isAdmin && !isSelf) {
+      return res.status(403).json({ message: 'No autorizado para ver este usuario' });
+    }
+
     const usuario = await Usuario.obtenerUsuarioPorId(id);
     if (!usuario) return res.status(404).json({ message: 'Usuario no encontrado' });
     return res.json(usuario);
@@ -143,6 +143,12 @@ exports.actualizarUsuario = async (req, res) => {
   try {
     const id = req.params.id;
     const body = req.body || {};
+    const requester = req.user;
+    const isAdmin = requester && requester.rol === 'super_admin';
+    const isSelf = requester && String(requester.id) === String(id);
+    if (!isAdmin && !isSelf) {
+      return res.status(403).json({ message: 'No autorizado para actualizar este usuario' });
+    }
 
     // Si vienen password, hashearla antes de actualizar
     if (body.password) {
@@ -152,6 +158,14 @@ exports.actualizarUsuario = async (req, res) => {
 
     // No permitir actualizar campos sensibles manualmente (ej: fecha_creacion)
     delete body.fecha_creacion;
+    delete body.fecha_actualizacion;
+
+    if (!isAdmin) {
+      // Un usuario normal no puede cambiar rol/estado/empresa.
+      delete body.rol;
+      delete body.activo;
+      delete body.empresa_id;
+    }
 
     const actualizado = await Usuario.actualizarUsuario(id, body);
     if (!actualizado) return res.status(404).json({ message: 'Usuario no encontrado' });
