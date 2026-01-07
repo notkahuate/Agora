@@ -148,3 +148,53 @@ document.addEventListener('DOMContentLoaded', () => {
   loadDocumentos()
   loadSaludSistema()
 })
+
+
+const modal = document.getElementById('modalUsuario');
+const btnAbrir = document.getElementById('btnAbrirModal');
+const cerrar = document.getElementById('cerrarModal');
+
+btnAbrir.onclick = () => modal.style.display = 'block';
+cerrar.onclick = () => modal.style.display = 'none';
+
+window.onclick = (e) => {
+  if (e.target === modal) modal.style.display = 'none';
+};
+
+
+document.getElementById('formCrearUsuario')
+  .addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const data = {
+      nombre: document.getElementById('nombre').value,
+      email: document.getElementById('email').value,
+      password: document.getElementById('password').value
+    };
+
+    try {
+      const resp = await fetch('http://localhost:3000/api/usuarios', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(data)
+      });
+
+      const result = await resp.json();
+
+      if (!resp.ok) {
+        alert(result.message || 'Error al crear usuario');
+        return;
+      }
+
+      alert('Usuario creado correctamente');
+      modal.style.display = 'none';
+      e.target.reset();
+
+    } catch (err) {
+      console.error(err);
+      alert('Error de conexión');
+    }
+  });
