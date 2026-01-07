@@ -27,6 +27,29 @@ const obtenerUsuarioPorEmail = async (email) => {
   return rows[0];
 };
 
+const obtenerUsuariosPorEmpresa = async (empresa_id, excluirUsuarioId) => {
+  const texto = `
+    SELECT 
+      id,
+      nombre,
+      email,
+      rol,
+      empresa_id,
+      activo,
+      fecha_creacion
+    FROM usuarios
+    WHERE empresa_id = $1
+      AND id <> $2
+      AND activo = true
+    ORDER BY nombre ASC;
+  `;
+
+  const valores = [empresa_id, excluirUsuarioId];
+  const { rows } = await pool.query(texto, valores);
+  return rows;
+};
+
+
 const actualizarUsuario = async (id, campos = {}) => {
   // Construye actualización dinámica con whitelist de campos permitidos
   const allowed = new Set(['nombre', 'email', 'password_hash', 'rol', 'empresa_id', 'activo']);
@@ -59,4 +82,5 @@ module.exports = {
   obtenerUsuarioPorEmail,
   actualizarUsuario,
   eliminarUsuario,
+  obtenerUsuariosPorEmpresa
 };

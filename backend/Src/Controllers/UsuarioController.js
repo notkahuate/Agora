@@ -202,3 +202,28 @@ exports.eliminarUsuario = async (req, res) => {
     return res.status(500).json({ message: 'Error al eliminar usuario' });
   }
 };
+
+// 📊 Usuarios de mi empresa (menos yo)
+exports.usuariosEmpresa = async (req, res) => {
+  try {
+    const requester = req.user;
+
+    if (!requester || !requester.empresa_id) {
+      return res.status(400).json({ message: 'Usuario sin empresa asignada' });
+    }
+
+    const usuarios = await Usuario.obtenerUsuariosPorEmpresa(
+      requester.empresa_id,
+      requester.id
+    );
+
+    return res.json({
+      cantidad: usuarios.length,
+      usuarios
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Error al obtener usuarios de la empresa' });
+  }
+};

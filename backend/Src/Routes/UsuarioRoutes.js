@@ -1,45 +1,95 @@
-// src/routes/usuariosRoutes.js
 const express = require('express');
 const { body, param, validationResult } = require('express-validator');
 const router = express.Router();
+
 const controller = require('../Controllers/UsuarioController');
-const { authenticate, authorize } = require('../milddlewares/authMiddleware');
+const verifyToken = require('../milddlewares/verifytoken');
 
 const handleValidation = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
-  return next();
+  next();
 };
 
-// Creación por super_admin (protegido)
+// =======================
+// 🔓 Registro público
+// =======================
 router.post(
-  '/',
-  authenticate,
-  authorize('super_admin'), // solo super_admin puede crear usuarios
+  '/registro',
   [
     body('nombre').isString().isLength({ min: 2 }),
     body('email').isEmail(),
-    body('password').isLength({ min: 6 }),
-    body('rol').optional().isIn(['usuario', 'super_admin', 'auditor']),
-    body('empresa_id').optional().isInt()
+    body('password').isLength({ min: 6 })
+  ],
+  handleValidation,
+  controller.crearUsuarioPublico
+);
+
+// =======================
+// 🔐 Crear usuario (solo super_admin)
+// =======================
+router.post(
+  '/',
+  verifyToken,
+  [
+    body('nombre').isString().isLength({ min: 2 }),
+    body('email').isEmail(),
+    body('password').isLength({ min: 6 })
   ],
   handleValidation,
   controller.crearUsuario
 );
 
+// =======================
+// 📋 Listar usuarios (solo super_admin)
+// =======================
+router.get(
+  '/',
+  verifyToken,
+  controller.listarUsuarios
+);
 
-router.post('/registro',controller.crearUsuarioPublico); // ruta pública para registro
+// =======================
+// 👤 Obtener usuario (admin o dueño)
+// =======================
+router.get(
+  '/:id',
+  verifyToken,
+  param('id').isInt(),
+  handleValidation,
+  controller.obtenerUsuario
+);
 
-// proteger las demás rutas (listar, obtener, actualizar, eliminar)
-router.get('/', authenticate, authorize('super_admin'), controller.listarUsuarios); // solo super_admin lista
-router.get('/:id', authenticate, param('id').isInt(), handleValidation, controller.obtenerUsuario);
+// =======================
+// ✏️ Actualizar usuario (admin o dueño)
+// =======================
+router.put(
+  '/:id',
+  verifyToken,
+  param('id').isInt(),
+  handleValidation,
+  controller.actualizarUsuario
+);
 
-// actualizar: permitir admin o el propio usuario
-router.put('/:id', authenticate, param('id').isInt(), handleValidation, controller.actualizarUsuario);
+// =======================
+// 🗑 Eliminar usuario (solo super_admin)
+// =======================
+router.delete(
+  '/:id',
+  verifyToken,
+  param('id').isInt(),
+  handleValidation,
+  controller.eliminarUsuario
+);
 
-// eliminar: solo admin
-router.delete('/:id', authenticate, authorize('super_admin'), param('id').isInt(), handleValidation, controller.eliminarUsuario);
+// 👥 Usuarios de la misma empresa (menos el actual)
+router.get(
+  '/empresa/mios',
+  verifyToken,
+  controller.usuariosEmpresa
+);
+
 
 module.exports = router;
