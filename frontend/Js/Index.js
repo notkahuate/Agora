@@ -48,3 +48,5 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
         alert("Hubo un problema al conectar con el servidor.");
     }
 });
+
+

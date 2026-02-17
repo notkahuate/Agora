@@ -1,4 +1,13 @@
-const user = window.Auth?.requireAuth(['usuario'])
+if (!window.Auth) {
+  window.location.replace('http://localhost:3000/');
+}
+
+const user = window.Auth.requireAuth(['usuario']);
+
+if (!user) {
+  window.location.replace('http://localhost:3000/');
+}
+
 
 if (user && document.getElementById('userAvatar')) {
   document.getElementById('userAvatar').textContent = user.nombre

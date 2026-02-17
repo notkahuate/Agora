@@ -1,4 +1,5 @@
 const user = window.Auth?.requireAuth(['auditor', 'super_admin'])
+
 if (user) {
   const avatar = document.getElementById('userAvatar')
   if (avatar) {

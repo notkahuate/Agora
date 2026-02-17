@@ -6,13 +6,13 @@ const user = JSON.parse(localStorage.getItem('user'));
 
 if (!token || !user) {
   alert('Sesión expirada');
-  window.location.href = '/login.html';
+  window.location.href = 'http://localhost:3000';
 }
 
 // solo auditor o super admin
 if (!['auditor', 'super_admin'].includes(user.rol)) {
   alert('No autorizado');
-  window.location.href = '/login.html';
+  window.location.href = 'http://localhost:3000/';
 }
 
 // ==============================
