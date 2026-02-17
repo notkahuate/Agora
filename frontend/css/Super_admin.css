@@ -66,3 +66,134 @@
   border: 1px solid var(--border);
   color: var(--text);
 }
+/* =========================
+   MODAL OVERLAY
+========================= */
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+
+  align-items: center;
+  justify-content: center;
+}
+
+/* =========================
+   MODAL CONTENIDO
+========================= */
+.modal-content {
+  background: #0f172a; /* slate-900 */
+  color: #e5e7eb;
+  width: 100%;
+  max-width: 420px;
+  padding: 24px 26px;
+  border-radius: 14px;
+  box-shadow:
+    0 20px 25px -5px rgba(0,0,0,.4),
+    0 10px 10px -5px rgba(0,0,0,.3);
+
+  animation: modalFadeIn .25s ease-out;
+  position: relative;
+}
+
+/* =========================
+   ANIMACIÓN
+========================= */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* =========================
+   HEADER
+========================= */
+.modal-content h2 {
+  margin-bottom: 16px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* =========================
+   CERRAR
+========================= */
+#cerrarModal {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  font-size: 22px;
+  cursor: pointer;
+  color: #94a3b8;
+  transition: color .2s;
+}
+
+#cerrarModal:hover {
+  color: #f87171;
+}
+
+/* =========================
+   FORMULARIO
+========================= */
+#formCrearUsuario {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#formCrearUsuario input {
+  background: #020617;
+  border: 1px solid #1e293b;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #e5e7eb;
+  font-size: .95rem;
+}
+
+#formCrearUsuario input:focus {
+  outline: none;
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56,189,248,.25);
+}
+
+/* =========================
+   BOTÓN
+========================= */
+#formCrearUsuario button {
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: .95rem;
+
+  background: linear-gradient(135deg, #38bdf8, #2563eb);
+  color: #020617;
+
+  transition: transform .15s, box-shadow .15s;
+}
+
+#formCrearUsuario button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(56,189,248,.35);
+}
+
+/* =========================
+   MOBILE
+========================= */
+@media (max-width: 480px) {
+  .modal-content {
+    margin: 0 14px;
+    padding: 20px;
+  }
+}
+

@@ -42,4 +42,4 @@ function uploadDocument(docType) {
   }
 }
 
-document.addEventListener('DOMContentLoaded', loadDocumentos)
+document.addEventListener('DOMContentLoaded', loadDocumentos)}
