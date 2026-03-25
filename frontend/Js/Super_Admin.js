@@ -23,6 +23,16 @@ if (avatar) {
     : user.email.charAt(0).toUpperCase();
 }
 
+function showAlert() {
+  const alertBox = document.getElementById("customAlert");
+  alertBox.classList.remove("hidden");
+  alertBox.classList.add("show");
+
+  setTimeout(() => {
+    alertBox.classList.remove("show");
+    alertBox.classList.add("hidden");
+  }, 3000);
+}
 // Modal
 const modal = document.getElementById('modalUsuario');
 const btnAbrir = document.getElementById('btnAbrirModal');
@@ -63,7 +73,7 @@ document.getElementById('formCrearUsuario')
         return;
       }
 
-      alert('Usuario creado correctamente');
+      showAlert();
 
       modal.style.display = 'none';
       e.target.reset();

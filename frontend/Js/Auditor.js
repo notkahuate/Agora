@@ -97,7 +97,9 @@ async function cargarEmpresas() {
               </span>
             </td>
             <td>
-              <button class="btn btn-secondary" style="padding:6px 12px;">Ver</button>
+              <button class="btn btn-secondary" style="padding:6px 12px;" onclick="verEmpresa('${e.id || e._id}')">
+                Ver
+              </button>
             </td>
           </tr>
         `).join('')
@@ -106,6 +108,10 @@ async function cargarEmpresas() {
   } catch (err) {
     console.error('Error cargando empresas:', err);
   }
+}
+
+function verEmpresa(id) {
+  window.location.href = `/Empresa_Detalles.html?id=${id}`;
 }
 
 // ==============================
