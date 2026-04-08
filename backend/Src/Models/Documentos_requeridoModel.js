@@ -47,8 +47,6 @@ const obtenerPendientes = async (empresa_id) => {
     LEFT JOIN documentos_subidos ds 
       ON ds.tipo_documento_id = dr.tipo_documento_id
       AND ds.empresa_id = dr.empresa_id
-      AND ds.mes IS NOT DISTINCT FROM dr.mes
-      AND ds.anio IS NOT DISTINCT FROM dr.anio
     WHERE dr.empresa_id = $1
     AND ds.id IS NULL
     ORDER BY dr.fecha_limite ASC
@@ -58,9 +56,39 @@ const obtenerPendientes = async (empresa_id) => {
 
   return result.rows;
 };
+// 📌 Cola de revisión (documentos subidos sin aprobar)
+const obtenerColaRevision = async () => {
+  const result = await pool.query(`
+    SELECT 
+      ds.id,
+      td.nombre AS documento,
+      e.nombre AS empresa,
+      COALESCE(dr.prioridad, 'media') AS prioridad,
+      ds.fecha_subida,
+      ds.estado
+    FROM documentos_subidos ds
+    JOIN tipos_documentos td ON td.id = ds.tipo_documento_id
+    JOIN empresas e ON e.id = ds.empresa_id
+    LEFT JOIN documentos_requeridos dr 
+      ON dr.tipo_documento_id = ds.tipo_documento_id 
+      AND dr.empresa_id = ds.empresa_id
+    WHERE ds.estado IN ('subido', 'pendiente')
+    ORDER BY 
+      CASE dr.prioridad 
+        WHEN 'alta' THEN 1
+        WHEN 'media' THEN 2
+        WHEN 'baja' THEN 3
+        ELSE 4
+      END,
+      ds.fecha_subida ASC
+  `);
+
+  return result.rows;
+};
 
 module.exports = {
   crearDocumentoRequerido,
   obtenerPorEmpresa,
-  obtenerPendientes
+  obtenerPendientes,
+  obtenerColaRevision
 };

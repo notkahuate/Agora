@@ -235,9 +235,51 @@ function goBack() {
   window.location.href = "auditor-dashboard.html";
 }
 
+
+async function cargarPendientesEmpresa(empresaId) {
+  try {
+    const res = await fetch(`http://localhost:3000/api/documentos-requeridos/empresa/${empresaId}/pendientes`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+
+    const data = await res.json();
+
+    const tbody = document.getElementById('tablaDocumentosPendientes');
+    tbody.innerHTML = '';
+
+    document.getElementById('statPendientes').textContent = data.length;
+
+    data.forEach(doc => {
+      const tr = document.createElement('tr');
+
+      tr.innerHTML = `
+        <td>${doc.nombre}</td>
+        <td>${doc.tipo_documento_id}</td>
+        <td>${doc.mes || 'N/A'} / ${doc.anio}</td>
+        <td>${new Date(doc.fecha_limite).toLocaleDateString()}</td>
+        <td>Empresa</td>
+        <td>
+          <span class="badge badge-${doc.prioridad === 'alta' ? 'danger' : doc.prioridad === 'media' ? 'warning' : 'info'}">
+            ${doc.prioridad}
+          </span>
+        </td>
+      `;
+
+      tbody.appendChild(tr);
+    });
+
+  } catch (error) {
+    console.error('Error cargando pendientes:', error);
+  }
+}
+
 // ==============================
 // INIT
 // ==============================
-document.addEventListener('DOMContentLoaded', () => {
-  cargarEmpresaDetalle();
+document.addEventListener('DOMContentLoaded', async () => {
+  await cargarEmpresaDetalle();
+  await cargarPendientesEmpresa(empresaId);
 });
+

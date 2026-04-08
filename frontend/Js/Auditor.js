@@ -49,64 +49,144 @@ async function cargarEmpresas() {
   const tablaEmpresas = document.getElementById('tablaEmpresas');
 
   try {
-    const res = await fetch('http://localhost:3000/api/empresas', {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
+    const headers = {
+      'Authorization': `Bearer ${token}`
+    };
 
-    if (!res.ok) {
-      console.error('Error endpoint empresas');
-      return;
+    const [empresasRes, usuariosRes] = await Promise.all([
+      fetch('http://localhost:3000/api/empresas', { headers }),
+      fetch('http://localhost:3000/api/usuarios', { headers })
+    ]);
+
+    const empresas = await empresasRes.json();
+    const usuarios = await usuariosRes.json();
+
+    let totalPendientesGlobal = 0;
+    let sumaCumplimiento = 0;
+    let totalEmpresas = empresas.length;
+
+    tablaEmpresas.innerHTML = '';
+    const empresasRiesgo = [];
+
+    // 🔥 recorrer empresas
+    for (const e of empresas) {
+
+      const resPend = await fetch(
+        `http://localhost:3000/api/documentos-requeridos/empresa/${e.id}/pendientes`,
+        { headers }
+      );
+
+      const pendientesEmpresa = await resPend.json();
+      const totalPendientes = pendientesEmpresa.length;
+
+      totalPendientesGlobal += totalPendientes;
+
+      // 👤 usuarios
+      const usuariosEmpresa = usuarios.filter(u =>
+        String(u.empresa_id) === String(e.id)
+      );
+
+      // ==============================
+      // 🔥 CUMPLIMIENTO
+      // ==============================
+      const cumplimiento = totalPendientes === 0
+        ? 100
+        : Math.max(0, 100 - totalPendientes * 10);
+
+      // 🔥 SUMAR PARA KPI GLOBAL
+      sumaCumplimiento += cumplimiento;
+
+      // ==============================
+      // 🚨 RIESGO
+      // ==============================
+      const enRiesgo = cumplimiento < 70;
+
+      if (enRiesgo) {
+        empresasRiesgo.push({
+          nombre: e.nombre,
+          pendientes: totalPendientes
+        });
+      }
+
+      const tr = document.createElement('tr');
+
+      tr.innerHTML = `
+        <td>${e.nombre}</td>
+
+        <td>${usuariosEmpresa.length}</td>
+
+        <td>
+          <span class="badge ${totalPendientes > 0 ? 'badge-warning' : 'badge-success'}">
+            ${totalPendientes}
+          </span>
+        </td>
+
+        <td>
+          <div class="progress-bar">
+            <div class="progress" style="width:${cumplimiento}%"></div>
+          </div>
+          <small>${cumplimiento}%</small>
+        </td>
+
+        <td>
+          <span class="badge ${enRiesgo ? 'badge-danger' : 'badge-success'}">
+            ${enRiesgo ? 'En riesgo' : 'Estable'}
+          </span>
+        </td>
+
+        <td>
+          <button class="btn btn-secondary" onclick="verEmpresa('${e.id}')">
+            Ver
+          </button>
+        </td>
+      `;
+
+      tablaEmpresas.appendChild(tr);
     }
 
-    const empresas = await res.json();
-
-    // KPI
+    // ==============================
+    // 🔥 KPI GLOBAL
+    // ==============================
     kpiEmpresas.textContent = empresas.length;
     kpiEmpresasDetalle.textContent = `${empresas.length} registradas`;
 
-    // Empresas en riesgo (simple visual)
-    const riesgo = empresas.slice(0, 4);
-    badgeRiesgo.textContent = riesgo.length;
+    document.getElementById('kpiPendientes').textContent = totalPendientesGlobal;
 
-    listaRiesgo.innerHTML = riesgo.length
-      ? riesgo.map(e => `
-          <div class="list-item">
-            <span>${e.nombre}</span>
-            <span class="badge badge-warning">Revisión</span>
-          </div>
-        `).join('')
-      : `<div class="list-item"><span>Sin datos</span></div>`;
+    // 🔥 CUMPLIMIENTO GLOBAL
+    const promedioCumplimiento = totalEmpresas
+      ? Math.round(sumaCumplimiento / totalEmpresas)
+      : 0;
 
-    // Tabla principal
-    tablaEmpresas.innerHTML = empresas.length
-      ? empresas.map(e => `
-          <tr>
-            <td>${e.nombre}</td>
-            <td>-</td>
-            <td>-</td>
-            <td>
-              <div class="progress-bar">
-                <div class="progress-fill" style="width:0%"></div>
-              </div>
-            </td>
-            <td>
-              <span class="badge ${e.activa ? 'badge-success' : 'badge-warning'}">
-                ${e.activa ? 'Activa' : 'Inactiva'}
+    document.getElementById('kpiCumplimiento').textContent = `${promedioCumplimiento}%`;
+
+    document.getElementById('kpiCumplimientoDetalle').textContent =
+      promedioCumplimiento >= 80
+        ? 'Buen nivel'
+        : promedioCumplimiento >= 60
+        ? 'Nivel medio'
+        : 'Nivel crítico';
+
+    // ==============================
+    // 🚨 EMPRESAS EN RIESGO
+    // ==============================
+    badgeRiesgo.textContent = empresasRiesgo.length;
+
+    listaRiesgo.innerHTML = empresasRiesgo.length
+      ? empresasRiesgo
+          .sort((a, b) => b.pendientes - a.pendientes)
+          .slice(0, 5)
+          .map(e => `
+            <div class="list-item">
+              <span>${e.nombre}</span>
+              <span class="badge badge-danger">
+                ${e.pendientes} pendientes
               </span>
-            </td>
-            <td>
-              <button class="btn btn-secondary" style="padding:6px 12px;" onclick="verEmpresa('${e.id || e._id}')">
-                Ver
-              </button>
-            </td>
-          </tr>
-        `).join('')
-      : `<tr><td colspan="6">Sin empresas</td></tr>`;
+            </div>
+          `).join('')
+      : `<div class="list-item"><span>Sin riesgo</span></div>`;
 
   } catch (err) {
-    console.error('Error cargando empresas:', err);
+    console.error('Error cargando dashboard:', err);
   }
 }
 
@@ -114,9 +194,53 @@ function verEmpresa(id) {
   window.location.href = `/Empresa_Detalles.html?id=${id}`;
 }
 
+async function cargarColaPrioritaria() {
+  try {
+    const res = await fetch('http://localhost:3000/api/documentos-requeridos/cola-revision', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+
+    const data = await res.json();
+
+    const tbody = document.getElementById('tablaColaPrioritaria');
+    const badge = document.getElementById('badgeCola');
+
+    tbody.innerHTML = '';
+
+    // 🔥 solo alta prioridad
+    const prioridadAlta = data.filter(d => d.prioridad === 'alta');
+
+    badge.textContent = prioridadAlta.length;
+
+    document.getElementById('kpiPendientes').textContent = data.length;
+
+    prioridadAlta.forEach(doc => {
+      const tr = document.createElement('tr');
+
+      tr.innerHTML = `
+        <td>${doc.nombre}</td>
+        <td>${doc.empresa}</td>
+        <td><span class="badge badge-danger">${doc.prioridad}</span></td>
+        <td>${new Date(doc.fecha_limite).toLocaleDateString()}</td>
+        <td>
+          <button class="btn btn-primary">Revisar</button>
+        </td>
+      `;
+
+      tbody.appendChild(tr);
+    });
+
+  } catch (error) {
+    console.error('Error auditor:', error);
+  }
+}
+
 // ==============================
 // INIT
 // ==============================
 document.addEventListener('DOMContentLoaded', () => {
   cargarEmpresas();
+  cargarColaPrioritaria();
 });

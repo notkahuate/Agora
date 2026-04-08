@@ -12,5 +12,7 @@ router.get('/empresa/:empresaId', authenticate, controller.listarPorEmpresa);
 
 // 📌 Pendientes
 router.get('/empresa/:empresaId/pendientes', authenticate, controller.listarPendientes);
+// 📌 Cola de revisión (solo para auditores y super admins)
+router.get('/cola-revision', authenticate, controller.listarColaRevision);
 
 module.exports = router;

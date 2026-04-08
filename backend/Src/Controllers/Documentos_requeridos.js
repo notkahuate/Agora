@@ -36,8 +36,21 @@ const listarPendientes = async (req, res) => {
   }
 };
 
+// ✅ Cola de revisión
+const listarColaRevision = async (req, res) => {
+  try {
+    const data = await model.obtenerColaRevision();
+    res.json(data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al listar cola de revisión' });
+  }
+};
+
+
 module.exports = {
   crear,
   listarPorEmpresa,
-  listarPendientes
+  listarPendientes,
+  listarColaRevision
 };
