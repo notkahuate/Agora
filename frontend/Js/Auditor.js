@@ -193,39 +193,84 @@ async function cargarEmpresas() {
 function verEmpresa(id) {
   window.location.href = `/Empresa_Detalles.html?id=${id}`;
 }
-
 async function cargarColaPrioritaria() {
   try {
-    const res = await fetch('http://localhost:3000/api/documentos-requeridos/cola-revision', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+    const headers = {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
+    };
+
+    // 🔥 1. TRAER EMPRESAS
+    const resEmpresas = await fetch('http://localhost:3000/api/empresas', { headers });
+    const empresas = await resEmpresas.json();
+
+    // 🔥 2. TRAER TODOS LOS PENDIENTES
+    const pendientesPorEmpresa = await Promise.all(
+      empresas.map(e =>
+        fetch(`http://localhost:3000/api/documentos-requeridos/empresa/${e.id}/pendientes`, { headers })
+          .then(res => res.json())
+          .then(docs => docs.map(doc => ({
+            ...doc,
+            empresa: e.nombre
+          })))
+      )
+    );
+
+    // 🔥 3. UNIR TODO
+    const todosPendientes = pendientesPorEmpresa.flat();
+
+    // 🔥 4. ORDENAR POR PRIORIDAD + FECHA
+   const ordenados = todosPendientes.sort((a, b) => {
+
+      // 🔥 1. ORDEN POR PUNTAJE (MAYOR IMPACTO)
+      const ordenados = todosPendientes.sort((a, b) => {
+
+      const porcentajeA = parseFloat(a.porcentaje) || 0;
+      const porcentajeB = parseFloat(b.porcentaje) || 0;
+
+      // 🔥 ORDEN POR IMPACTO REAL
+      if (porcentajeB !== porcentajeA) {
+        return porcentajeB - porcentajeA;
       }
+
+      // 🔥 DESEMPATE POR FECHA
+      return new Date(a.fecha_limite) - new Date(b.fecha_limite);
     });
 
-    const data = await res.json();
+      // 🔥 2. DESEMPATE POR FECHA
+      return new Date(a.fecha_limite) - new Date(b.fecha_limite);
+    });
+
+    // 🔥 5. TOP 5
+    const top5 = ordenados.slice(0, 5);
 
     const tbody = document.getElementById('tablaColaPrioritaria');
     const badge = document.getElementById('badgeCola');
 
     tbody.innerHTML = '';
+    badge.textContent = top5.length;
 
-    // 🔥 solo alta prioridad
-    const prioridadAlta = data.filter(d => d.prioridad === 'alta');
-
-    badge.textContent = prioridadAlta.length;
-
-    document.getElementById('kpiPendientes').textContent = data.length;
-
-    prioridadAlta.forEach(doc => {
+    top5.forEach(doc => {
       const tr = document.createElement('tr');
 
       tr.innerHTML = `
         <td>${doc.nombre}</td>
         <td>${doc.empresa}</td>
-        <td><span class="badge badge-danger">${doc.prioridad}</span></td>
+        <td>
+          <span class="badge badge-${
+            doc.prioridad === 'alta'
+              ? 'danger'
+              : doc.prioridad === 'media'
+              ? 'warning'
+              : 'info'
+          }">
+            ${doc.prioridad}
+          </span>
+        </td>
         <td>${new Date(doc.fecha_limite).toLocaleDateString()}</td>
         <td>
-          <button class="btn btn-primary">Revisar</button>
+          <button class="btn btn-primary" onclick="verDocumento('${doc.id}')">
+            Revisar
+          </button>
         </td>
       `;
 
@@ -233,7 +278,7 @@ async function cargarColaPrioritaria() {
     });
 
   } catch (error) {
-    console.error('Error auditor:', error);
+    console.error('Error cola prioritaria:', error);
   }
 }
 
