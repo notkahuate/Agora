@@ -41,7 +41,10 @@ const obtenerPorEmpresa = async (empresa_id) => {
 const obtenerPendientes = async (empresa_id) => {
   const result = await pool.query(
     `
-    SELECT dr.*, td.nombre
+    SELECT 
+      dr.*, 
+      td.nombre AS nombre,
+      td.porcentaje AS porcentaje
     FROM documentos_requeridos dr
     JOIN tipos_documentos td ON td.id = dr.tipo_documento_id
     LEFT JOIN documentos_subidos ds 

@@ -203,7 +203,7 @@ async function cargarColaPrioritaria() {
     const resEmpresas = await fetch('http://localhost:3000/api/empresas', { headers });
     const empresas = await resEmpresas.json();
 
-    // 🔥 2. TRAER TODOS LOS PENDIENTES
+    // 🔥 2. TRAER PENDIENTES POR EMPRESA
     const pendientesPorEmpresa = await Promise.all(
       empresas.map(e =>
         fetch(`http://localhost:3000/api/documentos-requeridos/empresa/${e.id}/pendientes`, { headers })
@@ -215,28 +215,20 @@ async function cargarColaPrioritaria() {
       )
     );
 
-    // 🔥 3. UNIR TODO
+    // 🔥 3. UNIR TODO (AQUÍ SE CREA)
     const todosPendientes = pendientesPorEmpresa.flat();
 
-    // 🔥 4. ORDENAR POR PRIORIDAD + FECHA
-   const ordenados = todosPendientes.sort((a, b) => {
-
-      // 🔥 1. ORDEN POR PUNTAJE (MAYOR IMPACTO)
-      const ordenados = todosPendientes.sort((a, b) => {
-
+    // 🔥 4. ORDENAR POR PORCENTAJE + FECHA
+    const ordenados = todosPendientes.sort((a, b) => {
       const porcentajeA = parseFloat(a.porcentaje) || 0;
       const porcentajeB = parseFloat(b.porcentaje) || 0;
 
-      // 🔥 ORDEN POR IMPACTO REAL
+      // 🔝 MAYOR PORCENTAJE PRIMERO
       if (porcentajeB !== porcentajeA) {
         return porcentajeB - porcentajeA;
       }
 
-      // 🔥 DESEMPATE POR FECHA
-      return new Date(a.fecha_limite) - new Date(b.fecha_limite);
-    });
-
-      // 🔥 2. DESEMPATE POR FECHA
+      // ⏱ SI EMPATAN → MÁS URGENTE
       return new Date(a.fecha_limite) - new Date(b.fecha_limite);
     });
 
@@ -253,7 +245,7 @@ async function cargarColaPrioritaria() {
       const tr = document.createElement('tr');
 
       tr.innerHTML = `
-        <td>${doc.nombre}</td>
+        <td>${doc.nombre} (${doc.porcentaje}%)</td>
         <td>${doc.empresa}</td>
         <td>
           <span class="badge badge-${
@@ -268,7 +260,7 @@ async function cargarColaPrioritaria() {
         </td>
         <td>${new Date(doc.fecha_limite).toLocaleDateString()}</td>
         <td>
-          <button class="btn btn-primary" onclick="verDocumento('${doc.id}')">
+          <button class="btn btn-primary">
             Revisar
           </button>
         </td>
