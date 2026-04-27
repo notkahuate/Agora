@@ -13,6 +13,10 @@ let pendientesGlobal = [];
 let paginaPendientes = 1;
 const limitePendientes = 5;
 
+let aprobadosGlobal = [];
+let paginaAprobados = 1;
+const limiteAprobados = 5;
+
 // ==============================
 // VALIDACIÓN BÁSICA
 // ==============================
@@ -230,19 +234,22 @@ async function loadDocumentosEmpresa() {
       String(d.empresa_id) === String(empresaId)
     );
 
-    const aprobados = empresaDocs.filter(d => d.estado === 'validado');
-    const pendientes = empresaDocs.filter(d => d.estado !== 'validado');
+    const aprobados = empresaDocs.filter(d => ['validado','revisado'].includes(d.estado));
+    const pendientes = empresaDocs.filter(d => !['validado','revisado'].includes(d.estado));
 
     document.getElementById('statSubidos').textContent = empresaDocs.length;
     document.getElementById('statAprobados').textContent = aprobados.length;
+
+    aprobadosGlobal = aprobados;
+    paginaAprobados = 1;
 
     if (tablaSubidos) {
       tablaSubidos.innerHTML = empresaDocs.length
         ? empresaDocs.map(doc => `
             <tr>
               <td>${doc.nombre_archivo || 'Documento'}</td>
-              <td>${doc.tipo_documento_id || '-'}</td>
-              <td>${doc.usuario_id || '-'}</td>
+              <td>${doc.tipo_documento_nombre || doc.tipo_documento_id || '-'}</td>
+              <td>${doc.usuario_nombre || doc.usuario_id || '-'}</td>
               <td>${doc.fecha_subida ? new Date(doc.fecha_subida).toLocaleDateString() : '-'}</td>
               <td>${doc.estado}</td>
               <td><button class="btn btn-secondary">Ver</button></td>
@@ -250,6 +257,8 @@ async function loadDocumentosEmpresa() {
           `).join('')
         : `<tr><td colspan="6">Sin documentos</td></tr>`;
     }
+
+    renderAprobados();
 
     if (tablaPendientes) {
       tablaPendientes.innerHTML = pendientes.length
@@ -269,6 +278,50 @@ async function loadDocumentosEmpresa() {
   } catch (err) {
     console.error("Error documentos:", err);
   }
+}
+
+function renderAprobados() {
+  const tablaAprobados = document.getElementById('tablaDocumentosAprobados');
+  const inicio = (paginaAprobados - 1) * limiteAprobados;
+  const fin = inicio + limiteAprobados;
+  const pagina = aprobadosGlobal.slice(inicio, fin);
+
+  if (!tablaAprobados) return;
+
+  tablaAprobados.innerHTML = pagina.length
+    ? pagina.map(doc => `
+        <tr>
+          <td>${doc.nombre_archivo || 'Documento'}</td>
+          <td>${doc.tipo_documento_nombre || doc.tipo_documento_id || '-'}</td>
+          <td>${doc.usuario_nombre || doc.usuario_id || '-'}</td>
+          <td>${doc.fecha_subida ? new Date(doc.fecha_subida).toLocaleDateString() : '-'}</td>
+          <td>${doc.estado}</td>
+          <td><button class="btn btn-secondary">Ver</button></td>
+        </tr>
+      `).join('')
+    : `<tr><td colspan="6">No hay documentos aprobados</td></tr>`;
+
+  renderControlesAprobados();
+}
+
+function renderControlesAprobados() {
+  const totalPaginas = Math.max(1, Math.ceil(aprobadosGlobal.length / limiteAprobados));
+  const container = document.getElementById('paginacionAprobados');
+  if (!container) return;
+
+  container.innerHTML = `
+    <button onclick="cambiarPaginaAprobados(-1)" ${paginaAprobados === 1 ? 'disabled' : ''}>⬅</button>
+    <span>Página ${paginaAprobados} de ${totalPaginas}</span>
+    <button onclick="cambiarPaginaAprobados(1)" ${paginaAprobados === totalPaginas ? 'disabled' : ''}>➡</button>
+  `;
+}
+
+function cambiarPaginaAprobados(direccion) {
+  paginaAprobados += direccion;
+  if (paginaAprobados < 1) paginaAprobados = 1;
+  const max = Math.max(1, Math.ceil(aprobadosGlobal.length / limiteAprobados));
+  if (paginaAprobados > max) paginaAprobados = max;
+  renderAprobados();
 }
 
 // ==============================
@@ -343,7 +396,7 @@ function renderPendientes() {
         <tr>
           <td>${doc.nombre}</td>
           <td>${doc.tipo_documento_id}</td>
-          <td>${doc.mes || 'N/A'} / ${doc.anio}</td>
+          <td>${doc.frecuencia}</td>
           <td>${new Date(doc.fecha_limite).toLocaleDateString()}</td>
           <td>Empresa</td>
           <td>

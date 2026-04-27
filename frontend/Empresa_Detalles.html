@@ -90,6 +90,7 @@
             </div>
             <div class="pill-tabs">
               <button class="pill is-active" onclick="switchTab('documentos-subidos', event)">Subidos</button>
+              <button class="pill" onclick="switchTab('documentos-aprobados', event)">Aprobados</button>
               <button class="pill" onclick="switchTab('documentos-pendientes', event)">Pendientes</button>
               <button class="pill" onclick="switchTab('usuarios-empresa', event)">Usuarios</button>
             </div>
@@ -104,10 +105,20 @@
             </div>
           </div>
 
+          <div id="tab-documentos-aprobados" class="tab-content">
+            <div class="table-container">
+              <table>
+                <thead><tr><th>Documento</th><th>Tipo</th><th>Usuario</th><th>Fecha subida</th><th>Estado</th><th>Acciones</th></tr></thead>
+                <tbody id="tablaDocumentosAprobados"></tbody>
+              </table>
+              <div id="paginacionAprobados" style="margin-top: 10px; text-align: center;"></div>
+            </div>
+          </div>
+
           <div id="tab-documentos-pendientes" class="tab-content">
             <div class="table-container">
               <table>
-                <thead><tr><th>Documento</th><th>Tipo</th><th>Periodicidad</th><th>Fecha límite</th><th>Requerido por</th><th>Prioridad</th></tr></thead>
+                <thead><tr><th>Documento</th><th>Tipo</th><th>Frecuencia</th><th>Fecha límite</th><th>Requerido por</th><th>Prioridad</th></tr></thead>
                 <tbody id="tablaDocumentosPendientes"></tbody>
               </table>
               <div id="paginacionPendientes" style="margin-top: 10px; text-align: center;"></div>

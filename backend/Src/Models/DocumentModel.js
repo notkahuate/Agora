@@ -97,6 +97,36 @@ const validarDocumento = async (id, { estado, validado_por, comentarios }) => {
   return rows[0];
 };
 
+/**
+ * Listar documentos pendientes de validación con JOINs a usuarios, empresas y tipos de documentos
+ */
+const listarPendientesValidacionConJoin = async () => {
+  const { rows } = await pool.query(`
+    SELECT 
+      ds.id,
+      ds.usuario_id,
+      ds.tipo_documento_id,
+      ds.empresa_id,
+      ds.nombre_archivo,
+      ds.ruta_archivo,
+      ds.comentarios,
+      ds.estado,
+      ds.fecha_subida,
+      ds.fecha_validacion,
+      ds.validado_por,
+      e.nombre AS empresa_nombre,
+      u.nombre AS usuario_nombre,
+      td.nombre AS tipo_documento_nombre
+    FROM documentos_subidos ds
+    LEFT JOIN empresas e ON ds.empresa_id = e.id
+    LEFT JOIN usuarios u ON ds.usuario_id = u.id
+    LEFT JOIN tipos_documentos td ON ds.tipo_documento_id = td.id
+    WHERE ds.estado = 'subido'
+    ORDER BY ds.fecha_subida DESC;
+  `);
+  return rows;
+};
+
 module.exports = {
   crearDocumento,
   listarDocumentos,
@@ -106,4 +136,5 @@ module.exports = {
   actualizarDocumento,
   eliminarDocumento,
   validarDocumento,
+  listarPendientesValidacionConJoin,
 };

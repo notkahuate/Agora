@@ -183,6 +183,18 @@ async function cargarEmpresas() {
         : 'Nivel crítico';
 
     // ==============================
+    // 🔥 REVISADOS DEL MES
+    // ==============================
+    try {
+      const resRevisados = await fetch('http://localhost:3000/api/documentos/revisados-mes', { headers });
+      const dataRevisados = await resRevisados.json();
+      document.getElementById('kpiRevisados').textContent = dataRevisados.count;
+    } catch (err) {
+      console.error('Error cargando revisados del mes:', err);
+      document.getElementById('kpiRevisados').textContent = '0';
+    }
+
+    // ==============================
     // 🚨 EMPRESAS EN RIESGO
     // ==============================
     badgeRiesgo.textContent = empresasRiesgo.length;
@@ -210,6 +222,20 @@ function verEmpresa(id) {
   window.location.href = `/Empresa_Detalles.html?id=${id}`;
 }
 
+async function actualizarKpiRevisados() {
+  try {
+    const headers = {
+      'Authorization': `Bearer ${token}`
+    };
+
+    const res = await fetch('http://localhost:3000/api/documentos/revisados-mes', { headers });
+    const data = await res.json();
+    document.getElementById('kpiRevisados').textContent = data.count;
+  } catch (err) {
+    console.error('Error actualizando KPI revisados:', err);
+  }
+}
+
 async function cargarDocumentos() {
   const tablaDocumentos = document.getElementById('tablaDocumentos');
 
@@ -221,9 +247,12 @@ async function cargarDocumentos() {
     const res = await fetch('http://localhost:3000/api/documentos/pendientes-validacion', { headers });
     const documentos = await res.json();
 
+    console.log('📋 DOCUMENTOS RECIBIDOS:', documentos); // 🔍 DEBUG
+
     tablaDocumentos.innerHTML = '';
 
     documentos.forEach(doc => {
+      console.log('📄 DOCUMENTO:', doc); // 🔍 DEBUG - Ver cada documento
       const tr = document.createElement('tr');
 
       tr.innerHTML = `
@@ -232,11 +261,14 @@ async function cargarDocumentos() {
         <td>${doc.usuario_nombre}</td>
         <td>${new Date(doc.fecha_subida).toLocaleDateString()}</td>
         <td>
-          <span class="badge badge-warning">Pendiente</span>
+          <span class="badge badge-warning">Subido</span>
         </td>
         <td>
-          <button class="btn btn-success" onclick="validarDocumento('${doc.id}')">
-            Revisar
+          <button class="btn btn-success" onclick="validarDocumento('${doc.id}', 'aprobar')">
+            Aprobar
+          </button>
+          <button class="btn btn-danger" onclick="validarDocumento('${doc.id}', 'rechazar')">
+            Rechazar
           </button>
         </td>
       `;
@@ -249,24 +281,31 @@ async function cargarDocumentos() {
   }
 }
 
-window.validarDocumento = async function(id) {
+window.validarDocumento = async function(id, action) {
   try {
     const headers = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     };
 
+    const estado = action === 'aprobar' ? 'revisado' : 'rechazado';
+
     const res = await fetch(`http://localhost:3000/api/documentos/${id}/validar`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ estado: 'validado' })
+      body: JSON.stringify({ estado })
     });
 
     if (res.ok) {
-      alert('Documento validado');
+      alert(`Documento ${action === 'aprobar' ? 'aprobado' : 'rechazado'}`);
       cargarDocumentos(); // Recargar la tabla
+
+      // Actualizar KPI si se aprobó
+      if (action === 'aprobar') {
+        actualizarKpiRevisados();
+      }
     } else {
-      alert('Error al validar documento');
+      alert(`Error al ${action === 'aprobar' ? 'aprobar' : 'rechazar'} documento`);
     }
   } catch (err) {
     console.error('Error validando documento:', err);

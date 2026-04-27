@@ -1,5 +1,6 @@
 // src/controllers/documentoController.js
 const Documento = require('../Models/DocumentModel');
+const { pool } = require('../configures/db');
 
 exports.crearDocumento = async (req, res) => {
   try {
@@ -125,16 +126,13 @@ exports.validarDocumento = async (req, res) => {
     const { estado, comentarios } = body;
     const requester = req.user;
 
-    if (!estado || !['subido','validado','rechazado'].includes(estado)) {
-      return res.status(400).json({ message: "estado inválido. Usa 'subido', 'validado' o 'rechazado'." });
+    if (!estado || !['subido','validado','rechazado','revisado'].includes(estado)) {
+      return res.status(400).json({ message: "estado inválido. Usa 'subido', 'validado', 'rechazado' o 'revisado'." });
     }
     const doc = await Documento.obtenerDocumentoPorId(id);
     if (!doc) return res.status(404).json({ message: 'Documento no encontrado' });
-    if (requester.rol === 'auditor') {
-      if (!requester.empresa_id || String(doc.empresa_id) !== String(requester.empresa_id)) {
-        return res.status(403).json({ message: 'No autorizado para validar este documento' });
-      }
-    }
+    // Auditores y super_admin pueden validar cualquier documento
+    // No hay restricción adicional de empresa para auditores
 
     const actualizado = await Documento.validarDocumento(id, { estado, validado_por: requester.id, comentarios });
     return res.json(actualizado);
@@ -154,13 +152,35 @@ exports.listarPendientesValidacion = async (req, res) => {
       return res.status(403).json({ message: 'No autorizado' });
     }
 
-    // Listar documentos con estado 'subido'
-    const documentos = await Documento.listarDocumentos();
-    const pendientes = documentos.filter(doc => doc.estado === 'subido');
+    // Listar documentos con estado 'subido' y todos sus datos con JOINs
+    const pendientes = await Documento.listarPendientesValidacionConJoin();
 
     return res.json(pendientes);
   } catch (err) {
-    console.error(err);
+    console.error('❌ Error en listarPendientesValidacion:', err);
     return res.status(500).json({ message: 'Error al listar documentos pendientes de validación' });
+  }
+};
+
+exports.contarRevisadosMes = async (req, res) => {
+  try {
+    const requester = req.user;
+    if (!['auditor', 'super_admin'].includes(requester.rol)) {
+      return res.status(403).json({ message: 'No autorizado' });
+    }
+
+    // Contar documentos con estado 'revisado' en el mes actual
+    const { rows } = await pool.query(`
+      SELECT COUNT(*) as count
+      FROM documentos_subidos
+      WHERE estado = 'revisado'
+      AND EXTRACT(MONTH FROM fecha_validacion) = EXTRACT(MONTH FROM CURRENT_DATE)
+      AND EXTRACT(YEAR FROM fecha_validacion) = EXTRACT(YEAR FROM CURRENT_DATE)
+    `);
+
+    return res.json({ count: parseInt(rows[0].count) });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Error al contar documentos revisados del mes' });
   }
 };

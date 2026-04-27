@@ -59,6 +59,7 @@ const obtenerPendientes = async (empresa_id) => {
     SELECT 
       dr.*, 
       td.nombre AS nombre,
+      td.frecuencia AS frecuencia,
       td.porcentaje AS porcentaje
     FROM documentos_requeridos dr
     JOIN tipos_documentos td ON td.id = dr.tipo_documento_id
