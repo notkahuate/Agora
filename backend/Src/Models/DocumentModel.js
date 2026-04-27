@@ -14,7 +14,18 @@ const crearDocumento = async ({ usuario_id, tipo_documento_id, empresa_id, nombr
 };
 
 const listarDocumentos = async () => {
-  const { rows } = await pool.query(`SELECT * FROM documentos_subidos ORDER BY fecha_subida DESC;`);
+  const { rows } = await pool.query(`
+    SELECT 
+      ds.*,
+      e.nombre AS empresa_nombre,
+      u.nombre AS usuario_nombre,
+      td.nombre AS tipo_documento_nombre
+    FROM documentos_subidos ds
+    JOIN empresas e ON ds.empresa_id = e.id
+    JOIN usuarios u ON ds.usuario_id = u.id
+    JOIN tipos_documentos td ON ds.tipo_documento_id = td.id
+    ORDER BY ds.fecha_subida DESC;
+  `);
   return rows;
 };
 

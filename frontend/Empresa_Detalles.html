@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AGORA | Detalle de empresa</title>
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/Styles_auditor.css">
   <link rel="icon" type="image/svg+xml" href="img/imagen1.png" />
 </head>
 <body>
@@ -78,7 +79,7 @@
           <div class="kpi-card"><div class="kpi-icon"><i data-lucide="upload" class="icon"></i></div><div class="kpi-value" id="statSubidos">127</div><div class="kpi-label">Documentos subidos</div></div>
           <div class="kpi-card"><div class="kpi-icon"><i data-lucide="hourglass" class="icon"></i></div><div class="kpi-value" id="statPendientes">18</div><div class="kpi-label">Pendientes</div></div>
           <div class="kpi-card"><div class="kpi-icon"><i data-lucide="check-circle-2" class="icon"></i></div><div class="kpi-value" id="statAprobados">125</div><div class="kpi-label">Aprobados</div></div>
-          <div class="kpi-card"><div class="kpi-icon"><i data-lucide="bar-chart-3" class="icon"></i></div><div class="kpi-value" id="statCumplimiento">85%</div><div class="kpi-label">Cumplimiento</div></div>
+          <div class="kpi-card"><div class="kpi-icon"><i data-lucide="bar-chart-3" class="icon"></i></div><div class="kpi-value" id="statCumplimiento">85%</div><div class="kpi-label">Cumplimiento</div><div class="progress-bar" id="barraCumplimiento"><div class="progress-fill" style="width:85%"></div></div></div>
         </div>
 
         <div class="card" style="margin-top:18px;">
@@ -109,6 +110,7 @@
                 <thead><tr><th>Documento</th><th>Tipo</th><th>Periodicidad</th><th>Fecha límite</th><th>Requerido por</th><th>Prioridad</th></tr></thead>
                 <tbody id="tablaDocumentosPendientes"></tbody>
               </table>
+              <div id="paginacionPendientes" style="margin-top: 10px; text-align: center;"></div>
             </div>
           </div>
 
@@ -118,6 +120,7 @@
                 <thead><tr><th>Nombre</th><th>Correo</th><th>Cargo</th><th>Documentos subidos</th><th>Última actividad</th><th>Estado</th></tr></thead>
                 <tbody id="tablaUsuariosEmpresa"></tbody>
               </table>
+              <div id="paginacionUsuarios" style="margin-top: 10px; text-align: center;"></div>
             </div>
           </div>
         </div>

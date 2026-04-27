@@ -5,6 +5,14 @@ const token = localStorage.getItem('token');
 const params = new URLSearchParams(window.location.search);
 const empresaId = params.get('id');
 
+let usuariosGlobal = [];
+let paginaUsuarios = 1;
+const limiteUsuarios = 5;
+
+let pendientesGlobal = [];
+let paginaPendientes = 1;
+const limitePendientes = 5;
+
 // ==============================
 // VALIDACIÓN BÁSICA
 // ==============================
@@ -66,6 +74,9 @@ async function cargarEmpresaDetalle() {
     // 🔥 cargar usuarios (esto llena empleados)
     await loadUsuariosEmpresa();
 
+    // 🔥 cargar cumplimiento
+    await cargarCumplimientoEmpresa();
+
     // 🔥 cargar documentos (opcional si ya lo tienes)
     await loadDocumentosEmpresa();
 
@@ -101,33 +112,100 @@ async function loadUsuariosEmpresa() {
       String(u.empresa_id) === String(empresaId)
     );
 
+    // 🔥 GUARDAR EN GLOBAL
+    usuariosGlobal = usuariosEmpresa;
+    paginaUsuarios = 1;
+
     // 🔥 AQUÍ SE CALCULA EMPLEADOS REAL
     document.getElementById('empresaEmpleados').textContent =
       usuariosEmpresa.length;
 
-    // 🔥 TABLA
-    tablaUsuarios.innerHTML = usuariosEmpresa.length
-      ? usuariosEmpresa.map(u => `
-          <tr>
-            <td>${u.nombre || u.email}</td>
-            <td>${u.email || '-'}</td>
-            <td>${u.rol || '-'}</td>
-            <td>-</td>
-            <td>-</td>
-            <td>
-              <span class="badge ${u.activo ? 'badge-success' : 'badge-warning'}">
-                ${u.activo ? 'Activo' : 'Inactivo'}
-              </span>
-            </td>
-          </tr>
-        `).join('')
-      : `<tr><td colspan="6">Sin usuarios</td></tr>`;
+    // 🔥 RENDER
+    renderUsuarios();
 
   } catch (err) {
     console.error("Error usuarios:", err);
   }
 }
 
+// ==============================
+// CARGAR CUMPLIMIENTO (como en auditor)
+// ==============================
+async function cargarCumplimientoEmpresa() {
+  try {
+    const resResumen = await fetch(`http://localhost:3000/api/documentos-requeridos/empresa/${empresaId}/resumen`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const resumen = await resResumen.json();
+
+    const totalDocs = parseInt(resumen.total) || 0;
+    const enviados = parseInt(resumen.enviados) || 0;
+
+    const cumplimiento = totalDocs === 0 ? 0 : Math.round((enviados / totalDocs) * 100);
+
+    document.getElementById('statCumplimiento').textContent = `${cumplimiento}%`;
+
+    // 🔥 Actualizar barra de progreso
+    const barra = document.getElementById('barraCumplimiento');
+    if (barra) {
+      const fill = barra.querySelector('.progress-fill');
+      if (fill) {
+        fill.style.width = `${cumplimiento}%`;
+      }
+    }
+
+  } catch (err) {
+    console.error("Error cargando cumplimiento:", err);
+  }
+}
+function renderUsuarios() {
+  const tablaUsuarios = document.getElementById('tablaUsuariosEmpresa');
+
+  const inicio = (paginaUsuarios - 1) * limiteUsuarios;
+  const fin = inicio + limiteUsuarios;
+
+  const pagina = usuariosGlobal.slice(inicio, fin);
+
+  tablaUsuarios.innerHTML = pagina.length
+    ? pagina.map(u => `
+        <tr>
+          <td>${u.nombre || u.email}</td>
+          <td>${u.email || '-'}</td>
+          <td>${u.rol || '-'}</td>
+          <td>-</td>
+          <td>-</td>
+          <td>
+            <span class="badge ${u.activo ? 'badge-success' : 'badge-warning'}">
+              ${u.activo ? 'Activo' : 'Inactivo'}
+            </span>
+          </td>
+        </tr>
+      `).join('')
+    : `<tr><td colspan="6">Sin usuarios</td></tr>`;
+
+  renderControlesUsuarios();
+}
+
+function renderControlesUsuarios() {
+  const totalPaginas = Math.ceil(usuariosGlobal.length / limiteUsuarios);
+
+  const container = document.getElementById('paginacionUsuarios');
+  if (!container) return;
+
+  container.innerHTML = `
+    <button onclick="cambiarPaginaUsuarios(-1)" ${paginaUsuarios === 1 ? 'disabled' : ''}>⬅</button>
+    <span>Página ${paginaUsuarios} de ${totalPaginas}</span>
+    <button onclick="cambiarPaginaUsuarios(1)" ${paginaUsuarios === totalPaginas ? 'disabled' : ''}>➡</button>
+  `;
+}
+
+function cambiarPaginaUsuarios(direccion) {
+  paginaUsuarios += direccion;
+  renderUsuarios();
+}
 // ==============================
 // DOCUMENTOS (opcional)
 // ==============================
@@ -155,16 +233,8 @@ async function loadDocumentosEmpresa() {
     const aprobados = empresaDocs.filter(d => d.estado === 'validado');
     const pendientes = empresaDocs.filter(d => d.estado !== 'validado');
 
-    const total = empresaDocs.length;
-    const cumplimiento = total
-      ? Math.round((aprobados.length / total) * 100)
-      : 0;
-
-    document.getElementById('statSubidos').textContent = total;
-    document.getElementById('statPendientes').textContent = pendientes.length;
+    document.getElementById('statSubidos').textContent = empresaDocs.length;
     document.getElementById('statAprobados').textContent = aprobados.length;
-    document.getElementById('statCumplimiento').textContent =
-      total ? `${cumplimiento}%` : '-';
 
     if (tablaSubidos) {
       tablaSubidos.innerHTML = empresaDocs.length
@@ -246,33 +316,64 @@ async function cargarPendientesEmpresa(empresaId) {
 
     const data = await res.json();
 
-    const tbody = document.getElementById('tablaDocumentosPendientes');
-    tbody.innerHTML = '';
+    // 🔥 GUARDAR EN GLOBAL
+    pendientesGlobal = data;
+    paginaPendientes = 1;
 
     document.getElementById('statPendientes').textContent = data.length;
 
-    data.forEach(doc => {
-      const tr = document.createElement('tr');
-
-      tr.innerHTML = `
-        <td>${doc.nombre}</td>
-        <td>${doc.tipo_documento_id}</td>
-        <td>${doc.mes || 'N/A'} / ${doc.anio}</td>
-        <td>${new Date(doc.fecha_limite).toLocaleDateString()}</td>
-        <td>Empresa</td>
-        <td>
-          <span class="badge badge-${doc.prioridad === 'alta' ? 'danger' : doc.prioridad === 'media' ? 'warning' : 'info'}">
-            ${doc.prioridad}
-          </span>
-        </td>
-      `;
-
-      tbody.appendChild(tr);
-    });
+    // 🔥 RENDER
+    renderPendientes();
 
   } catch (error) {
     console.error('Error cargando pendientes:', error);
   }
+}
+
+function renderPendientes() {
+  const tbody = document.getElementById('tablaDocumentosPendientes');
+
+  const inicio = (paginaPendientes - 1) * limitePendientes;
+  const fin = inicio + limitePendientes;
+
+  const pagina = pendientesGlobal.slice(inicio, fin);
+
+  tbody.innerHTML = pagina.length
+    ? pagina.map(doc => `
+        <tr>
+          <td>${doc.nombre}</td>
+          <td>${doc.tipo_documento_id}</td>
+          <td>${doc.mes || 'N/A'} / ${doc.anio}</td>
+          <td>${new Date(doc.fecha_limite).toLocaleDateString()}</td>
+          <td>Empresa</td>
+          <td>
+            <span class="badge badge-${doc.prioridad === 'alta' ? 'danger' : doc.prioridad === 'media' ? 'warning' : 'info'}">
+              ${doc.prioridad}
+            </span>
+          </td>
+        </tr>
+      `).join('')
+    : `<tr><td colspan="6">Sin pendientes</td></tr>`;
+
+  renderControlesPendientes();
+}
+
+function renderControlesPendientes() {
+  const totalPaginas = Math.ceil(pendientesGlobal.length / limitePendientes);
+
+  const container = document.getElementById('paginacionPendientes');
+  if (!container) return;
+
+  container.innerHTML = `
+    <button onclick="cambiarPaginaPendientes(-1)" ${paginaPendientes === 1 ? 'disabled' : ''}>⬅</button>
+    <span>Página ${paginaPendientes} de ${totalPaginas}</span>
+    <button onclick="cambiarPaginaPendientes(1)" ${paginaPendientes === totalPaginas ? 'disabled' : ''}>➡</button>
+  `;
+}
+
+function cambiarPaginaPendientes(direccion) {
+  paginaPendientes += direccion;
+  renderPendientes();
 }
 
 // ==============================

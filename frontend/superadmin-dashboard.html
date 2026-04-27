@@ -114,7 +114,7 @@
               </div>
               <span class="badge badge-success">Operativo</span>
             </div>
-            <div class="list" id="listaSaludSistema"></div>
+            <div class="list" id="listaSaludSistema">
               <div class="list-item"><span>Autenticación y SSO</span><span class="badge badge-success">OK</span></div>
               <div class="list-item"><span>Alertas y notificaciones</span><span class="badge badge-warning">Retrasos leves</span></div>
               <div class="list-item"><span>Integraciones externas</span><span class="badge badge-info">Revisión programada</span></div>
@@ -146,18 +146,6 @@
           </div>
         </div>
 
-        <div class="card" style="margin-top:18px;">
-          <div class="card-header">
-            <div>
-              <div class="card-title">Progreso SG-SST</div>
-              <div class="card-subtitle">Estado consolidado por fase.</div>
-            </div>
-            <button class="btn btn-secondary">Ver detalle</button>
-          </div>
-          <div class="sections-grid">
-            <div class="card" style="padding:18px;">Sin datos</div>
-          </div>
-        </div>
 
         <div class="card" style="margin-top:18px;">
           <div class="card-header">
@@ -183,6 +171,7 @@
                 </thead>
                 <tbody id="tablaUsuarios"></tbody>
               </table>
+              <div id="paginacionUsuarios" class="paginacion"></div>
             </div>
           </div>
 
@@ -200,6 +189,7 @@
                 </thead>
                 <tbody id="tablaDocumentos"></tbody>
               </table>
+              <div id="paginacionDocumentos" class="paginacion"></div>
             </div>
           </div>
 

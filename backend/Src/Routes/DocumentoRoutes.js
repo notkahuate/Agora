@@ -13,4 +13,7 @@ router.delete('/:id', authenticate, authorize('super_admin'), controller.elimina
 // endpoint extra para validar/rechazar
 router.post('/:id/validar', authenticate, authorize('auditor', 'super_admin'), controller.validarDocumento);
 
+// endpoint para listar documentos pendientes de validación
+router.get('/pendientes-validacion', authenticate, authorize('auditor', 'super_admin'), controller.listarPendientesValidacion);
+
 module.exports = router;

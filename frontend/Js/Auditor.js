@@ -36,6 +36,11 @@ window.switchTab = function (tabName, evt) {
 
   const panel = document.getElementById(`tab-${tabName}`);
   if (panel) panel.classList.add('active');
+
+  // Cargar datos según el tab
+  if (tabName === 'documentos') {
+    cargarDocumentos();
+  }
 };
 
 // ==============================
@@ -89,12 +94,22 @@ async function cargarEmpresas() {
       // ==============================
       // 🔥 CUMPLIMIENTO
       // ==============================
-      const cumplimiento = totalPendientes === 0
-        ? 100
-        : Math.max(0, 100 - totalPendientes * 10);
+      const resResumen = await fetch(
+        `http://localhost:3000/api/documentos-requeridos/empresa/${e.id}/resumen`,
+        { headers }
+      );
 
-      // 🔥 SUMAR PARA KPI GLOBAL
-      sumaCumplimiento += cumplimiento;
+      const resumen = await resResumen.json();
+
+      const totalDocs = parseInt(resumen.total) || 0;
+      const enviados = parseInt(resumen.enviados) || 0;
+
+      const cumplimiento = totalDocs === 0
+        ? 0
+        : Math.round((enviados / totalDocs) * 100);
+
+            // 🔥 SUMAR PARA KPI GLOBAL
+            sumaCumplimiento += cumplimiento;
 
       // ==============================
       // 🚨 RIESGO
@@ -123,7 +138,7 @@ async function cargarEmpresas() {
 
         <td>
           <div class="progress-bar">
-            <div class="progress" style="width:${cumplimiento}%"></div>
+            <div class="progress-fill" style="width:${cumplimiento}%"></div>
           </div>
           <small>${cumplimiento}%</small>
         </td>
@@ -144,6 +159,7 @@ async function cargarEmpresas() {
       tablaEmpresas.appendChild(tr);
     }
 
+   
     // ==============================
     // 🔥 KPI GLOBAL
     // ==============================
@@ -193,17 +209,79 @@ async function cargarEmpresas() {
 function verEmpresa(id) {
   window.location.href = `/Empresa_Detalles.html?id=${id}`;
 }
+
+async function cargarDocumentos() {
+  const tablaDocumentos = document.getElementById('tablaDocumentos');
+
+  try {
+    const headers = {
+      'Authorization': `Bearer ${token}`
+    };
+
+    const res = await fetch('http://localhost:3000/api/documentos/pendientes-validacion', { headers });
+    const documentos = await res.json();
+
+    tablaDocumentos.innerHTML = '';
+
+    documentos.forEach(doc => {
+      const tr = document.createElement('tr');
+
+      tr.innerHTML = `
+        <td>${doc.tipo_documento_nombre}</td>
+        <td>${doc.empresa_nombre}</td>
+        <td>${doc.usuario_nombre}</td>
+        <td>${new Date(doc.fecha_subida).toLocaleDateString()}</td>
+        <td>
+          <span class="badge badge-warning">Pendiente</span>
+        </td>
+        <td>
+          <button class="btn btn-success" onclick="validarDocumento('${doc.id}')">
+            Revisar
+          </button>
+        </td>
+      `;
+
+      tablaDocumentos.appendChild(tr);
+    });
+
+  } catch (err) {
+    console.error('Error cargando documentos:', err);
+  }
+}
+
+window.validarDocumento = async function(id) {
+  try {
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+
+    const res = await fetch(`http://localhost:3000/api/documentos/${id}/validar`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ estado: 'validado' })
+    });
+
+    if (res.ok) {
+      alert('Documento validado');
+      cargarDocumentos(); // Recargar la tabla
+    } else {
+      alert('Error al validar documento');
+    }
+  } catch (err) {
+    console.error('Error validando documento:', err);
+  }
+};
+
 async function cargarColaPrioritaria() {
   try {
     const headers = {
       'Authorization': `Bearer ${localStorage.getItem('token')}`
     };
 
-    // 🔥 1. TRAER EMPRESAS
     const resEmpresas = await fetch('http://localhost:3000/api/empresas', { headers });
     const empresas = await resEmpresas.json();
 
-    // 🔥 2. TRAER PENDIENTES POR EMPRESA
     const pendientesPorEmpresa = await Promise.all(
       empresas.map(e =>
         fetch(`http://localhost:3000/api/documentos-requeridos/empresa/${e.id}/pendientes`, { headers })
@@ -215,24 +293,22 @@ async function cargarColaPrioritaria() {
       )
     );
 
-    // 🔥 3. UNIR TODO (AQUÍ SE CREA)
-    const todosPendientes = pendientesPorEmpresa.flat();
+    const todos = pendientesPorEmpresa.flat();
 
-    // 🔥 4. ORDENAR POR PORCENTAJE + FECHA
-    const ordenados = todosPendientes.sort((a, b) => {
+    console.log("PENDIENTES REALES:", todos);
+
+    // 🔥 ORDENAR
+    const ordenados = todos.sort((a, b) => {
       const porcentajeA = parseFloat(a.porcentaje) || 0;
       const porcentajeB = parseFloat(b.porcentaje) || 0;
 
-      // 🔝 MAYOR PORCENTAJE PRIMERO
       if (porcentajeB !== porcentajeA) {
         return porcentajeB - porcentajeA;
       }
 
-      // ⏱ SI EMPATAN → MÁS URGENTE
       return new Date(a.fecha_limite) - new Date(b.fecha_limite);
     });
 
-    // 🔥 5. TOP 5
     const top5 = ordenados.slice(0, 5);
 
     const tbody = document.getElementById('tablaColaPrioritaria');
@@ -241,19 +317,28 @@ async function cargarColaPrioritaria() {
     tbody.innerHTML = '';
     badge.textContent = top5.length;
 
+    if (top5.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5">No hay documentos pendientes</td>
+        </tr>
+      `;
+      return;
+    }
+
     top5.forEach(doc => {
       const tr = document.createElement('tr');
 
       tr.innerHTML = `
-        <td>${doc.nombre} (${doc.porcentaje}%)</td>
+        <td>${doc.tipo_documento || doc.nombre} (${doc.porcentaje || 0}%)</td>
         <td>${doc.empresa}</td>
         <td>
-          <span class="badge badge-${
+          <span class="badge ${
             doc.prioridad === 'alta'
-              ? 'danger'
+              ? 'badge-danger'
               : doc.prioridad === 'media'
-              ? 'warning'
-              : 'info'
+              ? 'badge-warning'
+              : 'badge-success'
           }">
             ${doc.prioridad}
           </span>
@@ -273,6 +358,8 @@ async function cargarColaPrioritaria() {
     console.error('Error cola prioritaria:', error);
   }
 }
+
+
 
 // ==============================
 // INIT

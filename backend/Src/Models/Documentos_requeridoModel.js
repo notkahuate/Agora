@@ -37,6 +37,21 @@ const obtenerPorEmpresa = async (empresa_id) => {
   return result.rows;
 };
 
+const obtenerResumenEmpresa = async (empresa_id) => {
+  const result = await pool.query(`
+    SELECT 
+      COUNT(DISTINCT dr.tipo_documento_id) AS total,
+      COUNT(DISTINCT ds.tipo_documento_id) AS enviados
+    FROM documentos_requeridos dr
+    LEFT JOIN documentos_subidos ds 
+      ON ds.tipo_documento_id = dr.tipo_documento_id
+      AND ds.empresa_id = dr.empresa_id
+    WHERE dr.empresa_id = $1
+  `, [empresa_id]);
+
+  return result.rows[0];
+};
+
 // 📌 Documentos pendientes (NO subidos)
 const obtenerPendientes = async (empresa_id) => {
   const result = await pool.query(
@@ -60,38 +75,32 @@ const obtenerPendientes = async (empresa_id) => {
   return result.rows;
 };
 // 📌 Cola de revisión (documentos subidos sin aprobar)
-const obtenerColaRevision = async () => {
+// 📌 Cola de revisión (documentos subidos sin aprobar)
+const obtenerColaRevision = async (empresa_id = null) => {
   const result = await pool.query(`
     SELECT 
-      ds.id,
+      dr.id,
       td.nombre AS documento,
+      td.porcentaje,
       e.nombre AS empresa,
-      COALESCE(dr.prioridad, 'media') AS prioridad,
-      ds.fecha_subida,
-      ds.estado
-    FROM documentos_subidos ds
-    JOIN tipos_documentos td ON td.id = ds.tipo_documento_id
-    JOIN empresas e ON e.id = ds.empresa_id
-    LEFT JOIN documentos_requeridos dr 
-      ON dr.tipo_documento_id = ds.tipo_documento_id 
-      AND dr.empresa_id = ds.empresa_id
-    WHERE ds.estado IN ('subido', 'pendiente')
-    ORDER BY 
-      CASE dr.prioridad 
-        WHEN 'alta' THEN 1
-        WHEN 'media' THEN 2
-        WHEN 'baja' THEN 3
-        ELSE 4
-      END,
-      ds.fecha_subida ASC
-  `);
+      dr.prioridad,
+      dr.fecha_limite,
+      dr.estado
+    FROM documentos_requeridos dr
+    JOIN tipos_documentos td ON td.id = dr.tipo_documento_id
+    JOIN empresas e ON e.id = dr.empresa_id
+    WHERE dr.estado = 'pendiente' -- 🔥 SOLO PENDIENTES
+    ${empresa_id ? 'AND dr.empresa_id = $1' : ''}
+    ORDER BY td.porcentaje DESC -- 🔥 MAYOR PESO PRIMERO
+    LIMIT 5 -- 🔥 SOLO 5
+  `, empresa_id ? [empresa_id] : []);
 
   return result.rows;
 };
-
 module.exports = {
   crearDocumentoRequerido,
   obtenerPorEmpresa,
   obtenerPendientes,
-  obtenerColaRevision
+  obtenerColaRevision,
+  obtenerResumenEmpresa
 };

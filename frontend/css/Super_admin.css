@@ -221,3 +221,60 @@
   opacity: 1;
   transform: translateY(0);
 }
+
+/* =========================
+   PAGINACIÓN GLOBAL
+========================= */
+.paginacion {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+/* =========================
+   BOTONES
+========================= */
+.paginacion button {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+/* hover */
+.paginacion button:hover:not(:disabled) {
+  background: var(--primary);
+  color: #020617;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.25);
+}
+
+/* deshabilitado */
+.paginacion button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* =========================
+   TEXTO PÁGINA
+========================= */
+.paginacion span {
+  font-size: 13px;
+  color: var(--text-muted, #94a3b8);
+  font-weight: 500;
+}
+
+/* =========================
+   VERSION MÁS BONITA (OPCIONAL)
+========================= */
+.paginacion button.active {
+  background: linear-gradient(135deg, #38bdf8, #2563eb);
+  color: #020617;
+  border: none;
+}

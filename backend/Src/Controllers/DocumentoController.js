@@ -45,11 +45,8 @@ exports.listarDocumentos = async (req, res) => {
     if (requester.rol === 'super_admin') {
       docs = await Documento.listarDocumentos();
     } else if (requester.rol === 'auditor') {
-      if (!requester.empresa_id) {
-        return res.status(400).json({ message: 'El auditor no tiene empresa asignada' });
-      }
-      docs = await Documento.listarDocumentosPorEmpresa(requester.empresa_id);
-    } else {
+  docs = await Documento.listarDocumentos(); // 🔥 VE TODO
+}else {
       docs = await Documento.listarDocumentosPorUsuario(requester.id);
     }
     return res.json(docs);
@@ -147,5 +144,23 @@ exports.validarDocumento = async (req, res) => {
       return res.status(400).json({ message: 'validado_por no corresponde a un usuario válido', detail: err.detail });
     }
     return res.status(500).json({ message: 'Error al validar documento' });
+  }
+};
+
+exports.listarPendientesValidacion = async (req, res) => {
+  try {
+    const requester = req.user;
+    if (!['auditor', 'super_admin'].includes(requester.rol)) {
+      return res.status(403).json({ message: 'No autorizado' });
+    }
+
+    // Listar documentos con estado 'subido'
+    const documentos = await Documento.listarDocumentos();
+    const pendientes = documentos.filter(doc => doc.estado === 'subido');
+
+    return res.json(pendientes);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Error al listar documentos pendientes de validación' });
   }
 };
