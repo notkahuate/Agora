@@ -315,7 +315,7 @@ function renderDocumentos() {
 
     tr.innerHTML = `
       <td>${doc.tipo_documento}</td>
-      <td>—</td>
+      <td>${doc.responsable_nombre || 'Sin asignar'}</td>
       <td>${new Date(doc.fecha_limite).toLocaleDateString()}</td>
       <td>${doc.prioridad}</td>
       <td>

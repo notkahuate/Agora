@@ -50,6 +50,7 @@ const listarPendientes = async (req, res) => {
 
     let empresaFinal = empresa_id;
 
+    // auditor puede consultar cualquiera
     if (rol === 'auditor') {
       empresaFinal = req.params.empresaId;
     }
@@ -60,6 +61,52 @@ const listarPendientes = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Error al listar pendientes' });
+  }
+};
+
+// ✅ Pendientes por usuario
+const listarPendientesUsuario = async (req, res) => {
+  try {
+    const { id: usuario_id } = req.user;
+
+    const data = await model.obtenerPendientesPorUsuario(usuario_id);
+    res.json(data);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al listar pendientes del usuario' });
+  }
+};
+// ✅ Asignados por usuario (todos con estado)
+const listarAsignadosUsuario = async (req, res) => {
+  try {
+    const { id: usuario_id } = req.user;
+
+    const data = await model.obtenerAsignadosPorUsuario(usuario_id);
+    res.json(data);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al listar asignados del usuario' });
+  }
+};
+// ✅ Asignados por usuario (todos con estado)
+
+// ✅ Listar todos (para superadmin)
+const listarTodos = async (req, res) => {
+  try {
+    const { rol } = req.user;
+
+    if (rol !== 'super_admin') {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
+    const data = await model.obtenerTodos();
+    res.json(data);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al listar todos los documentos' });
   }
 };
 
@@ -87,7 +134,10 @@ const listarColaRevision = async (req, res) => {
 module.exports = {
   crear,
   listarPorEmpresa,
+  listarTodos,
   listarPendientes,
+  listarPendientesUsuario,
+  listarAsignadosUsuario,
   listarColaRevision,
   obtenerResumen
 };

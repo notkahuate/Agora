@@ -14,6 +14,7 @@ const  DocumentoRoutes = require('./Routes/DocumentoRoutes');
 const authRoutes = require('./Routes/authRoutes');
 const Tipodocs = require('./Routes/tipodocumentosRoutes');
 const documentosRequeridosRoutes = require('./Routes/DocumentosRoutes');
+const documentoResponsableRoutes = require('./Routes/DocumentoResponsableRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tipos-documentos', Tipodocs);
@@ -24,6 +25,7 @@ app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/empresas', empresasRoutes);
 
 app.use('/api/documentos-requeridos', documentosRequeridosRoutes);
+app.use('/api/documento-responsables', documentoResponsableRoutes);
 
 
 app.use(express.static(path.join(__dirname, "../../frontend")));

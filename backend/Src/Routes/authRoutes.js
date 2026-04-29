@@ -6,13 +6,16 @@ const rateLimit = require('express-rate-limit');
 const authController = require('../Controllers/authController');
 
 // Rate limiter para login (protección básica brute-force)
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 6, // 6 intentos por IP en 15 min
-  message: { message: 'Demasiados intentos, intenta de nuevo más tarde' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// const loginLimiter = rateLimit({
+//   windowMs: 1500 * 60 * 1000, // 15 minutos
+//   max: 6, // 6 intentos por IP en 15 min
+//   message: { message: 'Demasiados intentos, intenta de nuevo más tarde' },
+//   standardHeaders: true,
+//   legacyHeaders: false,
+// });
+
+// Temporalmente desactivado para pruebas
+const loginLimiter = (req, res, next) => next();
 
 // Validación de entrada para login
 const loginValidation = [
