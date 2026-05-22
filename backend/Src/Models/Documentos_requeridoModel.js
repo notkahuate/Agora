@@ -6,18 +6,16 @@ const crearDocumentoRequerido = async (data) => {
   const {
     empresa_id,
     tipo_documento_id,
-    mes,
-    anio,
     fecha_limite,
     prioridad
   } = data;
 
   const result = await pool.query(
     `INSERT INTO documentos_requeridos 
-    (empresa_id, tipo_documento_id, mes, anio, fecha_limite, prioridad)
-    VALUES ($1, $2, $3, $4, $5, $6)
+    (empresa_id, tipo_documento_id, fecha_limite, prioridad)
+    VALUES ($1, $2, $3, $4)
     RETURNING *`,
-    [empresa_id, tipo_documento_id, mes, anio, fecha_limite, prioridad]
+    [empresa_id, tipo_documento_id, fecha_limite, prioridad]
   );
 
   return result.rows[0];

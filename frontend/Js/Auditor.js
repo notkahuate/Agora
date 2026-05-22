@@ -353,9 +353,9 @@ function agruparDocumentosPorSeccion(documentos) {
 }
 
 async function abrirModalAsignarDocumentos(empresaId, empresaNombre) {
-  selectedEmpresaId = empresaId;
-  selectedEmpresaNombre = empresaNombre;
-  document.getElementById('asignarDocsTitulo').textContent = `Empresa: ${empresaNombre}`;
+  selectedEmpresaId = Number(empresaId);
+  selectedEmpresaNombre = String(empresaNombre || '').trim();
+  document.getElementById('asignarDocsTitulo').textContent = `Empresa: ${selectedEmpresaNombre}`;
   const fechaLimiteInput = document.getElementById('asignarFechaLimite');
   const defaultDate = new Date();
   defaultDate.setDate(defaultDate.getDate() + 30);
@@ -421,8 +421,18 @@ async function abrirModalAsignarDocumentos(empresaId, empresaNombre) {
 }
 
 async function asignarDocumentosEmpresa() {
+  if (!selectedEmpresaId) {
+    return alert('No se ha seleccionado correctamente la empresa. Vuelve a abrir el modal.');
+  }
+
   const fechaLimite = document.getElementById('asignarFechaLimite').value;
-  const prioridad = document.getElementById('asignarPrioridad').value;
+  const prioridad = String(document.getElementById('asignarPrioridad').value || 'media').trim().toLowerCase();
+  const validPrioridades = ['baja', 'media', 'alta'];
+
+  if (!validPrioridades.includes(prioridad)) {
+    return alert('La prioridad seleccionada no es válida.');
+  }
+
   const checkedBoxes = Array.from(document.querySelectorAll('#asignarDocsBody input[type="checkbox"]'))
     .filter(input => input.checked && !input.disabled);
 
@@ -430,7 +440,11 @@ async function asignarDocumentosEmpresa() {
     return alert('Selecciona al menos un documento para asignar.');
   }
 
-  const tipoIds = checkedBoxes.map(input => Number(input.value));
+  const tipoIds = checkedBoxes.map(input => Number(input.value)).filter(Boolean);
+  if (!tipoIds.length) {
+    return alert('No se pudo leer los documentos seleccionados. Intenta recargar el modal.');
+  }
+
   const fecha = new Date(fechaLimite);
   if (Number.isNaN(fecha.getTime())) {
     return alert('Fecha límite inválida.');
@@ -450,10 +464,8 @@ async function asignarDocumentosEmpresa() {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          empresa_id: selectedEmpresaId,
-          tipo_documento_id,
-          mes,
-          anio,
+          empresa_id: Number(selectedEmpresaId),
+          tipo_documento_id: Number(tipo_documento_id),
           fecha_limite: fechaLimite,
           prioridad
         })
@@ -463,8 +475,15 @@ async function asignarDocumentosEmpresa() {
     const failed = [];
     for (const res of results) {
       if (!res.ok) {
-        const error = await res.json();
-        failed.push(error.message || 'Error al asignar documento');
+        let errorMessage = 'Error al asignar documento';
+        try {
+          const errorBody = await res.json();
+          errorMessage = errorBody.message || errorBody.error || errorMessage;
+        } catch (_) {
+          const errorText = await res.text().catch(() => '');
+          if (errorText) errorMessage = errorText;
+        }
+        failed.push(errorMessage);
       }
     }
 
@@ -478,7 +497,7 @@ async function asignarDocumentosEmpresa() {
     cargarEmpresas();
   } catch (err) {
     console.error('Error asignando documentos a la empresa:', err);
-    alert('Error asignando documentos a la empresa');
+    alert('Error asignando documentos a la empresa. Revisa la consola o recarga la página.');
   }
 }
 
