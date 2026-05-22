@@ -65,6 +65,8 @@ async function cargarEmpresas() {
 
     const empresas = await empresasRes.json();
     const usuarios = await usuariosRes.json();
+    window.allUsuarios = usuarios;
+    window.empresasData = empresas;
 
     let totalPendientesGlobal = 0;
     let sumaCumplimiento = 0;
@@ -150,6 +152,12 @@ async function cargarEmpresas() {
         </td>
 
         <td>
+          <button class="btn btn-primary" onclick="abrirModalAsignarDocumentos(${e.id}, '${String(e.nombre).replace(/'/g, "\\'")}')">
+            Asignar
+          </button>
+          <button class="btn btn-secondary" onclick="abrirModalCrearUsuario(${e.id}, '${String(e.nombre).replace(/'/g, "\\'")}')">
+            Crear usuario
+          </button>
           <button class="btn btn-secondary" onclick="verEmpresa('${e.id}')">
             Ver
           </button>
@@ -218,8 +226,260 @@ async function cargarEmpresas() {
   }
 }
 
+let selectedEmpresaId = null;
+let selectedEmpresaNombre = '';
+
 function verEmpresa(id) {
   window.location.href = `/Empresa_Detalles.html?id=${id}`;
+}
+
+function cerrarModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) modal.style.display = 'none';
+}
+
+function abrirModalCrearEmpresa() {
+  selectedEmpresaId = null;
+  document.getElementById('empresaNombre').value = '';
+  document.getElementById('empresaRut').value = '';
+  document.getElementById('empresaSector').value = '';
+  document.getElementById('empresaUbicacion').value = '';
+  document.getElementById('empresaEmail').value = '';
+  document.getElementById('empresaTelefono').value = '';
+  document.getElementById('modalCrearEmpresa').style.display = 'flex';
+}
+
+async function crearEmpresa() {
+  const nombre = document.getElementById('empresaNombre').value.trim();
+  const rut = document.getElementById('empresaRut').value.trim();
+  const sector = document.getElementById('empresaSector').value.trim();
+  const ubicacion = document.getElementById('empresaUbicacion').value.trim();
+  const email = document.getElementById('empresaEmail').value.trim();
+  const telefono = document.getElementById('empresaTelefono').value.trim();
+
+  if (!nombre || !rut) {
+    return alert('Nombre y RUT son obligatorios.');
+  }
+
+  try {
+    const res = await fetch('http://localhost:3000/api/empresas', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ nombre, rut, sector, ubicacion, email, telefono })
+    });
+
+    if (!res.ok) {
+      const error = await res.json();
+      return alert(error.message || 'Error creando la empresa');
+    }
+
+    alert('Empresa creada correctamente');
+    cerrarModal('modalCrearEmpresa');
+    cargarEmpresas();
+  } catch (err) {
+    console.error('Error creando empresa:', err);
+    alert('Error creando empresa');
+  }
+}
+
+function abrirModalCrearUsuario(empresaId, empresaNombre) {
+  selectedEmpresaId = empresaId;
+  selectedEmpresaNombre = empresaNombre;
+  document.getElementById('usuarioEmpresaNombre').textContent = `Empresa: ${empresaNombre}`;
+  document.getElementById('usuarioNombre').value = '';
+  document.getElementById('usuarioEmail').value = '';
+  document.getElementById('usuarioPassword').value = '';
+
+  document.getElementById('usuarioRoleGroup').style.display = 'block';
+  document.getElementById('usuarioRol').value = 'usuario';
+
+  document.getElementById('modalCrearUsuario').style.display = 'flex';
+}
+
+async function crearUsuario() {
+  const nombre = document.getElementById('usuarioNombre').value.trim();
+  const email = document.getElementById('usuarioEmail').value.trim();
+  const password = document.getElementById('usuarioPassword').value.trim();
+  const rolInput = document.getElementById('usuarioRol');
+  const rol = rolInput ? rolInput.value : 'usuario';
+
+  if (!selectedEmpresaId) {
+    return alert('Selecciona una empresa primero.');
+  }
+  if (!nombre || !email || !password) {
+    return alert('Nombre, email y contraseña son obligatorios.');
+  }
+
+  try {
+    const res = await fetch('http://localhost:3000/api/usuarios', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ nombre, email, password, rol, empresa_id: selectedEmpresaId })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return alert(data.message || 'Error creando usuario');
+    }
+
+    alert('Usuario creado correctamente');
+    cerrarModal('modalCrearUsuario');
+    cargarEmpresas();
+  } catch (err) {
+    console.error('Error creando usuario:', err);
+    alert('Error creando usuario');
+  }
+}
+
+function obtenerSeccion(nombre) {
+  const text = String(nombre || '').trim();
+  const match = text.match(/^(\d+)(?:\.\d+)*\b/);
+  return match ? match[1] : 'Otros';
+}
+
+function agruparDocumentosPorSeccion(documentos) {
+  return documentos.reduce((grupos, doc) => {
+    const seccion = obtenerSeccion(doc.nombre || doc.tipo_documento || 'Otros');
+    grupos[seccion] = grupos[seccion] || [];
+    grupos[seccion].push(doc);
+    return grupos;
+  }, {});
+}
+
+async function abrirModalAsignarDocumentos(empresaId, empresaNombre) {
+  selectedEmpresaId = empresaId;
+  selectedEmpresaNombre = empresaNombre;
+  document.getElementById('asignarDocsTitulo').textContent = `Empresa: ${empresaNombre}`;
+  const fechaLimiteInput = document.getElementById('asignarFechaLimite');
+  const defaultDate = new Date();
+  defaultDate.setDate(defaultDate.getDate() + 30);
+  fechaLimiteInput.value = defaultDate.toISOString().split('T')[0];
+  document.getElementById('asignarPrioridad').value = 'media';
+  document.getElementById('asignarDocsBody').innerHTML = '<p>Cargando documentos disponibles...</p>';
+  document.getElementById('modalAsignarDocumentos').style.display = 'flex';
+
+  try {
+    const headers = { 'Authorization': `Bearer ${token}` };
+    const [tiposRes, docsEmpresaRes] = await Promise.all([
+      fetch('http://localhost:3000/api/tipos-documentos', { headers }),
+      fetch(`http://localhost:3000/api/documentos-requeridos/empresa/${empresaId}`, { headers })
+    ]);
+
+    if (!tiposRes.ok) {
+      const error = await tiposRes.json().catch(() => ({}));
+      throw new Error(error.message || 'Error cargando tipos de documentos');
+    }
+    if (!docsEmpresaRes.ok) {
+      const error = await docsEmpresaRes.json().catch(() => ({}));
+      throw new Error(error.message || 'Error cargando documentos de la empresa');
+    }
+
+    const tipos = await tiposRes.json();
+    const docsEmpresa = await docsEmpresaRes.json();
+    const tiposAsignados = new Set(docsEmpresa.map(d => d.tipo_documento_id));
+
+    if (!tipos.length) {
+      document.getElementById('asignarDocsBody').innerHTML = '<p>No hay tipos de documentos disponibles.</p>';
+      return;
+    }
+
+    const secciones = agruparDocumentosPorSeccion(tipos);
+    const html = Object.keys(secciones).sort().map(seccion => {
+      const items = secciones[seccion].map(tipo => {
+        const isAssigned = tiposAsignados.has(tipo.id);
+        return `
+          <div class="tipo-card">
+            <div class="tipo-card-info">
+              <div class="tipo-card-title">${tipo.nombre}</div>
+              <div class="tipo-card-meta">Frecuencia: ${tipo.frecuencia || 'n/a'} · ${tipo.porcentaje ? tipo.porcentaje + '%' : '0%'}</div>
+            </div>
+            <label class="tipo-card-action">
+              <input type="checkbox" id="check-tipo-${tipo.id}" value="${tipo.id}" ${isAssigned ? 'disabled checked' : ''} />
+              <span>${isAssigned ? 'Asignado' : 'Seleccionar'}</span>
+            </label>
+          </div>`;
+      }).join('');
+
+      return `
+        <details class="section-panel" ${seccion === '1' ? 'open' : ''}>
+          <summary>Sección ${seccion}</summary>
+          <div class="section-panel-body">${items}</div>
+        </details>`;
+    }).join('');
+
+    document.getElementById('asignarDocsBody').innerHTML = `<div class="seccion-grid">${html}</div>`;
+  } catch (err) {
+    console.error('Error cargando documentos para asignar:', err);
+    document.getElementById('asignarDocsBody').innerHTML = '<p>Error cargando documentos.</p>';
+  }
+}
+
+async function asignarDocumentosEmpresa() {
+  const fechaLimite = document.getElementById('asignarFechaLimite').value;
+  const prioridad = document.getElementById('asignarPrioridad').value;
+  const checkedBoxes = Array.from(document.querySelectorAll('#asignarDocsBody input[type="checkbox"]'))
+    .filter(input => input.checked && !input.disabled);
+
+  if (!checkedBoxes.length) {
+    return alert('Selecciona al menos un documento para asignar.');
+  }
+
+  const tipoIds = checkedBoxes.map(input => Number(input.value));
+  const fecha = new Date(fechaLimite);
+  if (Number.isNaN(fecha.getTime())) {
+    return alert('Fecha límite inválida.');
+  }
+
+  const mes = fecha.getMonth() + 1;
+  const anio = fecha.getFullYear();
+
+  try {
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+
+    const results = await Promise.all(tipoIds.map(tipo_documento_id =>
+      fetch('http://localhost:3000/api/documentos-requeridos', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          empresa_id: selectedEmpresaId,
+          tipo_documento_id,
+          mes,
+          anio,
+          fecha_limite: fechaLimite,
+          prioridad
+        })
+      })
+    ));
+
+    const failed = [];
+    for (const res of results) {
+      if (!res.ok) {
+        const error = await res.json();
+        failed.push(error.message || 'Error al asignar documento');
+      }
+    }
+
+    if (failed.length) {
+      alert(`Algunos documentos no se asignaron:\n${failed.join('\n')}`);
+    } else {
+      alert('Documentos asignados correctamente a la empresa.');
+    }
+
+    abrirModalAsignarDocumentos(selectedEmpresaId, selectedEmpresaNombre);
+    cargarEmpresas();
+  } catch (err) {
+    console.error('Error asignando documentos a la empresa:', err);
+    alert('Error asignando documentos a la empresa');
+  }
 }
 
 async function actualizarKpiRevisados() {
@@ -406,4 +666,12 @@ async function cargarColaPrioritaria() {
 document.addEventListener('DOMContentLoaded', () => {
   cargarEmpresas();
   cargarColaPrioritaria();
+
+  document.querySelectorAll('.modal').forEach((modal) => {
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) {
+        cerrarModal(modal.id);
+      }
+    });
+  });
 });

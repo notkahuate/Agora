@@ -51,7 +51,7 @@
             <p class="page-subtitle">Supervisa, asigna y valida documentos de todas las empresas.</p>
           </div>
           <div class="actions-row">
-            <button class="btn btn-primary">Crear Empresa</button>
+            <button class="btn btn-primary" onclick="abrirModalCrearEmpresa()">Crear Empresa</button>
           </div>
         </div>
 
@@ -146,6 +146,90 @@
           <div class="timeline" id="timelineAuditor"></div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalCrearEmpresa" class="modal">
+    <div class="modal-content">
+      <span style="float:right;cursor:pointer;font-size:24px;" onclick="cerrarModal('modalCrearEmpresa')">&times;</span>
+      <h2>Crear Empresa</h2>
+      <div class="form-group">
+        <label class="form-label">Nombre</label>
+        <input id="empresaNombre" class="form-control" type="text" placeholder="Nombre de la empresa" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">RUT</label>
+        <input id="empresaRut" class="form-control" type="text" placeholder="RUT" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sector</label>
+        <input id="empresaSector" class="form-control" type="text" placeholder="Sector" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ubicación</label>
+        <input id="empresaUbicacion" class="form-control" type="text" placeholder="Ubicación" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input id="empresaEmail" class="form-control" type="email" placeholder="Email de contacto" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Teléfono</label>
+        <input id="empresaTelefono" class="form-control" type="text" placeholder="Teléfono" />
+      </div>
+      <button class="btn btn-primary" onclick="crearEmpresa()">Crear empresa</button>
+    </div>
+  </div>
+
+  <div id="modalCrearUsuario" class="modal">
+    <div class="modal-content">
+      <span style="float:right;cursor:pointer;font-size:24px;" onclick="cerrarModal('modalCrearUsuario')">&times;</span>
+      <h2>Crear usuario</h2>
+      <p id="usuarioEmpresaNombre" style="margin-bottom:16px;color:#555;"></p>
+      <div class="form-group">
+        <label class="form-label">Nombre</label>
+        <input id="usuarioNombre" class="form-control" type="text" placeholder="Nombre del usuario" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input id="usuarioEmail" class="form-control" type="email" placeholder="Email" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Contraseña</label>
+        <input id="usuarioPassword" class="form-control" type="password" placeholder="Contraseña" />
+      </div>
+      <div class="form-group" id="usuarioRoleGroup">
+        <label class="form-label">Rol</label>
+        <select id="usuarioRol" class="form-control">
+          <option value="usuario">Usuario</option>
+          <option value="super_admin">Super admin</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="crearUsuario()">Crear usuario</button>
+    </div>
+  </div>
+
+  <div id="modalAsignarDocumentos" class="modal">
+    <div class="modal-content wide-modal">
+      <span style="float:right;cursor:pointer;font-size:24px;" onclick="cerrarModal('modalAsignarDocumentos')">&times;</span>
+      <h2>Asignar documentos a la empresa</h2>
+      <p id="asignarDocsTitulo" style="margin-bottom:16px;color:#555;"></p>
+      <div class="form-group">
+        <label class="form-label">Fecha límite común</label>
+        <input id="asignarFechaLimite" class="form-control" type="date" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Prioridad común</label>
+        <select id="asignarPrioridad" class="form-control">
+          <option value="media">Media</option>
+          <option value="alta">Alta</option>
+          <option value="baja">Baja</option>
+        </select>
+      </div>
+      <div id="asignarDocsBody"></div>
+      <div style="text-align:right; margin-top:16px;">
+        <button class="btn btn-primary" onclick="asignarDocumentosEmpresa()">Asignar documentos seleccionados</button>
       </div>
     </div>
   </div>

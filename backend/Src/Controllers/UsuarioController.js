@@ -67,7 +67,7 @@ exports.crearUsuario = async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { nombre, email, password, activo } = req.body;
+    const { nombre, email, password, activo, empresa_id: bodyEmpresaId, rol: bodyRol } = req.body;
 
     if (!nombre || !email || !password) {
       return res.status(400).json({
@@ -75,24 +75,34 @@ exports.crearUsuario = async (req, res) => {
       });
     }
 
-    // Usuario autenticado (super admin)
     const requester = req.user;
-
-    if (!requester || requester.rol !== 'super_admin') {
+    if (!requester || !['super_admin', 'auditor'].includes(requester.rol)) {
       return res.status(403).json({ message: 'No autorizado' });
     }
 
-    // Verificar email existente
     const existente = await Usuario.obtenerUsuarioPorEmail(email);
     if (existente) {
       return res.status(409).json({ message: 'El email ya está en uso' });
     }
 
-    // 🔐 VALORES FORZADOS
-    const rol = 'usuario';
-    const empresa_id = requester.empresa_id;
-    const activoFinal = typeof activo === 'boolean' ? activo : true;
+    const validRoles = new Set(['usuario', 'super_admin']);
+    const rol = validRoles.has(bodyRol) ? bodyRol : 'usuario';
 
+    if (requester.rol === 'auditor' && !validRoles.has(bodyRol)) {
+      return res.status(400).json({ message: 'Rol inválido. Debe ser usuario o super_admin.' });
+    }
+
+    let empresaId = null;
+    if (requester.rol === 'auditor') {
+      empresaId = bodyEmpresaId;
+      if (!empresaId) {
+        return res.status(400).json({ message: 'empresa_id es obligatorio para auditores' });
+      }
+    } else {
+      empresaId = bodyEmpresaId || requester.empresa_id || null;
+    }
+
+    const activoFinal = typeof activo === 'boolean' ? activo : true;
     const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
 
     const nuevoUsuario = await Usuario.crearUsuario({
@@ -100,7 +110,7 @@ exports.crearUsuario = async (req, res) => {
       email,
       password_hash,
       rol,
-      empresa_id,
+      empresa_id: empresaId,
       activo: activoFinal
     });
 

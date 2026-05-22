@@ -696,21 +696,119 @@ tbody tr:hover {
   top: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,.5);
+  background: rgba(0,0,0,.55);
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
 }
 
 .modal-content {
   background: #fff;
-  padding: 20px;
-  width: 400px;
-  margin: 10% auto;
-  border-radius: 8px;
+  padding: 24px;
+  width: 100%;
+  max-width: 980px;
+  border-radius: 12px;
+  max-height: 88vh;
+  overflow-y: auto;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.18);
+}
+
+.modal-content.wide-modal {
+  width: min(980px, calc(100% - 40px));
+  max-width: 980px;
+}
+
+.seccion-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 18px;
+}
+
+.section-panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.section-panel summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  font-weight: 700;
+  font-size: 16px;
+  color: #0f172a;
+  background: #f8fafc;
+  list-style: none;
+}
+
+.section-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.section-panel summary::after {
+  content: '▶';
+  transition: transform 0.2s ease;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.section-panel[open] summary::after {
+  transform: rotate(90deg);
+}
+
+.section-panel-body {
+  padding: 16px 20px 20px;
+  display: grid;
+  gap: 12px;
+}
+
+.tipo-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.tipo-card-info {
+  min-width: 0;
+}
+
+.tipo-card-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.tipo-card-meta {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.tipo-card-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.tipo-card-action input {
+  width: 16px;
+  height: 16px;
 }
 
 #cerrarModal {
   float: right;
   cursor: pointer;
-  font-size: 20px;
+  font-size: 22px;
 }
 
 /* Contenedor gris */
