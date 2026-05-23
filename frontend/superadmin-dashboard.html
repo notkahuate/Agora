@@ -70,6 +70,18 @@
   </div>
 </div>
 
+  <div id="modalAsignarResponsable" class="modal">
+    <div class="modal-content">
+      <span id="cerrarModalResponsable">&times;</span>
+      <h2>Asignar responsable</h2>
+      <p id="asignarResponsableTitulo" style="margin-bottom: 16px; color: #94a3b8;"></p>
+      <select id="selectUsuarioResponsable" class="form-control" style="width: 100%; margin-bottom: 18px;">
+        <option value="">Selecciona un usuario</option>
+      </select>
+      <button id="btnAsignarResponsable" class="btn btn-primary">Asignar</button>
+    </div>
+  </div>
+
       
 
       <div class="content">
@@ -185,6 +197,7 @@
                     <th>Fecha</th>
                     <th>Tipo</th>
                     <th>Estado</th>
+                    <th>Acción</th>
                   </tr>
                 </thead>
                 <tbody id="tablaDocumentos"></tbody>

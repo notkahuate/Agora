@@ -12,6 +12,8 @@ let documentosGlobal = [];
 let paginaDocumentos = 1;
 const limiteDocumentos = 5;
 
+let selectedDocumentoId = null;
+
 console.log("USER:", user);
 
 if (!token || !user) {
@@ -45,15 +47,82 @@ function showAlert() {
 }
 // Modal
 const modal = document.getElementById('modalUsuario');
+const modalResponsable = document.getElementById('modalAsignarResponsable');
 const btnAbrir = document.getElementById('btnAbrirModal');
 const cerrar = document.getElementById('cerrarModal');
+const cerrarResponsable = document.getElementById('cerrarModalResponsable');
 
 btnAbrir.onclick = () => modal.style.display = 'block';
 cerrar.onclick = () => modal.style.display = 'none';
+modalResponsable && cerrarResponsable && (cerrarResponsable.onclick = () => modalResponsable.style.display = 'none');
 
 window.onclick = (e) => {
   if (e.target === modal) modal.style.display = 'none';
+  if (e.target === modalResponsable) modalResponsable.style.display = 'none';
 };
+
+const btnAsignarResponsable = document.getElementById('btnAsignarResponsable');
+if (btnAsignarResponsable) {
+  btnAsignarResponsable.addEventListener('click', async () => {
+    await asignarResponsableDocumento();
+  });
+}
+
+async function abrirModalAsignarResponsable(documentoId, documentoNombre) {
+  selectedDocumentoId = documentoId;
+  const titulo = document.getElementById('asignarResponsableTitulo');
+  const select = document.getElementById('selectUsuarioResponsable');
+
+  titulo.textContent = `Documento: ${documentoNombre}`;
+  select.innerHTML = '<option value="">Selecciona un usuario</option>';
+
+  if (!usuariosGlobal || usuariosGlobal.length === 0) {
+    await cargarUsuariosEmpresa().catch(err => console.error('Error cargando usuarios para asignar:', err));
+  }
+
+  usuariosGlobal.forEach(usuario => {
+    const option = document.createElement('option');
+    option.value = usuario.id;
+    option.textContent = usuario.nombre || usuario.email;
+    select.appendChild(option);
+  });
+
+  modalResponsable.style.display = 'flex';
+}
+
+async function asignarResponsableDocumento() {
+  const select = document.getElementById('selectUsuarioResponsable');
+  const usuarioId = select.value;
+
+  if (!selectedDocumentoId || !usuarioId) {
+    return alert('Selecciona un documento y un usuario para asignar.');
+  }
+
+  try {
+    const res = await fetch('http://localhost:3000/api/documento-responsables', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ documento_requerido_id: selectedDocumentoId, usuario_id: Number(usuarioId) })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      return alert(data.error || 'Error al asignar responsable');
+    }
+
+    alert('Responsable asignado correctamente.');
+    modalResponsable.style.display = 'none';
+    cargarDocumentos();
+    cargarUsuariosEmpresa();
+  } catch (error) {
+    console.error('Error asignando responsable:', error);
+    alert('No se pudo asignar el responsable. Intenta nuevamente.');
+  }
+}
 
 // Crear usuario
 document.getElementById('formCrearUsuario')
@@ -328,6 +397,11 @@ function renderDocumentos() {
         }">
           ${estado}
         </span>
+      </td>
+      <td>
+        <button class="btn btn-secondary" onclick="abrirModalAsignarResponsable(${doc.id}, '${String(doc.tipo_documento).replace(/'/g, "\\'")}')">
+          Asignar
+        </button>
       </td>
     `;
 
