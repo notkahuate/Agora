@@ -201,16 +201,25 @@ function renderUsuarios() {
   pagina.forEach(usuario => {
     const tr = document.createElement('tr');
 
+    // Calculate pending and progress based on documentosGlobal
+    const totalAssigned = documentosGlobal ? documentosGlobal.filter(d => d.responsable_id === usuario.id).length : 0;
+    const pendingCount = documentosGlobal ? documentosGlobal.filter(d => d.responsable_id === usuario.id && d.estado && d.estado.toLowerCase() === 'pendiente').length : 0;
+    const completedCount = totalAssigned - pendingCount;
+    const progressPercent = totalAssigned > 0 ? Math.max(0, Math.min(100, Math.round((completedCount / totalAssigned) * 100))) : 100;
+
+    const estadoBadgeClass = usuario.activo ? 'badge-success' : 'badge-danger';
+    const estadoTexto = usuario.activo ? 'Activo' : 'Inactivo';
+
     tr.innerHTML = `
       <td>${usuario.nombre}</td>
-      <td>—</td>
-      <td>0</td>
+      <td>${usuario.email || '—'}</td>
+      <td>${pendingCount}</td>
       <td>
         <div class="progress-bar">
-          <div class="progress" style="width:70%"></div>
+          <div class="progress" style="width:${progressPercent}%"></div>
         </div>
       </td>
-      <td><span class="badge badge-success">Activo</span></td>
+      <td><span class="badge ${estadoBadgeClass}">${estadoTexto}</span></td>
     `;
 
     tbody.appendChild(tr);
