@@ -27,6 +27,8 @@ app.use('/api/empresas', empresasRoutes);
 app.use('/api/documentos-requeridos', documentosRequeridosRoutes);
 app.use('/api/documento-responsables', documentoResponsableRoutes);
 
+// Servir archivos de uploads
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use(express.static(path.join(__dirname, "../../frontend")));
 testConnection();

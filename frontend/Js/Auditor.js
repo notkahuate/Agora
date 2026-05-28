@@ -543,10 +543,16 @@ async function cargarDocumentos() {
           <span class="badge badge-warning">Subido</span>
         </td>
         <td>
-          <button class="btn btn-success" onclick="validarDocumento('${doc.id}', 'aprobar')">
+          <button class="btn btn-sm btn-info" onclick="previewDocumento('${doc.id}', '${doc.nombre_archivo}')" style="margin-right:5px;">
+            Ver
+          </button>
+          <button class="btn btn-sm btn-secondary" onclick="descargarDocumento('${doc.id}', '${doc.nombre_archivo}')" style="margin-right:5px;">
+            Descargar
+          </button>
+          <button class="btn btn-success btn-sm" onclick="validarDocumento('${doc.id}', 'aprobar')" style="margin-right:5px;">
             Aprobar
           </button>
-          <button class="btn btn-danger" onclick="validarDocumento('${doc.id}', 'rechazar')">
+          <button class="btn btn-danger btn-sm" onclick="validarDocumento('${doc.id}', 'rechazar')">
             Rechazar
           </button>
         </td>
@@ -588,6 +594,126 @@ window.validarDocumento = async function(id, action) {
     }
   } catch (err) {
     console.error('Error validando documento:', err);
+  }
+};
+
+window.descargarDocumento = async function(id, nombreArchivo) {
+  try {
+    const headers = {
+      'Authorization': `Bearer ${token}`
+    };
+
+    const res = await fetch(`http://localhost:3000/api/documentos/${id}/descargar`, {
+      method: 'GET',
+      headers
+    });
+
+    if (!res.ok) {
+      alert('Error al descargar el documento');
+      return;
+    }
+
+    // Obtener el blob
+    const blob = await res.blob();
+    
+    // Crear un link temporal y descargar
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombreArchivo || 'documento';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  } catch (err) {
+    console.error('Error descargando documento:', err);
+    alert('Error al descargar documento');
+  }
+};
+
+window.previewDocumento = async function(id, nombreArchivo) {
+  try {
+    const headers = {
+      'Authorization': `Bearer ${token}`
+    };
+
+    // Obtener info del documento
+    const docRes = await fetch(`http://localhost:3000/api/documentos/${id}`, {
+      method: 'GET',
+      headers
+    });
+
+    if (!docRes.ok) {
+      alert('Error al obtener documento');
+      return;
+    }
+
+    const doc = await docRes.json();
+    const extension = nombreArchivo.split('.').pop().toLowerCase();
+    const isImage = ['jpg', 'jpeg', 'png', 'gif'].includes(extension);
+    const isPdf = extension === 'pdf';
+
+    // Crear modal con preview
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+    `;
+
+    const content = document.createElement('div');
+    content.style.cssText = `
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 80%;
+      max-height: 80vh;
+      overflow: auto;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    `;
+
+    if (isPdf || isImage) {
+      const img = document.createElement('img');
+      img.style.cssText = 'max-width: 100%; max-height: 70vh;';
+      img.src = `http://localhost:3000${doc.ruta_archivo}`;
+      content.appendChild(img);
+    } else {
+      const p = document.createElement('p');
+      p.textContent = `Documento: ${nombreArchivo} (no se puede previsualizar)`;
+      p.style.cssText = 'margin-bottom: 20px;';
+      content.appendChild(p);
+    }
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'Cerrar';
+    closeBtn.style.cssText = `
+      margin-top: 20px;
+      padding: 8px 16px;
+      background: #334155;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    `;
+    closeBtn.onclick = () => modal.remove();
+    content.appendChild(closeBtn);
+
+    modal.appendChild(content);
+    modal.onclick = (e) => {
+      if (e.target === modal) modal.remove();
+    };
+
+    document.body.appendChild(modal);
+  } catch (err) {
+    console.error('Error en preview:', err);
+    alert('Error al previsualizar documento');
   }
 };
 

@@ -253,6 +253,44 @@ img {
   color: var(--text);
 }
 
+.btn-success {
+  background: #10b981;
+  color: white;
+  box-shadow: var(--shadow-soft);
+}
+
+.btn-success:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+  box-shadow: var(--shadow-soft);
+}
+
+.btn-danger:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+
+.btn-info {
+  background: #0ea5e9;
+  color: white;
+  box-shadow: var(--shadow-soft);
+}
+
+.btn-info:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
 .btn-ghost {
   background: transparent;
   color: var(--muted);

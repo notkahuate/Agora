@@ -1,11 +1,13 @@
 // src/controllers/documentoController.js
 const Documento = require('../Models/DocumentModel');
 const { pool } = require('../configures/db');
+const fs = require('fs');
+const path = require('path');
 
 exports.crearDocumento = async (req, res) => {
   try {
     const body = req.body || {};
-    const { usuario_id, tipo_documento_id, empresa_id, nombre_archivo, ruta_archivo, comentarios } = body;
+    const { usuario_id, tipo_documento_id, empresa_id, comentarios } = body;
     const requester = req.user;
     const isAdmin = requester && requester.rol === 'super_admin';
     const isUsuario = requester && requester.rol === 'usuario';
@@ -17,9 +19,13 @@ exports.crearDocumento = async (req, res) => {
     const resolvedUsuarioId = isUsuario ? requester.id : usuario_id;
     const resolvedEmpresaId = isUsuario ? requester.empresa_id : empresa_id;
 
-    if (!resolvedUsuarioId || !tipo_documento_id || !resolvedEmpresaId || !nombre_archivo) {
-      return res.status(400).json({ message: 'usuario_id, tipo_documento_id, empresa_id y nombre_archivo son obligatorios' });
+    if (!resolvedUsuarioId || !tipo_documento_id || !resolvedEmpresaId || !req.file) {
+      return res.status(400).json({ message: 'usuario_id, tipo_documento_id, empresa_id y archivo son obligatorios' });
     }
+
+    // Obtener nombre del archivo subido
+    const nombre_archivo = req.file.originalname;
+    const ruta_archivo = `/uploads/${req.file.filename}`;
 
     const creado = await Documento.crearDocumento({
       usuario_id: resolvedUsuarioId,
@@ -32,6 +38,12 @@ exports.crearDocumento = async (req, res) => {
     return res.status(201).json(creado);
   } catch (err) {
     console.error(err);
+    // Eliminar archivo si hubo error al guardar en BD
+    if (req.file) {
+      fs.unlink(req.file.path, (unlinkErr) => {
+        if (unlinkErr) console.error('Error eliminando archivo temporal:', unlinkErr);
+      });
+    }
     if (err.code === '23503') { // foreign key violation
       return res.status(400).json({ message: 'Referencia inválida (usuario, tipo o empresa no existe)', detail: err.detail });
     }
@@ -182,5 +194,54 @@ exports.contarRevisadosMes = async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Error al contar documentos revisados del mes' });
+  }
+};
+
+exports.descargarDocumento = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const doc = await Documento.obtenerDocumentoPorId(id);
+    
+    if (!doc) {
+      return res.status(404).json({ message: 'Documento no encontrado' });
+    }
+
+    const requester = req.user;
+    const isAdmin = requester.rol === 'super_admin';
+    const isOwner = String(doc.usuario_id) === String(requester.id);
+    const isAuditor = requester.rol === 'auditor';
+    const sameEmpresa = requester.empresa_id && String(doc.empresa_id) === String(requester.empresa_id);
+
+    // Verificar permisos: owner, admin, o auditor
+    if (!isAdmin && !isOwner && !(isAuditor)) {
+      return res.status(403).json({ message: 'No autorizado para descargar este documento' });
+    }
+
+    if (!doc.ruta_archivo) {
+      return res.status(404).json({ message: 'El documento no tiene archivo asociado' });
+    }
+
+    // Construir ruta absoluta
+    const uploadDir = path.join(__dirname, '../uploads');
+    const filename = path.basename(doc.ruta_archivo);
+    const filepath = path.join(uploadDir, filename);
+
+    // Verificar que el archivo existe
+    if (!fs.existsSync(filepath)) {
+      return res.status(404).json({ message: 'Archivo no encontrado en el servidor' });
+    }
+
+    // Descargar el archivo
+    res.download(filepath, doc.nombre_archivo, (err) => {
+      if (err) {
+        console.error('Error descargando archivo:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ message: 'Error al descargar el archivo' });
+        }
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Error al descargar documento', error: err.message });
   }
 };

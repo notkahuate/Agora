@@ -68,7 +68,7 @@ function uploadDocument(docType) {
   if (!authUser) return;
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.pdf,.doc,.docx,.jpg,.png';
+  input.accept = '.pdf,.doc,.docx,.jpg,.png,.xls,.xlsx';
 
   input.onchange = async (e) => {
     const file = e.target.files[0];
@@ -78,13 +78,17 @@ function uploadDocument(docType) {
     if (!tipoId) return;
 
     try {
-      const response = await window.Auth.apiFetch('/api/documentos', {
+      const formData = new FormData();
+      formData.append('archivo', file);
+      formData.append('tipo_documento_id', tipoId);
+      formData.append('comentarios', `Carga desde UI: ${docType || 'manual'}`);
+
+      const response = await fetch('http://localhost:3000/api/documentos', {
         method: 'POST',
-        body: JSON.stringify({
-          tipo_documento_id: Number(tipoId),
-          nombre_archivo: file.name,
-          comentarios: `Carga desde UI: ${docType || 'manual'}`
-        })
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
       });
 
       const data = await response.json();
@@ -93,7 +97,7 @@ function uploadDocument(docType) {
         return;
       }
 
-      alert(`Documento "${file.name}" subido. Queda en revisión.`);
+      alert(`Documento "${file.name}" subido exitosamente. Queda en revisión.`);
       loadDocumentos();
     } catch (error) {
       console.error('Error al cargar documentos:', error);
@@ -187,20 +191,24 @@ async function loadDocumentos() {
 function uploadDocumentForPending(tipoDocumentoId, nombre) {
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.pdf,.doc,.docx,.jpg,.png';
+  input.accept = '.pdf,.doc,.docx,.jpg,.png,.xls,.xlsx';
 
   input.onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     try {
-      const response = await window.Auth.apiFetch('/api/documentos', {
+      const formData = new FormData();
+      formData.append('archivo', file);
+      formData.append('tipo_documento_id', tipoDocumentoId);
+      formData.append('comentarios', `Subido desde dashboard usuario`);
+
+      const response = await fetch('http://localhost:3000/api/documentos', {
         method: 'POST',
-        body: JSON.stringify({
-          tipo_documento_id: tipoDocumentoId,
-          nombre_archivo: file.name,
-          comentarios: `Subido desde dashboard usuario`
-        })
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
       });
 
       const data = await response.json();
@@ -209,7 +217,7 @@ function uploadDocumentForPending(tipoDocumentoId, nombre) {
         return;
       }
 
-      alert(`Documento "${file.name}" subido. Queda en revisión.`);
+      alert(`Documento "${file.name}" subido exitosamente. Queda en revisión.`);
       loadDocumentos();
     } catch (error) {
       console.error('Error al subir documento:', error);
