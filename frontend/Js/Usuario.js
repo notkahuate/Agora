@@ -66,6 +66,13 @@ function showStatus(text) {
 
 function uploadDocument(docType) {
   if (!authUser) return;
+  const tipoId = prompt('Ingresa el ID del tipo de documento:');
+  if (!tipoId) return;
+  uploadDocumentGeneric(tipoId, `Carga desde UI: ${docType || 'manual'}`, null);
+}
+
+function uploadDocumentGeneric(tipoDocumentoId, comentarios, reemplazaId = null) {
+  if (!authUser) return;
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.pdf,.doc,.docx,.jpg,.png,.xls,.xlsx';
@@ -74,14 +81,12 @@ function uploadDocument(docType) {
     const file = e.target.files[0];
     if (!file) return;
 
-    const tipoId = prompt('Ingresa el ID del tipo de documento:');
-    if (!tipoId) return;
-
     try {
       const formData = new FormData();
       formData.append('archivo', file);
-      formData.append('tipo_documento_id', tipoId);
-      formData.append('comentarios', `Carga desde UI: ${docType || 'manual'}`);
+      formData.append('tipo_documento_id', tipoDocumentoId);
+      formData.append('comentarios', comentarios || 'Subido desde UI');
+      if (reemplazaId) formData.append('reemplaza_id', reemplazaId);
 
       const response = await fetch('http://localhost:3000/api/documentos', {
         method: 'POST',
@@ -100,12 +105,18 @@ function uploadDocument(docType) {
       alert(`Documento "${file.name}" subido exitosamente. Queda en revisión.`);
       loadDocumentos();
     } catch (error) {
-      console.error('Error al cargar documentos:', error);
+      console.error('Error al subir documento:', error);
       alert('Error al subir documento');
     }
   };
 
   input.click();
+}
+
+function reuploadRejectedDocument(tipoDocumentoId, nombre, docId = null) {
+  const confirmar = confirm('Este documento fue rechazado. ¿Deseas volver a subirlo ahora?');
+  if (!confirmar) return;
+  uploadDocumentGeneric(tipoDocumentoId, `Re-subido tras rechazo: ${nombre}`, docId);
 }
 
 document.addEventListener('DOMContentLoaded', loadDocumentos);
@@ -114,14 +125,69 @@ async function loadDocumentos() {
   showStatus('Cargando documentos...');
 
   try {
-    const asignadosResponse = await window.Auth.apiFetch('/api/documentos-requeridos/usuario/asignados');
+    // Fetch both assigned requirements and uploaded documents in parallel
+    const [asignadosResponse, subidosResponse] = await Promise.all([
+      window.Auth.apiFetch('/api/documentos-requeridos/usuario/asignados'),
+      window.Auth.apiFetch('/api/documentos')
+    ]);
+
     if (!asignadosResponse.ok) {
       const error = await asignadosResponse.json();
       throw new Error(error.message || 'Error al cargar documentos asignados');
     }
+    if (!subidosResponse.ok) {
+      const error = await subidosResponse.json();
+      throw new Error(error.message || 'Error al cargar historial de documentos');
+    }
 
     const asignados = await asignadosResponse.json();
-    const pendientes = asignados.filter(doc => doc.estado === 'pendiente');
+    const subidos = await subidosResponse.json();
+
+    // Resolve auditor names for any validado_por ids
+    const auditorIds = Array.from(new Set(subidos.map(s => s.validado_por).filter(Boolean)));
+    const auditorMap = new Map();
+    if (auditorIds.length > 0) {
+      await Promise.all(auditorIds.map(async id => {
+        try {
+          const res = await window.Auth.apiFetch(`/api/usuarios/${id}`);
+          if (res.ok) {
+            const userData = await res.json();
+            auditorMap.set(id, userData.nombre || userData.email || `#${id}`);
+          } else {
+            auditorMap.set(id, `#${id}`);
+          }
+        } catch (e) {
+          auditorMap.set(id, `#${id}`);
+        }
+      }));
+    }
+
+    // Start with assigned pendientes (include rejected)
+    const pendientesMap = new Map();
+    asignados.forEach(doc => {
+      if (doc.estado === 'pendiente' || doc.estado === 'rechazado') {
+        pendientesMap.set(doc.tipo_documento_id || doc.id, Object.assign({}, doc));
+      }
+    });
+
+    // Add rejected uploads into pendientes so user sees them in the pendientes table
+    const rejectedUploads = subidos.filter(d => d.estado === 'rechazado');
+    rejectedUploads.forEach(d => {
+      const key = d.tipo_documento_id || d.id;
+      if (!pendientesMap.has(key)) {
+        pendientesMap.set(key, {
+          nombre: d.nombre_archivo || d.nombre || 'Documento rechazado',
+          frecuencia: d.frecuencia || '-',
+          fecha_limite: d.fecha_limite || d.fecha_subida || new Date().toISOString(),
+          prioridad: d.prioridad || 'media',
+          estado: 'rechazado',
+          tipo_documento_id: d.tipo_documento_id,
+          id: d.id
+        });
+      }
+    });
+
+    const pendientes = Array.from(pendientesMap.values());
     const completados = asignados.filter(doc => doc.estado === 'subido');
     const total = asignados.length;
     const progreso = total > 0 ? (completados.length / total) * 100 : 0;
@@ -141,37 +207,42 @@ async function loadDocumentos() {
     } else {
       pendientes.forEach(doc => {
         const row = document.createElement('tr');
+        const safeName = (doc.nombre || '').replace(/'/g, "\\'");
+        const prioridadBadge = `<span class="badge badge-${doc.prioridad === 'alta' ? 'danger' : doc.prioridad === 'media' ? 'warning' : 'info'}">${doc.prioridad}</span>`;
+        const fechaLimite = new Date(doc.fecha_limite).toLocaleDateString();
+        const estadoLabel = doc.estado === 'rechazado' ? `<span class="badge badge-danger">rechazado</span>` : '';
+        const actionButton = doc.estado === 'rechazado'
+          ? `<button class="btn btn-sm btn-secondary" onclick="reuploadRejectedDocument(${doc.tipo_documento_id}, '${safeName}', ${doc.id || null})">Volver a subir</button>`
+          : `<button class="btn btn-sm btn-primary" onclick="uploadDocumentForPending(${doc.tipo_documento_id}, '${safeName}')">Subir</button>`;
+
         row.innerHTML = `
-          <td>${doc.nombre}</td>
-          <td>${doc.frecuencia}</td>
-          <td>${new Date(doc.fecha_limite).toLocaleDateString()}</td>
-          <td><span class="badge badge-${doc.prioridad === 'alta' ? 'danger' : doc.prioridad === 'media' ? 'warning' : 'info'}">${doc.prioridad}</span></td>
-          <td><button class="btn btn-sm btn-primary" onclick="uploadDocumentForPending(${doc.tipo_documento_id}, '${doc.nombre}')">Subir</button></td>
+          <td>${doc.nombre} ${estadoLabel}</td>
+          <td>${doc.frecuencia || '-'}</td>
+          <td>${fechaLimite}</td>
+          <td>${prioridadBadge}</td>
+          <td>${actionButton}</td>
         `;
         tablaPendientes.appendChild(row);
       });
     }
 
-    const subidosResponse = await window.Auth.apiFetch('/api/documentos');
-    if (!subidosResponse.ok) {
-      const error = await subidosResponse.json();
-      throw new Error(error.message || 'Error al cargar historial de documentos');
-    }
-
-    const subidos = await subidosResponse.json();
+    // Render historial excluding rejected uploads so they don't clutter historial
     const tablaHistorial = document.getElementById('tablaHistorial');
     tablaHistorial.innerHTML = '';
-
-    if (subidos.length === 0) {
+    const historial = subidos.filter(d => d.estado !== 'rechazado');
+    if (historial.length === 0) {
       tablaHistorial.innerHTML = '<tr><td colspan="4">No hay documentos subidos aún.</td></tr>';
     } else {
-      subidos.forEach(doc => {
+      historial.forEach(doc => {
         const row = document.createElement('tr');
+        const estadoBadge = `<span class="badge badge-${doc.estado === 'aprobado' ? 'success' : 'warning'}">${doc.estado}</span>`;
+        const validado = doc.validado_por ? (auditorMap.get(doc.validado_por) || `#${doc.validado_por}`) : 'Pendiente';
+
         row.innerHTML = `
           <td>${doc.nombre_archivo}</td>
           <td>${new Date(doc.fecha_subida).toLocaleDateString()}</td>
-          <td><span class="badge badge-${doc.estado === 'aprobado' ? 'success' : doc.estado === 'rechazado' ? 'danger' : 'warning'}">${doc.estado}</span></td>
-          <td>${doc.validado_por || 'Pendiente'}</td>
+          <td>${estadoBadge}</td>
+          <td>${validado}</td>
         `;
         tablaHistorial.appendChild(row);
       });
