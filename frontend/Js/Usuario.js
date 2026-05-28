@@ -171,7 +171,21 @@ async function loadDocumentos() {
     });
 
     // Add rejected uploads into pendientes so user sees them in the pendientes table
-    const rejectedUploads = subidos.filter(d => d.estado === 'rechazado');
+    // Only keep the latest upload per tipo_documento_id, otherwise a previously rejected file may remain after re-upload.
+    const latestUploadsByTipo = new Map();
+    subidos.forEach(d => {
+      const tipo = d.tipo_documento_id || d.id;
+      const timestamp = d.fecha_subida ? new Date(d.fecha_subida).getTime() : 0;
+      const prev = latestUploadsByTipo.get(tipo);
+      if (!prev || timestamp > prev.timestamp || (timestamp === prev.timestamp && d.id > prev.doc.id)) {
+        latestUploadsByTipo.set(tipo, { doc: d, timestamp });
+      }
+    });
+
+    const rejectedUploads = Array.from(latestUploadsByTipo.values())
+      .map(entry => entry.doc)
+      .filter(d => String(d.estado).toLowerCase() === 'rechazado');
+
     rejectedUploads.forEach(d => {
       const key = d.tipo_documento_id || d.id;
       if (!pendientesMap.has(key)) {

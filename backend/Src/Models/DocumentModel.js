@@ -1,14 +1,23 @@
 // src/models/documentoModel.js
 const { pool } = require('../configures/db');
 
-const crearDocumento = async ({ usuario_id, tipo_documento_id, empresa_id, nombre_archivo, ruta_archivo, comentarios }) => {
+const crearDocumento = async ({ usuario_id, tipo_documento_id, empresa_id, nombre_archivo, ruta_archivo, archivo, mime_type, comentarios }) => {
   const texto = `
     INSERT INTO documentos_subidos
-      (usuario_id, tipo_documento_id, empresa_id, nombre_archivo, ruta_archivo, comentarios)
-    VALUES ($1,$2,$3,$4,$5,$6)
+      (usuario_id, tipo_documento_id, empresa_id, nombre_archivo, ruta_archivo, archivo, mime_type, comentarios)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
     RETURNING *;
   `;
-  const valores = [usuario_id, tipo_documento_id, empresa_id, nombre_archivo, ruta_archivo || null, comentarios || null];
+  const valores = [
+    usuario_id,
+    tipo_documento_id,
+    empresa_id,
+    nombre_archivo,
+    ruta_archivo || null,
+    archivo || null,
+    mime_type || null,
+    comentarios || null
+  ];
   const { rows } = await pool.query(texto, valores);
   return rows[0];
 };
@@ -16,7 +25,18 @@ const crearDocumento = async ({ usuario_id, tipo_documento_id, empresa_id, nombr
 const listarDocumentos = async () => {
   const { rows } = await pool.query(`
     SELECT 
-      ds.*,
+      ds.id,
+      ds.usuario_id,
+      ds.tipo_documento_id,
+      ds.empresa_id,
+      ds.nombre_archivo,
+      COALESCE(ds.ruta_archivo, '/api/documentos/' || ds.id || '/descargar') AS ruta_archivo,
+      ds.estado,
+      ds.validado_por,
+      ds.comentarios,
+      ds.fecha_subida,
+      ds.fecha_validacion,
+      ds.fecha_actualizacion,
       e.nombre AS empresa_nombre,
       u.nombre AS usuario_nombre,
       td.nombre AS tipo_documento_nombre
@@ -31,7 +51,24 @@ const listarDocumentos = async () => {
 
 const listarDocumentosPorUsuario = async (usuario_id) => {
   const { rows } = await pool.query(
-    `SELECT * FROM documentos_subidos WHERE usuario_id = $1 ORDER BY fecha_subida DESC;`,
+    `
+      SELECT
+        ds.id,
+        ds.usuario_id,
+        ds.tipo_documento_id,
+        ds.empresa_id,
+        ds.nombre_archivo,
+        COALESCE(ds.ruta_archivo, '/api/documentos/' || ds.id || '/descargar') AS ruta_archivo,
+        ds.estado,
+        ds.validado_por,
+        ds.comentarios,
+        ds.fecha_subida,
+        ds.fecha_validacion,
+        ds.fecha_actualizacion
+      FROM documentos_subidos ds
+      WHERE ds.usuario_id = $1
+      ORDER BY ds.fecha_subida DESC;
+    `,
     [usuario_id]
   );
   return rows;
@@ -39,14 +76,70 @@ const listarDocumentosPorUsuario = async (usuario_id) => {
 
 const listarDocumentosPorEmpresa = async (empresa_id) => {
   const { rows } = await pool.query(
-    `SELECT * FROM documentos_subidos WHERE empresa_id = $1 ORDER BY fecha_subida DESC;`,
+    `
+      SELECT
+        ds.id,
+        ds.usuario_id,
+        ds.tipo_documento_id,
+        ds.empresa_id,
+        ds.nombre_archivo,
+        COALESCE(ds.ruta_archivo, '/api/documentos/' || ds.id || '/descargar') AS ruta_archivo,
+        ds.estado,
+        ds.validado_por,
+        ds.comentarios,
+        ds.fecha_subida,
+        ds.fecha_validacion,
+        ds.fecha_actualizacion
+      FROM documentos_subidos ds
+      WHERE ds.empresa_id = $1
+      ORDER BY ds.fecha_subida DESC;
+    `,
     [empresa_id]
   );
   return rows;
 };
 
 const obtenerDocumentoPorId = async (id) => {
-  const { rows } = await pool.query(`SELECT * FROM documentos_subidos WHERE id = $1;`, [id]);
+  const { rows } = await pool.query(`
+    SELECT
+      ds.id,
+      ds.usuario_id,
+      ds.tipo_documento_id,
+      ds.empresa_id,
+      ds.nombre_archivo,
+      COALESCE(ds.ruta_archivo, '/api/documentos/' || ds.id || '/descargar') AS ruta_archivo,
+      ds.estado,
+      ds.validado_por,
+      ds.comentarios,
+      ds.fecha_subida,
+      ds.fecha_validacion,
+      ds.fecha_actualizacion
+    FROM documentos_subidos ds
+    WHERE ds.id = $1;
+  `, [id]);
+  return rows[0];
+};
+
+const obtenerDocumentoArchivoPorId = async (id) => {
+  const { rows } = await pool.query(`
+    SELECT
+      ds.id,
+      ds.usuario_id,
+      ds.tipo_documento_id,
+      ds.empresa_id,
+      ds.nombre_archivo,
+      ds.ruta_archivo,
+      ds.archivo,
+      ds.mime_type,
+      ds.estado,
+      ds.validado_por,
+      ds.comentarios,
+      ds.fecha_subida,
+      ds.fecha_validacion,
+      ds.fecha_actualizacion
+    FROM documentos_subidos ds
+    WHERE ds.id = $1;
+  `, [id]);
   return rows[0];
 };
 
@@ -108,7 +201,7 @@ const listarPendientesValidacionConJoin = async () => {
       ds.tipo_documento_id,
       ds.empresa_id,
       ds.nombre_archivo,
-      ds.ruta_archivo,
+      COALESCE(ds.ruta_archivo, '/api/documentos/' || ds.id || '/descargar') AS ruta_archivo,
       ds.comentarios,
       ds.estado,
       ds.fecha_subida,
@@ -133,6 +226,7 @@ module.exports = {
   listarDocumentosPorUsuario,
   listarDocumentosPorEmpresa,
   obtenerDocumentoPorId,
+  obtenerDocumentoArchivoPorId,
   actualizarDocumento,
   eliminarDocumento,
   validarDocumento,

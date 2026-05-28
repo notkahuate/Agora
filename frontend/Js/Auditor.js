@@ -653,7 +653,22 @@ window.previewDocumento = async function(id, nombreArchivo) {
     const isImage = ['jpg', 'jpeg', 'png', 'gif'].includes(extension);
     const isPdf = extension === 'pdf';
 
-    // Crear modal con preview
+    let previewUrl = null;
+    if (isImage || isPdf) {
+      const token = localStorage.getItem('token');
+      const previewRes = await fetch(`http://localhost:3000/api/documentos/${id}/descargar`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (!previewRes.ok) {
+        throw new Error('No se pudo obtener el archivo para previsualizar');
+      }
+      const blob = await previewRes.blob();
+      previewUrl = URL.createObjectURL(blob);
+    }
+
     const modal = document.createElement('div');
     modal.style.cssText = `
       position: fixed;
@@ -679,11 +694,16 @@ window.previewDocumento = async function(id, nombreArchivo) {
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
     `;
 
-    if (isPdf || isImage) {
+    if (isImage && previewUrl) {
       const img = document.createElement('img');
       img.style.cssText = 'max-width: 100%; max-height: 70vh;';
-      img.src = `http://localhost:3000${doc.ruta_archivo}`;
+      img.src = previewUrl;
       content.appendChild(img);
+    } else if (isPdf && previewUrl) {
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'width: 100%; height: 70vh; border: none;';
+      iframe.src = previewUrl;
+      content.appendChild(iframe);
     } else {
       const p = document.createElement('p');
       p.textContent = `Documento: ${nombreArchivo} (no se puede previsualizar)`;
@@ -702,12 +722,18 @@ window.previewDocumento = async function(id, nombreArchivo) {
       border-radius: 4px;
       cursor: pointer;
     `;
-    closeBtn.onclick = () => modal.remove();
+    closeBtn.onclick = () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      modal.remove();
+    };
     content.appendChild(closeBtn);
 
     modal.appendChild(content);
     modal.onclick = (e) => {
-      if (e.target === modal) modal.remove();
+      if (e.target === modal) {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        modal.remove();
+      }
     };
 
     document.body.appendChild(modal);

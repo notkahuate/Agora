@@ -54,6 +54,8 @@ CREATE TABLE documentos_subidos (
     empresa_id INTEGER NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
     nombre_archivo VARCHAR(255) NOT NULL,
     ruta_archivo VARCHAR(500),
+    archivo BYTEA,
+    mime_type VARCHAR(255),
     estado document_status DEFAULT 'subido',
     validado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
     comentarios TEXT,

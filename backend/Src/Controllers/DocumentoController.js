@@ -25,25 +25,26 @@ exports.crearDocumento = async (req, res) => {
 
     // Obtener nombre del archivo subido
     const nombre_archivo = req.file.originalname;
-    const ruta_archivo = `/uploads/${req.file.filename}`;
+    const archivo = req.file.buffer;
+    const mime_type = req.file.mimetype;
 
     const creado = await Documento.crearDocumento({
       usuario_id: resolvedUsuarioId,
       tipo_documento_id,
       empresa_id: resolvedEmpresaId,
       nombre_archivo,
-      ruta_archivo,
+      ruta_archivo: null,
+      archivo,
+      mime_type,
       comentarios
     });
-    return res.status(201).json(creado);
+
+    return res.status(201).json({
+      ...creado,
+      ruta_archivo: `/api/documentos/${creado.id}/descargar`
+    });
   } catch (err) {
     console.error(err);
-    // Eliminar archivo si hubo error al guardar en BD
-    if (req.file) {
-      fs.unlink(req.file.path, (unlinkErr) => {
-        if (unlinkErr) console.error('Error eliminando archivo temporal:', unlinkErr);
-      });
-    }
     if (err.code === '23503') { // foreign key violation
       return res.status(400).json({ message: 'Referencia inválida (usuario, tipo o empresa no existe)', detail: err.detail });
     }
@@ -200,8 +201,8 @@ exports.contarRevisadosMes = async (req, res) => {
 exports.descargarDocumento = async (req, res) => {
   try {
     const { id } = req.params;
-    const doc = await Documento.obtenerDocumentoPorId(id);
-    
+    const doc = await Documento.obtenerDocumentoArchivoPorId(id);
+
     if (!doc) {
       return res.status(404).json({ message: 'Documento no encontrado' });
     }
@@ -210,28 +211,30 @@ exports.descargarDocumento = async (req, res) => {
     const isAdmin = requester.rol === 'super_admin';
     const isOwner = String(doc.usuario_id) === String(requester.id);
     const isAuditor = requester.rol === 'auditor';
-    const sameEmpresa = requester.empresa_id && String(doc.empresa_id) === String(requester.empresa_id);
 
     // Verificar permisos: owner, admin, o auditor
-    if (!isAdmin && !isOwner && !(isAuditor)) {
+    if (!isAdmin && !isOwner && !isAuditor) {
       return res.status(403).json({ message: 'No autorizado para descargar este documento' });
+    }
+
+    if (doc.archivo && doc.archivo.length > 0) {
+      res.setHeader('Content-Type', doc.mime_type || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.nombre_archivo)}"`);
+      return res.send(doc.archivo);
     }
 
     if (!doc.ruta_archivo) {
       return res.status(404).json({ message: 'El documento no tiene archivo asociado' });
     }
 
-    // Construir ruta absoluta
     const uploadDir = path.join(__dirname, '../uploads');
     const filename = path.basename(doc.ruta_archivo);
     const filepath = path.join(uploadDir, filename);
 
-    // Verificar que el archivo existe
     if (!fs.existsSync(filepath)) {
       return res.status(404).json({ message: 'Archivo no encontrado en el servidor' });
     }
 
-    // Descargar el archivo
     res.download(filepath, doc.nombre_archivo, (err) => {
       if (err) {
         console.error('Error descargando archivo:', err);

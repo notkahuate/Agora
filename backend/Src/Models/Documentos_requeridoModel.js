@@ -26,7 +26,8 @@ const obtenerPorEmpresa = async (empresa_id) => {
   const result = await pool.query(
     `SELECT dr.*, td.nombre as tipo_documento,
             COALESCE(u.nombre, 'Sin asignar') as responsable_nombre,
-            COALESCE(u.email, '') as responsable_email
+            COALESCE(u.email, '') as responsable_email,
+            dr_resp.usuario_id as responsable_id
      FROM documentos_requeridos dr
      JOIN tipos_documentos td ON dr.tipo_documento_id = td.id
      LEFT JOIN documento_responsables dr_resp ON dr.id = dr_resp.documento_requerido_id
@@ -44,7 +45,8 @@ const obtenerTodos = async () => {
   const result = await pool.query(
     `SELECT dr.*, td.nombre as tipo_documento, e.nombre as empresa_nombre,
             COALESCE(u.nombre, 'Sin asignar') as responsable_nombre,
-            COALESCE(u.email, '') as responsable_email
+            COALESCE(u.email, '') as responsable_email,
+            dr_resp.usuario_id as responsable_id
      FROM documentos_requeridos dr
      JOIN tipos_documentos td ON dr.tipo_documento_id = td.id
      JOIN empresas e ON dr.empresa_id = e.id
@@ -81,7 +83,8 @@ const obtenerPendientes = async (empresa_id) => {
       td.frecuencia AS frecuencia,
       td.porcentaje AS porcentaje,
       COALESCE(u.nombre, 'Sin asignar') as responsable_nombre,
-      COALESCE(u.email, '') as responsable_email
+      COALESCE(u.email, '') as responsable_email,
+      dr_resp.usuario_id as responsable_id
     FROM documentos_requeridos dr
     JOIN tipos_documentos td ON td.id = dr.tipo_documento_id
     LEFT JOIN documentos_subidos ds 

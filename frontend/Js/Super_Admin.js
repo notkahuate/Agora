@@ -203,9 +203,9 @@ function renderUsuarios() {
 
     // Calculate pending and progress based on documentosGlobal
     const totalAssigned = documentosGlobal ? documentosGlobal.filter(d => d.responsable_id === usuario.id).length : 0;
-    const pendingCount = documentosGlobal ? documentosGlobal.filter(d => d.responsable_id === usuario.id && d.estado && d.estado.toLowerCase() === 'pendiente').length : 0;
-    const completedCount = totalAssigned - pendingCount;
-    const progressPercent = totalAssigned > 0 ? Math.max(0, Math.min(100, Math.round((completedCount / totalAssigned) * 100))) : 100;
+    const pendingCount = documentosGlobal ? documentosGlobal.filter(d => d.responsable_id === usuario.id && String(d.estado).toLowerCase() === 'pendiente').length : 0;
+    const completedCount = documentosGlobal ? documentosGlobal.filter(d => d.responsable_id === usuario.id && String(d.estado).toLowerCase() !== 'pendiente').length : 0;
+    const progressPercent = totalAssigned > 0 ? Math.max(0, Math.min(100, Math.round((completedCount / totalAssigned) * 100))) : 0;
 
     const estadoBadgeClass = usuario.activo ? 'badge-success' : 'badge-danger';
     const estadoTexto = usuario.activo ? 'Activo' : 'Inactivo';
@@ -269,25 +269,27 @@ async function cargarColaRevision() {
       'Authorization': `Bearer ${token}`
     };
 
-    const res = await fetch('http://localhost:3000/api/documentos-requeridos/cola-revision', { headers });
+    const res = await fetch(`http://localhost:3000/api/documentos-requeridos/empresa/${user.empresa_id}/pendientes`, { headers });
     const docs = await res.json();
 
     const tabla = document.getElementById('tablaColaRevision');
     const badge = document.getElementById('badgeColaRevision');
 
+    const unassigned = docs.filter(doc => !doc.responsable_id);
+
     tabla.innerHTML = '';
-    badge.textContent = docs.length;
+    badge.textContent = unassigned.length;
 
-    console.log("COLA REVISION:", docs);
+    console.log("COLA PENDIENTES SIN ASIGNAR:", unassigned);
 
-    docs.forEach(doc => {
+    unassigned.forEach(doc => {
       const dias = calcularDias(doc.fecha_limite);
 
       const tr = document.createElement('tr');
 
       tr.innerHTML = `
-        <td>${doc.documento} (${doc.porcentaje}%)</td> <!-- 🔥 AQUÍ -->
-        <td>${doc.empresa}</td>
+        <td>${doc.nombre} (${doc.frecuencia || '-'})</td>
+        <td>${doc.responsable_email ? doc.responsable_email : 'Sin asignar'}</td>
         <td>
           <span class="badge ${
             doc.prioridad === 'alta'
@@ -301,8 +303,8 @@ async function cargarColaRevision() {
         </td>
         <td>${dias} días</td>
         <td>
-          <button class="btn btn-primary" onclick="validarDocumento(${doc.id})">
-            Revisar
+          <button class="btn btn-primary" onclick="abrirModalAsignarResponsable(${doc.id}, '${String(doc.nombre).replace(/'/g, "\\'")}')">
+            Asignar
           </button>
         </td>
       `;
@@ -371,6 +373,7 @@ async function cargarDocumentos() {
     paginaDocumentos = 1;
 
     renderDocumentos();
+    renderUsuarios();
 
   } catch (error) {
     console.error('Error cargando documentos:', error);
