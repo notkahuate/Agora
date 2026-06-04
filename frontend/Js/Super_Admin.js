@@ -116,8 +116,9 @@ async function asignarResponsableDocumento() {
 
     alert('Responsable asignado correctamente.');
     modalResponsable.style.display = 'none';
-    cargarDocumentos();
-    cargarUsuariosEmpresa();
+    await cargarDocumentos();
+    await cargarUsuariosEmpresa();
+    await cargarColaRevision();
   } catch (error) {
     console.error('Error asignando responsable:', error);
     alert('No se pudo asignar el responsable. Intenta nuevamente.');

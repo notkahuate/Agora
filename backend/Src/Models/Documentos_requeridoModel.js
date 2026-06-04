@@ -94,6 +94,7 @@ const obtenerPendientes = async (empresa_id) => {
     LEFT JOIN usuarios u ON dr_resp.usuario_id = u.id
     WHERE dr.empresa_id = $1
     AND ds.id IS NULL
+    AND dr_resp.id IS NULL
     ORDER BY dr.fecha_limite ASC
     `,
     [empresa_id]

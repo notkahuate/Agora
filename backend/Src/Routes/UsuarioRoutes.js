@@ -51,6 +51,13 @@ router.get(
   controller.listarUsuarios
 );
 
+// 👥 Usuarios de la misma empresa (menos el actual)
+router.get(
+  '/empresa/mios',
+  verifyToken,
+  controller.usuariosEmpresa
+);
+
 // =======================
 // 👤 Obtener usuario (admin o dueño)
 // =======================
@@ -82,13 +89,6 @@ router.delete(
   param('id').isInt(),
   handleValidation,
   controller.eliminarUsuario
-);
-
-// 👥 Usuarios de la misma empresa (menos el actual)
-router.get(
-  '/empresa/mios',
-  verifyToken,
-  controller.usuariosEmpresa
 );
 
 

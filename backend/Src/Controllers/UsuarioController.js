@@ -13,7 +13,7 @@ exports.crearUsuarioPublico = async (req, res) => {
     }
 
     const body = req.body || {};
-    const { nombre, email, password } = body;
+    const { nombre, email, password, empresa_id: bodyEmpresaId } = body;
 
     if (!nombre || !email || !password) {
       return res.status(400).json({
@@ -30,7 +30,7 @@ exports.crearUsuarioPublico = async (req, res) => {
     // Valores forzados (seguridad)
     const rol = 'usuario';
     const activo = true;
-    const empresa_id = null;
+    const empresa_id = bodyEmpresaId || null;
 
     const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
 
@@ -218,12 +218,21 @@ exports.usuariosEmpresa = async (req, res) => {
   try {
     const requester = req.user;
 
-    if (!requester || !requester.empresa_id) {
+    if (!requester || !requester.id) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+
+    const usuarioActual = await Usuario.obtenerUsuarioPorId(requester.id);
+    if (!usuarioActual) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    if (!usuarioActual.empresa_id) {
       return res.status(400).json({ message: 'Usuario sin empresa asignada' });
     }
 
     const usuarios = await Usuario.obtenerUsuariosPorEmpresa(
-      requester.empresa_id,
+      usuarioActual.empresa_id,
       requester.id
     );
 

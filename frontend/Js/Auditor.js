@@ -543,9 +543,6 @@ async function cargarDocumentos() {
           <span class="badge badge-warning">Subido</span>
         </td>
         <td>
-          <button class="btn btn-sm btn-info" onclick="previewDocumento('${doc.id}', '${doc.nombre_archivo}')" style="margin-right:5px;">
-            Ver
-          </button>
           <button class="btn btn-sm btn-secondary" onclick="descargarDocumento('${doc.id}', '${doc.nombre_archivo}')" style="margin-right:5px;">
             Descargar
           </button>
