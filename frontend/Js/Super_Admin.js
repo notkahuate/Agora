@@ -204,8 +204,9 @@ function renderUsuarios() {
 
     // Calculate pending and progress based on documentosGlobal
     const totalAssigned = documentosGlobal ? documentosGlobal.filter(d => d.responsable_id === usuario.id).length : 0;
-    const pendingCount = documentosGlobal ? documentosGlobal.filter(d => d.responsable_id === usuario.id && String(d.estado).toLowerCase() === 'pendiente').length : 0;
-    const completedCount = documentosGlobal ? documentosGlobal.filter(d => d.responsable_id === usuario.id && String(d.estado).toLowerCase() !== 'pendiente').length : 0;
+    const pendingCount = documentosGlobal ? documentosGlobal.filter(d => d.responsable_id === usuario.id && String(d.estado_documento || d.estado || 'pendiente').toLowerCase() === 'pendiente').length : 0;
+    
+    const completedCount = documentosGlobal ? documentosGlobal.filter(d => d.responsable_id === usuario.id && !['pendiente'].includes(String(d.estado_documento || d.estado || 'pendiente').toLowerCase())).length : 0;
     const progressPercent = totalAssigned > 0 ? Math.max(0, Math.min(100, Math.round((completedCount / totalAssigned) * 100))) : 0;
 
     const estadoBadgeClass = usuario.activo ? 'badge-success' : 'badge-danger';
@@ -216,8 +217,11 @@ function renderUsuarios() {
       <td>${usuario.email || '—'}</td>
       <td>${pendingCount}</td>
       <td>
-        <div class="progress-bar">
-          <div class="progress" style="width:${progressPercent}%"></div>
+        <div style="display:flex; align-items:center; gap:8px; width:100%;">
+          <div class="progress-bar" style="flex:1;">
+            <div class="progress" style="width:${progressPercent}%"></div>
+          </div>
+          <span style="font-size:12px; font-weight:700; min-width:40px;">${progressPercent}%</span>
         </div>
       </td>
       <td><span class="badge ${estadoBadgeClass}">${estadoTexto}</span></td>
@@ -262,6 +266,16 @@ window.switchTab = function (tabName, evt) {
 
   const panel = document.getElementById(`tab-${tabName}`);
   if (panel) panel.classList.add('active');
+
+  if (tabName === 'documentos') {
+    cargarDocumentos();
+    if (window.docRefreshInterval) clearInterval(window.docRefreshInterval);
+    window.docRefreshInterval = setInterval(() => {
+      cargarDocumentos();
+    }, 10000);
+  } else {
+    if (window.docRefreshInterval) clearInterval(window.docRefreshInterval);
+  }
 };
 
 async function cargarColaRevision() {
@@ -375,6 +389,7 @@ async function cargarDocumentos() {
 
     renderDocumentos();
     renderUsuarios();
+    actualizarBarrasProgreso();
 
   } catch (error) {
     console.error('Error cargando documentos:', error);
@@ -393,7 +408,20 @@ function renderDocumentos() {
   pagina.forEach(doc => {
     const tr = document.createElement('tr');
 
-    const estado = doc.estado || 'pendiente';
+    const estado = String(doc.estado_documento || doc.estado || 'pendiente').toLowerCase();
+    let badgeClass = 'badge-warning';
+    let estadoDisplay = 'Pendiente';
+
+    if (['validado', 'revisado'].includes(estado)) {
+      badgeClass = 'badge-success';
+      estadoDisplay = estado === 'validado' ? 'Validado' : 'Revisado';
+    } else if (estado === 'rechazado') {
+      badgeClass = 'badge-danger';
+      estadoDisplay = 'Rechazado';
+    } else if (estado === 'subido') {
+      badgeClass = 'badge-info';
+      estadoDisplay = 'Subido';
+    }
 
     tr.innerHTML = `
       <td>${doc.tipo_documento}</td>
@@ -401,14 +429,8 @@ function renderDocumentos() {
       <td>${new Date(doc.fecha_limite).toLocaleDateString()}</td>
       <td>${doc.prioridad}</td>
       <td>
-        <span class="badge ${
-          estado === 'pendiente'
-            ? 'badge-warning'
-            : estado === 'aprobado'
-            ? 'badge-success'
-            : 'badge-danger'
-        }">
-          ${estado}
+        <span class="badge ${badgeClass}">
+          ${estadoDisplay}
         </span>
       </td>
       <td>
@@ -479,6 +501,97 @@ async function cargarKPIs() {
     const data = await res.json();
 
     document.getElementById('kpiDocsPendientes').textContent = data.length;
+
+// ==============================
+// PROGRESO DE DOCUMENTACIÓN Y PERSONAS
+// ==============================
+
+function actualizarBarrasProgreso() {
+  if (!documentosGlobal || documentosGlobal.length === 0) {
+    // Sin datos, mostrar 0%
+    document.getElementById('badgeProgresoDocs').textContent = '0%';
+    document.getElementById('barraProgresoDocs').style.width = '0%';
+    document.getElementById('docsCompletados').textContent = '0';
+    document.getElementById('docsTotales').textContent = '0';
+    document.getElementById('docsValidados').textContent = '0';
+
+    document.getElementById('badgeProgresoPersonas').textContent = '0%';
+    document.getElementById('barraProgresoPersonas').style.width = '0%';
+    document.getElementById('usuariosCompletos').textContent = '0';
+    document.getElementById('usuariosTotales').textContent = '0';
+    document.getElementById('usuariosProgreso').textContent = '0';
+    return;
+  }
+
+  // ========== PROGRESO DE DOCUMENTACIÓN ==========
+  const totalDocs = documentosGlobal.length;
+  
+  // Contar documentos completados (validado, revisado, aprobado)
+  const docsCompletadosCount = documentosGlobal.filter(d => {
+    const estado = String(d.estado_documento || d.estado || 'pendiente').toLowerCase();
+    return ['validado', 'revisado', 'aprobado'].includes(estado);
+  }).length;
+
+  // Contar documentos validados/revisados
+  const docsValidadosCount = documentosGlobal.filter(d => {
+    const estado = String(d.estado_documento || d.estado || 'pendiente').toLowerCase();
+    return ['validado', 'revisado'].includes(estado);
+  }).length;
+
+  const progresoDocs = totalDocs > 0 ? Math.round((docsCompletadosCount / totalDocs) * 100) : 0;
+
+  document.getElementById('badgeProgresoDocs').textContent = progresoDocs + '%';
+  document.getElementById('barraProgresoDocs').style.width = progresoDocs + '%';
+  document.getElementById('docsCompletados').textContent = docsCompletadosCount;
+  document.getElementById('docsTotales').textContent = totalDocs;
+  document.getElementById('docsValidados').textContent = docsValidadosCount;
+
+  // ========== PROGRESO DE PERSONAS ==========
+  const totalUsuarios = usuariosGlobal.length;
+  
+  if (totalUsuarios === 0) {
+    document.getElementById('badgeProgresoPersonas').textContent = '0%';
+    document.getElementById('barraProgresoPersonas').style.width = '0%';
+    document.getElementById('usuariosCompletos').textContent = '0';
+    document.getElementById('usuariosTotales').textContent = '0';
+    document.getElementById('usuariosProgreso').textContent = '0';
+    return;
+  }
+
+  // Contar usuarios con 100% de documentos completados
+  let usuariosCompletosCount = 0;
+  let usuariosEnProgresoCount = 0;
+
+  usuariosGlobal.forEach(usuario => {
+    const docsDelUsuario = documentosGlobal.filter(d => d.responsable_id === usuario.id);
+    
+    if (docsDelUsuario.length === 0) {
+      // Usuario sin documentos asignados
+      return;
+    }
+
+    const docsCompletadosDelUsuario = docsDelUsuario.filter(d => {
+      const estado = String(d.estado_documento || d.estado || 'pendiente').toLowerCase();
+      return ['validado', 'revisado', 'aprobado'].includes(estado);
+    }).length;
+
+    const progresoUsuario = (docsCompletadosDelUsuario / docsDelUsuario.length) * 100;
+
+    if (progresoUsuario === 100) {
+      usuariosCompletosCount++;
+    } else if (progresoUsuario > 0) {
+      usuariosEnProgresoCount++;
+    }
+  });
+
+  const progresoPersonas = totalUsuarios > 0 ? Math.round((usuariosCompletosCount / totalUsuarios) * 100) : 0;
+
+  document.getElementById('badgeProgresoPersonas').textContent = progresoPersonas + '%';
+  document.getElementById('barraProgresoPersonas').style.width = progresoPersonas + '%';
+  document.getElementById('usuariosCompletos').textContent = usuariosCompletosCount;
+  document.getElementById('usuariosTotales').textContent = totalUsuarios;
+  document.getElementById('usuariosProgreso').textContent = usuariosEnProgresoCount;
+}
 
   } catch (error) {
     console.error('Error KPI:', error);

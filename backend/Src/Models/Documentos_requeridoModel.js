@@ -27,11 +27,18 @@ const obtenerPorEmpresa = async (empresa_id) => {
     `SELECT dr.*, td.nombre as tipo_documento,
             COALESCE(u.nombre, 'Sin asignar') as responsable_nombre,
             COALESCE(u.email, '') as responsable_email,
-            dr_resp.usuario_id as responsable_id
+            dr_resp.usuario_id as responsable_id,
+            COALESCE(ds.estado, 'pendiente') as estado_documento,
+            ds.id as documento_subido_id
      FROM documentos_requeridos dr
      JOIN tipos_documentos td ON dr.tipo_documento_id = td.id
      LEFT JOIN documento_responsables dr_resp ON dr.id = dr_resp.documento_requerido_id
      LEFT JOIN usuarios u ON dr_resp.usuario_id = u.id
+     LEFT JOIN LATERAL (
+       SELECT id, estado FROM documentos_subidos 
+       WHERE empresa_id = $1 AND tipo_documento_id = dr.tipo_documento_id
+       ORDER BY fecha_subida DESC LIMIT 1
+     ) ds ON true
      WHERE dr.empresa_id = $1
      ORDER BY dr.fecha_limite ASC`,
     [empresa_id]

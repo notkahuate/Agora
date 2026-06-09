@@ -84,7 +84,7 @@
 
       
 
-      <div class="content">
+      <div class="content" id="sectionDashboard">
         <div class="page-header">
           <div>
             <h1 class="page-title">Panel de control</h1>
@@ -121,6 +121,71 @@
           <div class="card">
             <div class="card-header">
               <div>
+                <div class="card-title">Progreso de documentación</div>
+                <div class="card-subtitle">Documentos completados vs pendientes.</div>
+              </div>
+              <span class="badge badge-info" id="badgeProgresoDocs">0%</span>
+            </div>
+            <div class="progress-bar" style="margin-bottom: 18px;">
+              <div class="progress-fill" id="barraProgresoDocs" style="width:0%"></div>
+            </div>
+            <div class="subsection-item" style="margin-bottom: 8px;">
+              <span>Documentos completados</span>
+              <strong id="docsCompletados">0</strong>
+            </div>
+            <div class="subsection-item" style="margin-bottom: 8px;">
+              <span>Documentos totales</span>
+              <strong id="docsTotales">0</strong>
+            </div>
+            <div class="subsection-item">
+              <span>Validados/Revisados</span>
+              <strong id="docsValidados">0</strong>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Progreso de personas</div>
+                <div class="card-subtitle">Usuarios con documentación completa.</div>
+              </div>
+              <span class="badge badge-info" id="badgeProgresoPersonas">0%</span>
+            </div>
+            <div class="progress-bar" style="margin-bottom: 18px;">
+              <div class="progress-fill" id="barraProgresoPersonas" style="width:0%"></div>
+            </div>
+            <div class="subsection-item" style="margin-bottom: 8px;">
+              <span>Usuarios con 100%</span>
+              <strong id="usuariosCompletos">0</strong>
+            </div>
+            <div class="subsection-item" style="margin-bottom: 8px;">
+              <span>Total de usuarios</span>
+              <strong id="usuariosTotales">0</strong>
+            </div>
+            <div class="subsection-item">
+              <span>Usuarios en progreso</span>
+              <strong id="usuariosProgreso">0</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="sectionEmpresas" style="margin-top:18px;">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Empresas</div>
+              <div class="card-subtitle">Gestión de las empresas registradas.</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <p>Esta sección muestra las empresas registradas en el sistema y su estado general.</p>
+            <p>Pronto estará disponible la lista completa de empresas con detalles de auditoría.</p>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-top:18px;">
+          <div class="card">
+            <div class="card-header">
+              <div>
                 <div class="card-title">Salud del sistema</div>
                 <div class="card-subtitle">Estados clave de infraestructura y seguridad.</div>
               </div>
@@ -133,7 +198,7 @@
             </div>
           </div>
 
-          <div class="card">
+          <div class="card" id="sectionAuditoria">
             <div class="card-header">
               <div>
                 <div class="card-title">Cola de pendientes sin asignar</div>
@@ -225,6 +290,31 @@
           </div>
         </div>
 
+        <div class="card" id="sectionPoliticasRoles" style="margin-top:18px;">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Políticas y roles</div>
+              <div class="card-subtitle">Define permisos y políticas internas.</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <p>Administra los roles de usuario y políticas del sistema desde aquí.</p>
+            <p>Las políticas se pueden revisar y ajustar dentro de la siguiente versión.</p>
+          </div>
+        </div>
+
+        <div class="card" id="sectionIntegraciones" style="margin-top:18px;">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Integraciones</div>
+              <div class="card-subtitle">Conecta sistemas externos y servicios.</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <p>Esta sección muestra el estado de las integraciones y conectores externos.</p>
+          </div>
+        </div>
+
         <div class="card" style="margin-top:18px;">
           <div class="card-header">
             <div>
@@ -234,7 +324,6 @@
             <button class="btn btn-secondary">Ver todo</button>
           </div>
           <div class="timeline" id="timelineSuperAdmin"></div>
-          </div>
         </div>
       </div>
     </div>
@@ -242,6 +331,7 @@
 
 
   <script src="Js/Super_Admin.js"></script>
+  <script src="Js/Sidebar.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script>lucide.createIcons();</script>
 </body>

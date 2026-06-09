@@ -44,7 +44,7 @@
         </div>
       </header>
 
-      <div class="content">
+      <div class="content" id="sectionDashboard">
         <div class="page-header">
           <div>
             <h1 class="page-title">Panel de Auditoría</h1>
@@ -77,7 +77,7 @@
 </div>
           
 
-          <div class="card">
+          <div class="card" id="sectionColaRevision">
             <div class="card-header">
               <div>
                 <div class="card-title">Cola prioritaria</div>
@@ -135,6 +135,23 @@
           </div>
         </div>
 
+        <div class="card" id="sectionGuiasPoliticas" style="margin-top:18px;">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Guías y políticas</div>
+              <div class="card-subtitle">Accede a la documentación de auditoría y políticas internas.</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <p>En esta sección encontrarás las guías y políticas necesarias para la auditoría.</p>
+            <ul>
+              <li>Proceso de revisión y validación</li>
+              <li>Criterios de cumplimiento</li>
+              <li>Protocolos y listas de verificación</li>
+            </ul>
+          </div>
+        </div>
+
         <div class="card" style="margin-top:18px;">
           <div class="card-header">
             <div>
@@ -144,7 +161,6 @@
             <button class="btn btn-secondary">Ver todo</button>
           </div>
           <div class="timeline" id="timelineAuditor"></div>
-          </div>
         </div>
       </div>
     </div>
@@ -237,5 +253,6 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script>lucide.createIcons();</script>
   <script src="Js/Auditor.js"></script>
+  <script src="Js/Sidebar.js"></script>
 </body>
 </html>

@@ -82,6 +82,58 @@
           <div class="kpi-card"><div class="kpi-icon"><i data-lucide="bar-chart-3" class="icon"></i></div><div class="kpi-value" id="statCumplimiento">85%</div><div class="kpi-label">Cumplimiento</div><div class="progress-bar" id="barraCumplimiento"><div class="progress-fill" style="width:85%"></div></div></div>
         </div>
 
+        <div class="grid-2" style="margin-top:18px;">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Progreso de documentación</div>
+                <div class="card-subtitle">Documentos completados vs pendientes.</div>
+              </div>
+              <span class="badge badge-info" id="badgeProgresoDocEmpresa">0%</span>
+            </div>
+            <div class="progress-bar" style="margin-bottom: 18px;">
+              <div class="progress-fill" id="barraProgresoDocEmpresa" style="width:0%"></div>
+            </div>
+            <div class="subsection-item" style="margin-bottom: 8px;">
+              <span>Documentos completados</span>
+              <strong id="docsCompletadosEmpresa">0</strong>
+            </div>
+            <div class="subsection-item" style="margin-bottom: 8px;">
+              <span>Documentos totales</span>
+              <strong id="docsTotalesEmpresa">0</strong>
+            </div>
+            <div class="subsection-item">
+              <span>Validados/Revisados</span>
+              <strong id="docsValidadosEmpresa">0</strong>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Progreso de personas</div>
+                <div class="card-subtitle">Usuarios con documentación completa.</div>
+              </div>
+              <span class="badge badge-info" id="badgeProgresoPersonasEmpresa">0%</span>
+            </div>
+            <div class="progress-bar" style="margin-bottom: 18px;">
+              <div class="progress-fill" id="barraProgresoPersonasEmpresa" style="width:0%"></div>
+            </div>
+            <div class="subsection-item" style="margin-bottom: 8px;">
+              <span>Usuarios con 100%</span>
+              <strong id="usuariosCompletosEmpresa">0</strong>
+            </div>
+            <div class="subsection-item" style="margin-bottom: 8px;">
+              <span>Total de usuarios</span>
+              <strong id="usuariosTotalesEmpresa">0</strong>
+            </div>
+            <div class="subsection-item">
+              <span>Usuarios en progreso</span>
+              <strong id="usuariosProgresoEmpresa">0</strong>
+            </div>
+          </div>
+        </div>
+
         <div class="card" style="margin-top:18px;">
           <div class="card-header">
             <div>
@@ -89,10 +141,10 @@
               <div class="card-subtitle">Subidos, pendientes y responsables.</div>
             </div>
             <div class="pill-tabs">
-              <button class="pill is-active" onclick="switchTab('documentos-subidos', event)">Subidos</button>
-              <button class="pill" onclick="switchTab('documentos-aprobados', event)">Aprobados</button>
-              <button class="pill" onclick="switchTab('documentos-pendientes', event)">Pendientes</button>
-              <button class="pill" onclick="switchTab('usuarios-empresa', event)">Usuarios</button>
+              <button class="pill is-active" data-tab="documentos-subidos" onclick="switchTab('documentos-subidos', event)">Subidos</button>
+              <button class="pill" data-tab="documentos-aprobados" onclick="switchTab('documentos-aprobados', event)">Aprobados</button>
+              <button class="pill" data-tab="documentos-pendientes" onclick="switchTab('documentos-pendientes', event)">Pendientes</button>
+              <button class="pill" data-tab="usuarios-empresa" onclick="switchTab('usuarios-empresa', event)">Usuarios</button>
             </div>
           </div>
 
@@ -128,7 +180,7 @@
           <div id="tab-usuarios-empresa" class="tab-content">
             <div class="table-container">
               <table>
-                <thead><tr><th>Nombre</th><th>Correo</th><th>Cargo</th><th>Documentos subidos</th><th>Última actividad</th><th>Estado</th></tr></thead>
+                <thead><tr><th>Nombre</th><th>Correo</th><th>Cargo</th><th>Estado</th><th>Documentos cargados</th><th>Última actividad</th></tr></thead>
                 <tbody id="tablaUsuariosEmpresa"></tbody>
               </table>
               <div id="paginacionUsuarios" style="margin-top: 10px; text-align: center;"></div>

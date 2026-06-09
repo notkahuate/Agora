@@ -90,6 +90,8 @@ async function cargarEmpresaDetalle() {
   }
 }
 
+let documentosGlobal = [];
+
 // ==============================
 // CARGAR USUARIOS (EMPLEADOS)
 // ==============================
@@ -106,29 +108,47 @@ async function loadUsuariosEmpresa() {
     const data = await res.json();
 
     if (!res.ok) {
-      tablaUsuarios.innerHTML = `<tr><td colspan="6">Error cargando usuarios</td></tr>`;
+      tablaUsuarios.innerHTML = `<tr><td colspan="5">Error cargando usuarios</td></tr>`;
       return;
     }
 
     const usuarios = Array.isArray(data) ? data : [];
-
     const usuariosEmpresa = usuarios.filter(u =>
       String(u.empresa_id) === String(empresaId)
     );
 
-    // 🔥 GUARDAR EN GLOBAL
     usuariosGlobal = usuariosEmpresa;
     paginaUsuarios = 1;
 
-    // 🔥 AQUÍ SE CALCULA EMPLEADOS REAL
-    document.getElementById('empresaEmpleados').textContent =
-      usuariosEmpresa.length;
+    document.getElementById('empresaEmpleados').textContent = usuariosEmpresa.length;
 
-    // 🔥 RENDER
+    // Cargar documentos una sola vez
+    await cargarTodosLosDocumentos();
+
     renderUsuarios();
 
   } catch (err) {
     console.error("Error usuarios:", err);
+  }
+}
+
+async function cargarTodosLosDocumentos() {
+  try {
+    const res = await fetch('http://localhost:3000/api/documentos', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      const allDocs = Array.isArray(data) ? data : [];
+      documentosGlobal = allDocs.filter(d => String(d.empresa_id) === String(empresaId));
+    }
+  } catch (err) {
+    console.error("Error cargando documentos:", err);
+    documentosGlobal = [];
   }
 }
 
@@ -165,6 +185,93 @@ async function cargarCumplimientoEmpresa() {
     console.error("Error cargando cumplimiento:", err);
   }
 }
+
+// ==============================
+// ACTUALIZAR BARRAS DE PROGRESO
+// ==============================
+function actualizarBarrasProgresoEmpresa() {
+  if (!documentosGlobal || documentosGlobal.length === 0 || !usuariosGlobal) {
+    // Sin datos, mostrar 0%
+    document.getElementById('badgeProgresoDocEmpresa').textContent = '0%';
+    document.getElementById('barraProgresoDocEmpresa').style.width = '0%';
+    document.getElementById('docsCompletadosEmpresa').textContent = '0';
+    document.getElementById('docsTotalesEmpresa').textContent = '0';
+    document.getElementById('docsValidadosEmpresa').textContent = '0';
+
+    document.getElementById('badgeProgresoPersonasEmpresa').textContent = '0%';
+    document.getElementById('barraProgresoPersonasEmpresa').style.width = '0%';
+    document.getElementById('usuariosCompletosEmpresa').textContent = '0';
+    document.getElementById('usuariosTotalesEmpresa').textContent = '0';
+    document.getElementById('usuariosProgresoEmpresa').textContent = '0';
+    return;
+  }
+
+  // ========== PROGRESO DE DOCUMENTACIÓN ==========
+  const totalDocs = documentosGlobal.length;
+  
+  const docsCompletadosCount = documentosGlobal.filter(d => {
+    const estado = String(d.estado_documento || d.estado || 'pendiente').toLowerCase();
+    return ['validado', 'revisado', 'aprobado'].includes(estado);
+  }).length;
+
+  const docsValidadosCount = documentosGlobal.filter(d => {
+    const estado = String(d.estado_documento || d.estado || 'pendiente').toLowerCase();
+    return ['validado', 'revisado'].includes(estado);
+  }).length;
+
+  const progresoDocs = totalDocs > 0 ? Math.round((docsCompletadosCount / totalDocs) * 100) : 0;
+
+  document.getElementById('badgeProgresoDocEmpresa').textContent = progresoDocs + '%';
+  document.getElementById('barraProgresoDocEmpresa').style.width = progresoDocs + '%';
+  document.getElementById('docsCompletadosEmpresa').textContent = docsCompletadosCount;
+  document.getElementById('docsTotalesEmpresa').textContent = totalDocs;
+  document.getElementById('docsValidadosEmpresa').textContent = docsValidadosCount;
+
+  // ========== PROGRESO DE PERSONAS ==========
+  const totalUsuarios = usuariosGlobal.length;
+  
+  if (totalUsuarios === 0) {
+    document.getElementById('badgeProgresoPersonasEmpresa').textContent = '0%';
+    document.getElementById('barraProgresoPersonasEmpresa').style.width = '0%';
+    document.getElementById('usuariosCompletosEmpresa').textContent = '0';
+    document.getElementById('usuariosTotalesEmpresa').textContent = '0';
+    document.getElementById('usuariosProgresoEmpresa').textContent = '0';
+    return;
+  }
+
+  let usuariosCompletosCount = 0;
+  let usuariosEnProgresoCount = 0;
+
+  usuariosGlobal.forEach(usuario => {
+    const docsDelUsuario = documentosGlobal.filter(d => d.responsable_id === usuario.id);
+    
+    if (docsDelUsuario.length === 0) {
+      return;
+    }
+
+    const docsCompletadosDelUsuario = docsDelUsuario.filter(d => {
+      const estado = String(d.estado_documento || d.estado || 'pendiente').toLowerCase();
+      return ['validado', 'revisado', 'aprobado'].includes(estado);
+    }).length;
+
+    const progresoUsuario = (docsCompletadosDelUsuario / docsDelUsuario.length) * 100;
+
+    if (progresoUsuario === 100) {
+      usuariosCompletosCount++;
+    } else if (progresoUsuario > 0) {
+      usuariosEnProgresoCount++;
+    }
+  });
+
+  const progresoPersonas = totalUsuarios > 0 ? Math.round((usuariosCompletosCount / totalUsuarios) * 100) : 0;
+
+  document.getElementById('badgeProgresoPersonasEmpresa').textContent = progresoPersonas + '%';
+  document.getElementById('barraProgresoPersonasEmpresa').style.width = progresoPersonas + '%';
+  document.getElementById('usuariosCompletosEmpresa').textContent = usuariosCompletosCount;
+  document.getElementById('usuariosTotalesEmpresa').textContent = totalUsuarios;
+  document.getElementById('usuariosProgresoEmpresa').textContent = usuariosEnProgresoCount;
+}
+
 function renderUsuarios() {
   const tablaUsuarios = document.getElementById('tablaUsuariosEmpresa');
 
@@ -174,23 +281,45 @@ function renderUsuarios() {
   const pagina = usuariosGlobal.slice(inicio, fin);
 
   tablaUsuarios.innerHTML = pagina.length
-    ? pagina.map(u => `
-        <tr>
-          <td>${u.nombre || u.email}</td>
-          <td>${u.email || '-'}</td>
-          <td>${u.rol || '-'}</td>
-          <td>-</td>
-          <td>-</td>
-          <td>
-            <span class="badge ${u.activo ? 'badge-success' : 'badge-warning'}">
-              ${u.activo ? 'Activo' : 'Inactivo'}
-            </span>
-          </td>
-        </tr>
-      `).join('')
+    ? pagina.map(u => {
+        const docsDelUsuario = documentosGlobal.filter(d =>
+          String(d.usuario_id) === String(u.id)
+        );
+
+        const contadorDocumentos = docsDelUsuario.length;
+
+        const listaDocumentos = docsDelUsuario.length > 0
+          ? docsDelUsuario.map(d => `
+              <div style="font-size:12px; padding:6px; background:#f8fafc; border-radius:6px; margin:4px 0; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <span>${d.nombre_archivo || d.nombre || 'Documento'}</span>
+                <button class="btn btn-sm btn-secondary" onclick="descargarDocumento('${d.id}', '${String(d.nombre_archivo || d.nombre || 'Documento').replace(/'/g, "\\'")}')">Descargar</button>
+              </div>
+            `).join('')
+          : '<div style="font-size:12px; color:#64748b;">Sin documentos</div>';
+
+        const ultimaActividad = docsDelUsuario.length > 0
+          ? new Date(Math.max(...docsDelUsuario.map(d => new Date(d.fecha_subida).getTime()))).toLocaleDateString()
+          : '-';
+
+        const activoValor = String(u.activo ?? u.estado ?? u.status ?? u.estatus ?? '').toLowerCase();
+        const estaActivo = ['true', '1', 'activo', 'activo', 'active', 't', 'yes', 'si'].includes(activoValor) || u.activo === true || u.activo === 1;
+        const estadoUsuario = estaActivo ? 'Activo' : 'Inactivo';
+
+        return `
+          <tr>
+            <td>${u.nombre || u.email}</td>
+            <td>${u.email || '-'}</td>
+            <td>${u.rol || '-'}</td>
+            <td><span class="badge ${estadoUsuario === 'Activo' ? 'badge-success' : 'badge-danger'}">${estadoUsuario}</span></td>
+            <td>${contadorDocumentos}</td>
+            <td>${ultimaActividad}</td>
+          </tr>
+        `;
+      }).join('')
     : `<tr><td colspan="6">Sin usuarios</td></tr>`;
 
   renderControlesUsuarios();
+  actualizarBarrasProgresoEmpresa();
 }
 
 function renderControlesUsuarios() {
@@ -252,7 +381,11 @@ async function loadDocumentosEmpresa() {
               <td>${doc.usuario_nombre || doc.usuario_id || '-'}</td>
               <td>${doc.fecha_subida ? new Date(doc.fecha_subida).toLocaleDateString() : '-'}</td>
               <td>${doc.estado}</td>
-              <td><button class="btn btn-secondary">Ver</button></td>
+              <td>
+                <button class="btn btn-secondary" onclick="descargarDocumento('${doc.id}', '${String(doc.nombre_archivo).replace(/'/g, "\\'")}')">
+                  Descargar
+                </button>
+              </td>
             </tr>
           `).join('')
         : `<tr><td colspan="6">Sin documentos</td></tr>`;
@@ -296,7 +429,11 @@ function renderAprobados() {
           <td>${doc.usuario_nombre || doc.usuario_id || '-'}</td>
           <td>${doc.fecha_subida ? new Date(doc.fecha_subida).toLocaleDateString() : '-'}</td>
           <td>${doc.estado}</td>
-          <td><button class="btn btn-secondary">Ver</button></td>
+          <td>
+            <button class="btn btn-secondary" onclick="descargarDocumento('${doc.id}', '${String(doc.nombre_archivo).replace(/'/g, "\\'")}')">
+              Descargar
+            </button>
+          </td>
         </tr>
       `).join('')
     : `<tr><td colspan="6">No hay documentos aprobados</td></tr>`;
@@ -327,14 +464,21 @@ function cambiarPaginaAprobados(direccion) {
 // ==============================
 // TABS
 // ==============================
-function switchTab(tabName, evt) {
+async function switchTab(tabName, evt) {
   document.querySelectorAll('.pill').forEach(p => p.classList.remove('is-active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-  if (evt?.currentTarget) evt.currentTarget.classList.add('is-active');
+  const selectedPill = evt?.currentTarget || document.querySelector(`.pill[data-tab="${tabName}"]`);
+  if (selectedPill) selectedPill.classList.add('is-active');
 
   const panel = document.getElementById(`tab-${tabName}`);
   if (panel) panel.classList.add('active');
+
+  if (tabName === 'usuarios-empresa') {
+    await cargarTodosLosDocumentos();
+    renderUsuarios();
+    actualizarBarrasProgresoEmpresa();
+  }
 }
 
 // ==============================
@@ -428,6 +572,39 @@ function cambiarPaginaPendientes(direccion) {
   paginaPendientes += direccion;
   renderPendientes();
 }
+
+window.descargarDocumento = async function (id, nombreArchivo) {
+  if (!id) {
+    return alert('No se encontró el documento para descargar.');
+  }
+
+  try {
+    const res = await fetch(`http://localhost:3000/api/documentos/${id}/descargar`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => null);
+      const message = error?.message || 'No se pudo descargar el documento.';
+      return alert(message);
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombreArchivo || `documento-${id}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Error descargando documento:', err);
+    alert('Error al descargar el documento. Intenta nuevamente.');
+  }
+};
 
 // ==============================
 // INIT

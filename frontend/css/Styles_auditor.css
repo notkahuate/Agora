@@ -63,6 +63,8 @@ img {
   position: sticky;
   top: 0;
   height: 100vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .sidebar .brand {
@@ -102,21 +104,40 @@ img {
 
 .nav-item {
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 12px;
-  padding: 12px;
+  border-radius: 14px;
+  padding: 14px 16px;
   color: #e2e8f0;
   display: flex;
   align-items: center;
   gap: 12px;
   background: rgba(255, 255, 255, 0.02);
-  transition: all 0.18s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
   cursor: pointer;
+  min-height: 48px;
+  position: relative;
 }
 
-.nav-item:hover,
+.nav-item:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateX(1px);
+}
+
 .nav-item.is-active {
-  border-color: rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(96, 165, 250, 0.5);
+  background: rgba(96, 165, 250, 0.15);
+  color: #ffffff;
+}
+
+.nav-item.is-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
+  border-radius: 9999px;
+  background: #60a5fa;
 }
 
 .main-content {
