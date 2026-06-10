@@ -1,5 +1,6 @@
 // src/controllers/empresaController.js
 const Empresa = require('../Models/empresaModel');
+const auditoria = require('../Helpers/auditoriaHelper');
 
 const crearEmpresa = async (req, res) => {
   try {
@@ -10,6 +11,19 @@ const crearEmpresa = async (req, res) => {
     }
 
     const nueva = await Empresa.createEmpresa({ nombre, rut, sector, ubicacion, email, telefono, activa });
+    // registrar en auditoria
+    try {
+      await auditoria.registrar({
+        entidad: 'empresas',
+        entidad_id: nueva.id,
+        accion: 'crear',
+        usuario_id: req.user ? req.user.id : null,
+        descripcion: `Empresa creada: ${nueva.nombre}`,
+        datos_nuevos: nueva
+      });
+    } catch (e) {
+      console.error('auditoria crearEmpresa error:', e.message);
+    }
     return res.status(201).json(nueva);
   } catch (err) {
     // Manejo de errores comunes: unique constraint

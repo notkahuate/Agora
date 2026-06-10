@@ -130,6 +130,8 @@ async function cargarEmpresas() {
       tr.innerHTML = `
         <td>${e.nombre}</td>
 
+        <td>${e.sector || '-'}</td>
+
         <td>${usuariosEmpresa.length}</td>
 
         <td>
@@ -829,11 +831,173 @@ async function cargarColaPrioritaria() {
 
 
 // ==============================
+// ACTIVIDAD RECIENTE (TIMELINE)
+// ==============================
+async function cargarActividadReciente() {
+  const timeline = document.getElementById('timelineAuditor');
+  
+  if (!timeline) {
+    console.warn('Elemento timelineAuditor no encontrado');
+    return;
+  }
+
+  try {
+    const headers = {
+      'Authorization': `Bearer ${token}`
+    };
+
+    // Obtener los últimos 15 eventos
+    const res = await fetch('http://localhost:3000/api/auditoria/recientes?limit=15', { headers });
+    
+    if (!res.ok) {
+      throw new Error(`HTTP Error: ${res.status}`);
+    }
+
+    const data = await res.json();
+    const eventos = data.eventos || [];
+
+    timeline.innerHTML = '';
+
+    if (eventos.length === 0) {
+      timeline.innerHTML = '<p style="color: #94a3b8; text-align: center; padding: 20px;">Sin eventos registrados</p>';
+      return;
+    }
+
+    eventos.forEach((evento) => {
+      const fecha = new Date(evento.fecha_evento);
+      const fechaFormato = fecha.toLocaleDateString('es-ES', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      // Determinar icono y color según la acción
+      let iconoColor = '#94a3b8'; // gris por defecto
+      let icono = '●';
+      const entidadTexto = String(evento.entidad || '').replace(/_/g, ' ');
+
+      if (evento.accion === 'crear') {
+        iconoColor = '#10b981'; // verde
+        icono = '✚';
+      } else if (evento.accion === 'actualizar') {
+        iconoColor = '#3b82f6'; // azul
+        icono = '⟳';
+      } else if (evento.accion === 'eliminar') {
+        iconoColor = '#ef4444'; // rojo
+        icono = '✕';
+      } else if (evento.accion === 'validar' || evento.accion === 'aprobar' || evento.accion === 'revisar') {
+        iconoColor = '#8b5cf6'; // púrpura
+        icono = '✓';
+      } else if (evento.accion === 'descargar') {
+        iconoColor = '#0ea5e9'; // azul claro
+        icono = '↓';
+      } else if (evento.accion === 'subir') {
+        iconoColor = '#f59e0b'; // naranja
+        icono = '↑';
+      } else if (evento.accion === 'asignar') {
+        iconoColor = '#f59e0b'; // naranja
+        icono = '→';
+      } else if (entidadTexto.toLowerCase().includes('documento')) {
+        iconoColor = '#f97316';
+        icono = '📄';
+      }
+
+      const usuarioNombre = evento.usuario_nombre || 'Sistema';
+      
+      // Crear elemento del timeline
+      const timelineItem = document.createElement('div');
+      timelineItem.style.cssText = `
+        display: flex;
+        margin-bottom: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #e2e8f0;
+      `;
+
+      // Icono del timeline
+      const iconEl = document.createElement('div');
+      iconEl.style.cssText = `
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        background: ${iconoColor}20;
+        color: ${iconoColor};
+        border-radius: 50%;
+        font-weight: bold;
+        margin-right: 12px;
+        flex-shrink: 0;
+      `;
+      iconEl.textContent = icono;
+
+      // Contenido del evento
+      const contentEl = document.createElement('div');
+      contentEl.style.cssText = `
+        flex: 1;
+        min-width: 0;
+      `;
+
+      // Descripción del evento
+      const descEl = document.createElement('div');
+      descEl.style.cssText = `
+        font-size: 14px;
+        color: #1e293b;
+        font-weight: 500;
+      `;
+      
+      const entidadLabel = entidadTexto
+        ? entidadTexto.charAt(0).toUpperCase() + entidadTexto.slice(1)
+        : 'Evento';
+      let descripcion = evento.descripcion || `${evento.accion} en ${entidadLabel}`;
+      if (evento.entidad_id) {
+        descripcion += ` (#${evento.entidad_id})`;
+      }
+      descEl.textContent = descripcion;
+
+      // Detalles (usuario y fecha)
+      const detallesEl = document.createElement('div');
+      detallesEl.style.cssText = `
+        display: flex;
+        gap: 12px;
+        margin-top: 4px;
+        font-size: 12px;
+        color: #64748b;
+      `;
+      
+      const usuarioSpan = document.createElement('span');
+      usuarioSpan.textContent = `Por: ${usuarioNombre}`;
+      
+      const fechaSpan = document.createElement('span');
+      fechaSpan.textContent = fechaFormato;
+
+      detallesEl.appendChild(usuarioSpan);
+      detallesEl.appendChild(fechaSpan);
+
+      contentEl.appendChild(descEl);
+      contentEl.appendChild(detallesEl);
+
+      timelineItem.appendChild(iconEl);
+      timelineItem.appendChild(contentEl);
+
+      timeline.appendChild(timelineItem);
+    });
+
+  } catch (err) {
+    console.error('Error cargando actividad reciente:', err);
+    timeline.innerHTML = '<p style="color: #ef4444; text-align: center; padding: 20px;">Error cargando actividad reciente</p>';
+  }
+}
+
+// ==============================
 // INIT
 // ==============================
 document.addEventListener('DOMContentLoaded', () => {
   cargarEmpresas();
   cargarColaPrioritaria();
+  cargarActividadReciente();
 
   document.querySelectorAll('.modal').forEach((modal) => {
     modal.addEventListener('click', (event) => {

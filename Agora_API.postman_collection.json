@@ -1,0 +1,660 @@
+{
+  "info": {
+    "_postman_id": "agora-system-collection",
+    "name": "Agora System API",
+    "description": "Colección completa de endpoints para el sistema Agora",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set(\"token\", jsonData.token);",
+                  "    pm.environment.set(\"usuario_id\", jsonData.usuario.id);",
+                  "    pm.environment.set(\"usuario_rol\", jsonData.usuario.rol);",
+                  "    pm.environment.set(\"empresa_id\", jsonData.usuario.empresa_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n  \\\"email\\\": \\\"admin@agora.com\\\",\\n  \\\"password\\\": \\\"Admin123\\\"\\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Crear Usuario",
+      "item": [
+        {
+          "name": "Registro Público",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set(\\\"nuevo_usuario_id\\\", jsonData.id);",
+                  "    console.log(\\\"Nuevo usuario ID:\\\", jsonData.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n  \\\"nombre\\\": \\\"Juan Pérez\\\",\\n  \\\"email\\\": \\\"juan@empresa.com\\\",\\n  \\\"password\\\": \\\"Password123\\\",\\n  \\\"empresa_id\\\": 1\\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/registro",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "registro"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear Usuario (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n  \\\"nombre\\\": \\\"Carlos López\\\",\\n  \\\"email\\\": \\\"carlos@empresa.com\\\",\\n  \\\"password\\\": \\\"Password456\\\",\\n  \\\"rol\\\": \\\"usuario\\\",\\n  \\\"empresa_id\\\": 1,\\n  \\\"activo\\\": true\\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "usuarios"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Listar Usuarios",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/usuarios",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "usuarios"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Crear Empresa",
+      "item": [
+        {
+          "name": "Crear Empresa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set(\\\"nueva_empresa_id\\\", jsonData.id);",
+                  "    console.log(\\\"Nueva empresa ID:\\\", jsonData.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n  \\\"nombre\\\": \\\"Soluciones Digitales\\\",\\n  \\\"rut\\\": \\\"76.555.666-3\\\",\\n  \\\"sector\\\": \\\"Tecnología\\\",\\n  \\\"ubicacion\\\": \\\"Santiago, Chile\\\",\\n  \\\"email\\\": \\\"info@sdigitales.cl\\\",\\n  \\\"telefono\\\": \\\"+56998765432\\\",\\n  \\\"activa\\\": true\\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/empresas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "empresas"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Listar Empresas",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/empresas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "empresas"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Obtener Empresa",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/empresas/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "empresas",
+                "1"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Asignar Documento a Empresa",
+      "item": [
+        {
+          "name": "Crear Documento Requerido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set(\\\"documento_requerido_id\\\", jsonData.id);",
+                  "    console.log(\\\"Documento requerido ID:\\\", jsonData.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n  \\\"empresa_id\\\": 1,\\n  \\\"tipo_documento_id\\\": 1,\\n  \\\"fecha_limite\\\": \\\"2026-08-31\\\",\\n  \\\"prioridad\\\": \\\"alta\\\"\\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/documentos-requeridos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documentos-requeridos"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Listar Documentos por Empresa",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/documentos-requeridos/empresa/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documentos-requeridos",
+                "empresa",
+                "1"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Asignar Documento a Usuario",
+      "item": [
+        {
+          "name": "Asignar Responsable",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n  \\\"documento_requerido_id\\\": 1,\\n  \\\"usuario_id\\\": 1\\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/documento-responsables",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documento-responsables"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Ver Responsable",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/documento-responsables/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documento-responsables",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Documentos Pendientes del Usuario",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/documentos-requeridos/usuario/pendientes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documentos-requeridos",
+                "usuario",
+                "pendientes"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Cambiar Estado de Documento",
+      "item": [
+        {
+          "name": "Validar/Cambiar Estado",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n  \\\"estado\\\": \\\"aprobado\\\",\\n  \\\"comentarios\\\": \\\"Documento validado correctamente\\\"\\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/documentos/1/validar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documentos",
+                "1",
+                "validar"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Rechazar Documento",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n  \\\"estado\\\": \\\"rechazado\\\",\\n  \\\"comentarios\\\": \\\"Documento incompleto, revisar formatos\\\"\\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/documentos/1/validar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documentos",
+                "1",
+                "validar"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Pendientes de Validación",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/documentos/pendientes-validacion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documentos",
+                "pendientes-validacion"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Extras",
+      "item": [
+        {
+          "name": "Listar Documentos",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/documentos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documentos"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Tipos de Documentos",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/tipos-documentos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tipos-documentos"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "usuario_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "usuario_rol",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "empresa_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "nuevo_usuario_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "nueva_empresa_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "documento_requerido_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

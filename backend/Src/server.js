@@ -15,6 +15,7 @@ const authRoutes = require('./Routes/authRoutes');
 const Tipodocs = require('./Routes/tipodocumentosRoutes');
 const documentosRequeridosRoutes = require('./Routes/DocumentosRoutes');
 const documentoResponsableRoutes = require('./Routes/DocumentoResponsableRoutes');
+const auditoriaRoutes = require('./Routes/AuditoriaRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tipos-documentos', Tipodocs);
@@ -26,6 +27,7 @@ app.use('/api/empresas', empresasRoutes);
 
 app.use('/api/documentos-requeridos', documentosRequeridosRoutes);
 app.use('/api/documento-responsables', documentoResponsableRoutes);
+app.use('/api/auditoria', auditoriaRoutes);
 
 // Servir archivos de uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

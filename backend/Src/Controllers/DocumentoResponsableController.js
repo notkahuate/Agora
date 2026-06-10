@@ -1,5 +1,6 @@
 // src/controllers/DocumentoResponsableController.js
 const model = require('../Models/DocumentoResponsableModel');
+const auditoria = require('../Helpers/auditoriaHelper');
 
 // ✅ Asignar responsable
 const asignar = async (req, res) => {
@@ -7,7 +8,21 @@ const asignar = async (req, res) => {
     const { documento_requerido_id, usuario_id } = req.body;
 
     const data = await model.asignarResponsable(documento_requerido_id, usuario_id);
-    res.status(201).json(data);
+      // Registrar auditoría: asignación de responsable
+      try {
+        await auditoria.registrar({
+          entidad: 'documento_responsables',
+          entidad_id: data.id,
+          accion: 'asignar',
+          usuario_id: req.user ? req.user.id : null,
+          descripcion: `Asignado usuario ${usuario_id} al documento requerido ${documento_requerido_id}`,
+          datos_nuevos: data
+        });
+      } catch (e) {
+        console.error('auditoria asignarResponsable error:', e.message);
+      }
+
+      res.status(201).json(data);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Error al asignar responsable' });

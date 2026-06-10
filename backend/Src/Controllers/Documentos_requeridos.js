@@ -1,10 +1,23 @@
 // src/controllers/DocumentoRequeridoController.js
 const model = require('../Models/Documentos_requeridoModel');
+const auditoria = require('../Helpers/auditoriaHelper');
 
 // ✅ Crear
 const crear = async (req, res) => {
   try {
     const data = await model.crearDocumentoRequerido(req.body);
+    try {
+      await auditoria.registrar({
+        entidad: 'documentos_requeridos',
+        entidad_id: data.id,
+        accion: 'asignar',
+        usuario_id: req.user ? req.user.id : null,
+        descripcion: `Documento requerido asignado a empresa ${data.empresa_id} tipo ${data.tipo_documento_id}`,
+        datos_nuevos: data
+      });
+    } catch (e) {
+      console.error('auditoria crearDocumentoRequerido error:', e.message);
+    }
     res.status(201).json(data);
   } catch (error) {
     console.error(error);

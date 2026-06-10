@@ -65,6 +65,9 @@ async function cargarEmpresaDetalle() {
     document.getElementById('empresaRuc').textContent =
       e.ruc || e.rut || '-';
 
+    document.getElementById('empresaSector').textContent =
+      e.sector || '-';
+
     document.getElementById('empresaFecha').textContent =
       e.createdAt
         ? new Date(e.createdAt).toLocaleDateString()

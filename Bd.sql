@@ -79,4 +79,21 @@ CREATE TABLE historial_documentos (
     usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
     comentario TEXT,
     fecha_cambio TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+); 
+CREATE TABLE auditoria_sistema (
+    id SERIAL PRIMARY KEY,
+
+    entidad VARCHAR(50) NOT NULL,
+    entidad_id INTEGER,
+
+    accion VARCHAR(50) NOT NULL,
+
+    usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+
+    descripcion TEXT,
+
+    datos_anteriores JSONB,
+    datos_nuevos JSONB,
+
+    fecha_evento TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

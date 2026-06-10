@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs'); // usar bcryptjs para consistencia
 const { validationResult } = require('express-validator');
 const Usuario = require('../Models/UsuarioModel'); // asegúrate del path y nombre
 const SALT_ROUNDS = parseInt(process.env.SALT_ROUNDS || '10', 10);
+const auditoria = require('../Helpers/auditoriaHelper');
 
 
 exports.crearUsuarioPublico = async (req, res) => {
@@ -45,6 +46,20 @@ exports.crearUsuarioPublico = async (req, res) => {
 
     // Nunca devolver el hash
     delete nuevo.password_hash;
+
+    // Registrar auditoría del registro público
+    try {
+      await auditoria.registrar({
+        entidad: 'usuarios',
+        entidad_id: nuevo.id,
+        accion: 'registro_publico',
+        usuario_id: nuevo.id,
+        descripcion: `Registro público de usuario: ${nuevo.email}`,
+        datos_nuevos: nuevo
+      });
+    } catch (e) {
+      console.error('auditoria crearUsuarioPublico error:', e.message);
+    }
 
     return res.status(201).json(nuevo);
   } catch (err) {
@@ -113,6 +128,20 @@ exports.crearUsuario = async (req, res) => {
       empresa_id: empresaId,
       activo: activoFinal
     });
+
+    // Registrar auditoría: creación de usuario por admin/auditor
+    try {
+      await auditoria.registrar({
+        entidad: 'usuarios',
+        entidad_id: nuevoUsuario.id,
+        accion: 'crear',
+        usuario_id: requester ? requester.id : null,
+        descripcion: `Usuario creado: ${nuevoUsuario.email}`,
+        datos_nuevos: nuevoUsuario
+      });
+    } catch (e) {
+      console.error('auditoria crearUsuario error:', e.message);
+    }
 
     return res.status(201).json(nuevoUsuario);
 

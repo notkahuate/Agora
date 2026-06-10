@@ -3,6 +3,7 @@ const Documento = require('../Models/DocumentModel');
 const { pool } = require('../configures/db');
 const fs = require('fs');
 const path = require('path');
+const auditoria = require('../Helpers/auditoriaHelper');
 
 exports.crearDocumento = async (req, res) => {
   try {
@@ -38,6 +39,20 @@ exports.crearDocumento = async (req, res) => {
       mime_type,
       comentarios
     });
+
+    // Registrar auditoría: documento subido
+    try {
+      await auditoria.registrar({
+        entidad: 'documentos_subidos',
+        entidad_id: creado.id,
+        accion: 'subir',
+        usuario_id: resolvedUsuarioId,
+        descripcion: `Documento subido: ${creado.nombre_archivo}`,
+        datos_nuevos: creado
+      });
+    } catch (e) {
+      console.error('auditoria crearDocumento error:', e.message);
+    }
 
     return res.status(201).json({
       ...creado,
@@ -110,6 +125,19 @@ exports.actualizarDocumento = async (req, res) => {
     delete campos.validado_por;
 
     const actualizado = await Documento.actualizarDocumento(id, campos);
+    try {
+      await auditoria.registrar({
+        entidad: 'documentos_subidos',
+        entidad_id: actualizado.id,
+        accion: 'actualizar',
+        usuario_id: requester.id,
+        descripcion: `Documento ${actualizado.id} actualizado`,
+        datos_anteriores: doc,
+        datos_nuevos: actualizado
+      });
+    } catch (e) {
+      console.error('auditoria actualizarDocumento error:', e.message);
+    }
     return res.json(actualizado);
   } catch (err) {
     console.error(err);
@@ -123,8 +151,25 @@ exports.actualizarDocumento = async (req, res) => {
 exports.eliminarDocumento = async (req, res) => {
   try {
     const { id } = req.params;
+    const doc = await Documento.obtenerDocumentoPorId(id);
+    if (!doc) return res.status(404).json({ message: 'Documento no encontrado' });
+
     const eliminado = await Documento.eliminarDocumento(id);
     if (!eliminado) return res.status(404).json({ message: 'Documento no encontrado' });
+
+    try {
+      await auditoria.registrar({
+        entidad: 'documentos_subidos',
+        entidad_id: doc.id,
+        accion: 'eliminar',
+        usuario_id: req.user ? req.user.id : null,
+        descripcion: `Documento eliminado: ${doc.nombre_archivo}`,
+        datos_anteriores: doc
+      });
+    } catch (e) {
+      console.error('auditoria eliminarDocumento error:', e.message);
+    }
+
     return res.json({ message: 'Documento eliminado', documento: eliminado });
   } catch (err) {
     console.error(err);
@@ -148,6 +193,21 @@ exports.validarDocumento = async (req, res) => {
     // No hay restricción adicional de empresa para auditores
 
     const actualizado = await Documento.validarDocumento(id, { estado, validado_por: requester.id, comentarios });
+    // Registrar auditoría: cambio de estado
+    try {
+      await auditoria.registrar({
+        entidad: 'documentos_subidos',
+        entidad_id: actualizado.id,
+        accion: 'validar',
+        usuario_id: requester.id,
+        descripcion: `Documento ${actualizado.id} cambiado a estado ${actualizado.estado}`,
+        datos_anteriores: doc,
+        datos_nuevos: actualizado
+      });
+    } catch (e) {
+      console.error('auditoria validarDocumento error:', e.message);
+    }
+
     return res.json(actualizado);
   } catch (err) {
     console.error(err);
@@ -215,6 +275,19 @@ exports.descargarDocumento = async (req, res) => {
     // Verificar permisos: owner, admin, o auditor
     if (!isAdmin && !isOwner && !isAuditor) {
       return res.status(403).json({ message: 'No autorizado para descargar este documento' });
+    }
+
+    try {
+      await auditoria.registrar({
+        entidad: 'documentos_subidos',
+        entidad_id: doc.id,
+        accion: 'descargar',
+        usuario_id: requester.id,
+        descripcion: `Documento descargado: ${doc.nombre_archivo}`,
+        datos_anteriores: doc
+      });
+    } catch (e) {
+      console.error('auditoria descargarDocumento error:', e.message);
     }
 
     if (doc.archivo && doc.archivo.length > 0) {
