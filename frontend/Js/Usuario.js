@@ -2,6 +2,44 @@
 // AUTH SIMPLE (SIN Auth.js)
 // ==============================
 const token = localStorage.getItem('token');
+
+function obtenerNombreValidador(documento) {
+  if (!documento) return 'No disponible';
+  if (documento.validado_por_nombre) return documento.validado_por_nombre;
+  if (documento.auditor_nombre) return documento.auditor_nombre;
+  if (documento.revisor_nombre) return documento.revisor_nombre;
+  if (documento.validated_by_name) return documento.validated_by_name;
+  if (documento.validator_name) return documento.validator_name;
+  if (documento.auditor) return documento.auditor;
+  if (documento.revisor) return documento.revisor;
+  if (documento.validado_por) return `Auditor #${documento.validado_por}`;
+  if (documento.revisor_id) return `Usuario #${documento.revisor_id}`;
+  if (documento.auditor_id) return `Usuario #${documento.auditor_id}`;
+  return 'No disponible';
+}
+
+function obtenerEstadoDocumentoVisual(documento) {
+  const estado = String(documento.estado_documento || documento.estado || documento.status || 'pendiente').toLowerCase();
+  if (['validado', 'revisado', 'aprobado'].includes(estado)) {
+    return { clase: 'badge-success', texto: 'Validado' };
+  }
+  if (estado === 'rechazado') {
+    return { clase: 'badge-danger', texto: 'Rechazado' };
+  }
+  if (estado === 'subido') {
+    return { clase: 'badge-info', texto: 'Subido' };
+  }
+  return { clase: 'badge-warning', texto: 'Pendiente' };
+}
+
+function obtenerNombreValidadorDesdeMapa(doc, auditorMap) {
+  if (!doc) return 'No disponible';
+  if (doc.validado_por && auditorMap.has(doc.validado_por)) {
+    return auditorMap.get(doc.validado_por);
+  }
+  return obtenerNombreValidador(doc);
+}
+
 const user = JSON.parse(localStorage.getItem('user'));
 
 if (!token || !user) {
@@ -217,22 +255,24 @@ async function loadDocumentos() {
     tablaPendientes.innerHTML = '';
 
     if (pendientes.length === 0) {
-      tablaPendientes.innerHTML = '<tr><td colspan="5">No hay documentos pendientes asignados.</td></tr>';
+      tablaPendientes.innerHTML = '<tr><td colspan="6">No hay documentos pendientes asignados.</td></tr>';
     } else {
       pendientes.forEach(doc => {
         const row = document.createElement('tr');
         const safeName = (doc.nombre || '').replace(/'/g, "\\'");
         const prioridadBadge = `<span class="badge badge-${doc.prioridad === 'alta' ? 'danger' : doc.prioridad === 'media' ? 'warning' : 'info'}">${doc.prioridad}</span>`;
         const fechaLimite = new Date(doc.fecha_limite).toLocaleDateString();
-        const estadoLabel = doc.estado === 'rechazado' ? `<span class="badge badge-danger">rechazado</span>` : '';
-        const actionButton = doc.estado === 'rechazado'
+        const estadoInfo = obtenerEstadoDocumentoVisual(doc);
+        const estadoBadge = `<span class="badge ${estadoInfo.clase}">${estadoInfo.texto}</span>`;
+        const actionButton = estadoInfo.texto === 'Rechazado'
           ? `<button class="btn btn-sm btn-secondary" onclick="reuploadRejectedDocument(${doc.tipo_documento_id}, '${safeName}', ${doc.id || null})">Volver a subir</button>`
           : `<button class="btn btn-sm btn-primary" onclick="uploadDocumentForPending(${doc.tipo_documento_id}, '${safeName}')">Subir</button>`;
 
         row.innerHTML = `
-          <td>${doc.nombre} ${estadoLabel}</td>
+          <td>${doc.nombre}</td>
           <td>${doc.frecuencia || '-'}</td>
           <td>${fechaLimite}</td>
+          <td>${estadoBadge}</td>
           <td>${prioridadBadge}</td>
           <td>${actionButton}</td>
         `;
@@ -249,12 +289,15 @@ async function loadDocumentos() {
     } else {
       historial.forEach(doc => {
         const row = document.createElement('tr');
-        const estadoBadge = `<span class="badge badge-${doc.estado === 'aprobado' ? 'success' : 'warning'}">${doc.estado}</span>`;
-        const validado = doc.validado_por ? (auditorMap.get(doc.validado_por) || `#${doc.validado_por}`) : 'Pendiente';
+        
+        // Determinar color según estado
+        const estadoInfo = obtenerEstadoDocumentoVisual(doc);
+        const estadoBadge = `<span class="badge ${estadoInfo.clase}">${estadoInfo.texto}</span>`;
+        const validado = obtenerNombreValidadorDesdeMapa(doc, auditorMap) || '—';
 
         row.innerHTML = `
-          <td>${doc.nombre_archivo}</td>
-          <td>${new Date(doc.fecha_subida).toLocaleDateString()}</td>
+          <td>${doc.nombre_archivo || doc.nombre || 'Documento'}</td>
+          <td>${doc.fecha_subida ? new Date(doc.fecha_subida).toLocaleDateString() : '-'}</td>
           <td>${estadoBadge}</td>
           <td>${validado}</td>
         `;
