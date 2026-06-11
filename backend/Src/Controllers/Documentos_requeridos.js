@@ -1,18 +1,28 @@
 // src/controllers/DocumentoRequeridoController.js
 const model = require('../Models/Documentos_requeridoModel');
 const auditoria = require('../Helpers/auditoriaHelper');
+const { pool } = require('../configures/db');
 
 // ✅ Crear
 const crear = async (req, res) => {
   try {
     const data = await model.crearDocumentoRequerido(req.body);
     try {
+      const infoResult = await pool.query(
+        `SELECT e.nombre AS empresa_nombre, td.nombre AS tipo_nombre
+         FROM documentos_requeridos dr
+         JOIN empresas e ON dr.empresa_id = e.id
+         JOIN tipos_documentos td ON dr.tipo_documento_id = td.id
+         WHERE dr.id = $1`,
+        [data.id]
+      );
+      const info = infoResult.rows[0] || {};
       await auditoria.registrar({
         entidad: 'documentos_requeridos',
         entidad_id: data.id,
         accion: 'asignar',
         usuario_id: req.user ? req.user.id : null,
-        descripcion: `Documento requerido asignado a empresa ${data.empresa_id} tipo ${data.tipo_documento_id}`,
+        descripcion: `Asignado documento requerido '${info.tipo_nombre || data.tipo_documento_id}' a empresa '${info.empresa_nombre || data.empresa_id}'`,
         datos_nuevos: data
       });
     } catch (e) {

@@ -1,6 +1,7 @@
 // src/controllers/DocumentoResponsableController.js
 const model = require('../Models/DocumentoResponsableModel');
 const auditoria = require('../Helpers/auditoriaHelper');
+const { pool } = require('../configures/db');
 
 // ✅ Asignar responsable
 const asignar = async (req, res) => {
@@ -10,12 +11,23 @@ const asignar = async (req, res) => {
     const data = await model.asignarResponsable(documento_requerido_id, usuario_id);
       // Registrar auditoría: asignación de responsable
       try {
+        const infoResult = await pool.query(
+          `SELECT dr.empresa_id, e.nombre AS empresa_nombre, dr.tipo_documento_id, td.nombre AS tipo_nombre
+           FROM documento_responsables dresp
+           JOIN documentos_requeridos dr ON dresp.documento_requerido_id = dr.id
+           JOIN empresas e ON dr.empresa_id = e.id
+           JOIN tipos_documentos td ON dr.tipo_documento_id = td.id
+           WHERE dresp.id = $1`,
+          [data.id]
+        );
+        const info = infoResult.rows[0] || {};
+
         await auditoria.registrar({
           entidad: 'documento_responsables',
           entidad_id: data.id,
           accion: 'asignar',
           usuario_id: req.user ? req.user.id : null,
-          descripcion: `Asignado usuario ${usuario_id} al documento requerido ${documento_requerido_id}`,
+          descripcion: `Asignado documento '${info.tipo_nombre || data.documento_requerido_id}' de la empresa '${info.empresa_nombre || info.empresa_id}' al usuario ${usuario_id}`,
           datos_nuevos: data
         });
       } catch (e) {

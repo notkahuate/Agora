@@ -42,12 +42,19 @@ exports.crearDocumento = async (req, res) => {
 
     // Registrar auditoría: documento subido
     try {
+      const infoResult = await pool.query(
+        `SELECT e.nombre AS empresa_nombre, td.nombre AS tipo_nombre
+         FROM empresas e, tipos_documentos td
+         WHERE e.id = $1 AND td.id = $2`,
+        [resolvedEmpresaId, tipo_documento_id]
+      );
+      const info = infoResult.rows[0] || {};
       await auditoria.registrar({
         entidad: 'documentos_subidos',
         entidad_id: creado.id,
         accion: 'subir',
         usuario_id: resolvedUsuarioId,
-        descripcion: `Documento subido: ${creado.nombre_archivo}`,
+        descripcion: `Documento '${info.tipo_nombre || creado.nombre_archivo}' subido para empresa '${info.empresa_nombre || resolvedEmpresaId}'`,
         datos_nuevos: creado
       });
     } catch (e) {
@@ -126,12 +133,19 @@ exports.actualizarDocumento = async (req, res) => {
 
     const actualizado = await Documento.actualizarDocumento(id, campos);
     try {
+      const infoResult = await pool.query(
+        `SELECT e.nombre AS empresa_nombre, td.nombre AS tipo_nombre
+         FROM empresas e, tipos_documentos td
+         WHERE e.id = $1 AND td.id = $2`,
+        [doc.empresa_id, doc.tipo_documento_id]
+      );
+      const info = infoResult.rows[0] || {};
       await auditoria.registrar({
         entidad: 'documentos_subidos',
         entidad_id: actualizado.id,
         accion: 'actualizar',
         usuario_id: requester.id,
-        descripcion: `Documento ${actualizado.id} actualizado`,
+        descripcion: `Documento '${info.tipo_nombre || actualizado.nombre_archivo}' actualizado para empresa '${info.empresa_nombre || doc.empresa_id}'`,
         datos_anteriores: doc,
         datos_nuevos: actualizado
       });
@@ -158,12 +172,19 @@ exports.eliminarDocumento = async (req, res) => {
     if (!eliminado) return res.status(404).json({ message: 'Documento no encontrado' });
 
     try {
+      const infoResult = await pool.query(
+        `SELECT e.nombre AS empresa_nombre, td.nombre AS tipo_nombre
+         FROM empresas e, tipos_documentos td
+         WHERE e.id = $1 AND td.id = $2`,
+        [doc.empresa_id, doc.tipo_documento_id]
+      );
+      const info = infoResult.rows[0] || {};
       await auditoria.registrar({
         entidad: 'documentos_subidos',
         entidad_id: doc.id,
         accion: 'eliminar',
         usuario_id: req.user ? req.user.id : null,
-        descripcion: `Documento eliminado: ${doc.nombre_archivo}`,
+        descripcion: `Documento '${info.tipo_nombre || doc.nombre_archivo}' eliminado de empresa '${info.empresa_nombre || doc.empresa_id}'`,
         datos_anteriores: doc
       });
     } catch (e) {
@@ -195,12 +216,19 @@ exports.validarDocumento = async (req, res) => {
     const actualizado = await Documento.validarDocumento(id, { estado, validado_por: requester.id, comentarios });
     // Registrar auditoría: cambio de estado
     try {
+      const infoResult = await pool.query(
+        `SELECT e.nombre AS empresa_nombre, td.nombre AS tipo_nombre
+         FROM empresas e, tipos_documentos td
+         WHERE e.id = $1 AND td.id = $2`,
+        [doc.empresa_id, doc.tipo_documento_id]
+      );
+      const info = infoResult.rows[0] || {};
       await auditoria.registrar({
         entidad: 'documentos_subidos',
         entidad_id: actualizado.id,
         accion: 'validar',
         usuario_id: requester.id,
-        descripcion: `Documento ${actualizado.id} cambiado a estado ${actualizado.estado}`,
+        descripcion: `Documento '${info.tipo_nombre || actualizado.nombre_archivo}' de empresa '${info.empresa_nombre || doc.empresa_id}' cambió a estado ${actualizado.estado}`,
         datos_anteriores: doc,
         datos_nuevos: actualizado
       });
@@ -278,12 +306,19 @@ exports.descargarDocumento = async (req, res) => {
     }
 
     try {
+      const infoResult = await pool.query(
+        `SELECT e.nombre AS empresa_nombre, td.nombre AS tipo_nombre
+         FROM empresas e, tipos_documentos td
+         WHERE e.id = $1 AND td.id = $2`,
+        [doc.empresa_id, doc.tipo_documento_id]
+      );
+      const info = infoResult.rows[0] || {};
       await auditoria.registrar({
         entidad: 'documentos_subidos',
         entidad_id: doc.id,
         accion: 'descargar',
         usuario_id: requester.id,
-        descripcion: `Documento descargado: ${doc.nombre_archivo}`,
+        descripcion: `Descargado documento '${info.tipo_nombre || doc.nombre_archivo}' de empresa '${info.empresa_nombre || doc.empresa_id}'`,
         datos_anteriores: doc
       });
     } catch (e) {
