@@ -80,7 +80,7 @@ const obtenerResumenEmpresa = async (empresa_id) => {
   return result.rows[0];
 };
 
-// 📌 Documentos pendientes (NO subidos)
+// 📌 Documentos pendientes (no subidos o asignados, hasta que sean aprobados/validados)
 const obtenerPendientes = async (empresa_id) => {
   const result = await pool.query(
     `
@@ -101,7 +101,6 @@ const obtenerPendientes = async (empresa_id) => {
     LEFT JOIN usuarios u ON dr_resp.usuario_id = u.id
     WHERE dr.empresa_id = $1
     AND ds.id IS NULL
-    AND dr_resp.id IS NULL
     ORDER BY dr.fecha_limite ASC
     `,
     [empresa_id]
