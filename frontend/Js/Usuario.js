@@ -2,6 +2,10 @@
 // AUTH SIMPLE (SIN Auth.js)
 // ==============================
 const token = localStorage.getItem('token');
+let paginaHistorial = 1;
+const limiteHistorial = 5;
+let historialGlobal = [];
+let auditorMapHistorial = new Map();
 
 function obtenerNombreValidador(documento) {
   if (!documento) return 'No disponible';
@@ -179,9 +183,13 @@ async function loadDocumentos() {
     const asignados = await asignadosResponse.json();
     const subidos = await subidosResponse.json();
 
+    historialGlobal = subidos.filter(d => String(d.estado).toLowerCase() !== 'rechazado');
+    paginaHistorial = 1;
+    auditorMapHistorial = new Map();
+
     // Resolve auditor names for any validado_por ids
     const auditorIds = Array.from(new Set(subidos.map(s => s.validado_por).filter(Boolean)));
-    const auditorMap = new Map();
+    const auditorMap = auditorMapHistorial;
     if (auditorIds.length > 0) {
       await Promise.all(auditorIds.map(async id => {
         try {
@@ -280,27 +288,12 @@ async function loadDocumentos() {
 
     // Render historial excluding rejected uploads so they don't clutter historial
     const tablaHistorial = document.getElementById('tablaHistorial');
-    tablaHistorial.innerHTML = '';
-    const historial = subidos.filter(d => d.estado !== 'rechazado');
+    const historial = historialGlobal;
     if (historial.length === 0) {
       tablaHistorial.innerHTML = '<tr><td colspan="4">No hay documentos subidos aún.</td></tr>';
+      document.getElementById('paginacionHistorial').innerHTML = '';
     } else {
-      historial.forEach(doc => {
-        const row = document.createElement('tr');
-        
-        // Determinar color según estado
-        const estadoInfo = obtenerEstadoDocumentoVisual(doc);
-        const estadoBadge = `<span class="badge ${estadoInfo.clase}">${estadoInfo.texto}</span>`;
-        const validado = obtenerNombreValidadorDesdeMapa(doc, auditorMap) || '—';
-
-        row.innerHTML = `
-          <td>${doc.nombre_archivo || doc.nombre || 'Documento'}</td>
-          <td>${doc.fecha_subida ? new Date(doc.fecha_subida).toLocaleDateString() : '-'}</td>
-          <td>${estadoBadge}</td>
-          <td>${validado}</td>
-        `;
-        tablaHistorial.appendChild(row);
-      });
+      renderHistorial(historial, auditorMap);
     }
 
     if (pendientes.length > 0) {
@@ -313,6 +306,53 @@ async function loadDocumentos() {
     showStatus('No se pudo cargar los documentos. Revisa la consola.');
   }
 }
+
+function renderHistorial(historial, auditorMap) {
+  const tablaHistorial = document.getElementById('tablaHistorial');
+  const inicio = (paginaHistorial - 1) * limiteHistorial;
+  const pagina = historial.slice(inicio, inicio + limiteHistorial);
+
+  tablaHistorial.innerHTML = '';
+
+  if (pagina.length === 0) {
+    tablaHistorial.innerHTML = '<tr><td colspan="4">No hay documentos subidos aún.</td></tr>';
+  } else {
+    pagina.forEach(doc => {
+      const row = document.createElement('tr');
+      const estadoInfo = obtenerEstadoDocumentoVisual(doc);
+      const estadoBadge = `<span class="badge ${estadoInfo.clase}">${estadoInfo.texto}</span>`;
+      const validado = obtenerNombreValidadorDesdeMapa(doc, auditorMap) || '—';
+
+      row.innerHTML = `
+        <td>${doc.nombre_archivo || doc.nombre || 'Documento'}</td>
+        <td>${doc.fecha_subida ? new Date(doc.fecha_subida).toLocaleDateString() : '-'}</td>
+        <td>${estadoBadge}</td>
+        <td>${validado}</td>
+      `;
+      tablaHistorial.appendChild(row);
+    });
+  }
+
+  renderPaginacionHistorial(historial.length);
+}
+
+function renderPaginacionHistorial(totalItems) {
+  const container = document.getElementById('paginacionHistorial');
+  if (!container) return;
+
+  const totalPaginas = Math.max(1, Math.ceil(totalItems / limiteHistorial));
+  container.innerHTML = `
+    <button onclick="cambiarPaginaHistorial(-1)" ${paginaHistorial === 1 ? 'disabled' : ''}>⬅</button>
+    <span>Página ${paginaHistorial} de ${totalPaginas}</span>
+    <button onclick="cambiarPaginaHistorial(1)" ${paginaHistorial === totalPaginas ? 'disabled' : ''}>➡</button>
+  `;
+}
+
+window.cambiarPaginaHistorial = function (direccion) {
+  const totalPaginas = Math.max(1, Math.ceil(historialGlobal.length / limiteHistorial));
+  paginaHistorial = Math.min(totalPaginas, Math.max(1, paginaHistorial + direccion));
+  renderHistorial(historialGlobal, auditorMapHistorial);
+};
 
 function uploadDocumentForPending(tipoDocumentoId, nombre) {
   const input = document.createElement('input');

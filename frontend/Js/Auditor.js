@@ -3,6 +3,9 @@
 // ==============================
 const token = localStorage.getItem('token');
 const user = JSON.parse(localStorage.getItem('user'));
+let actividadPagina = 1;
+const limiteActividad = 5;
+let actividadTotal = 0;
 
 if (!token || !user) {
   alert('Sesión expirada');
@@ -837,21 +840,24 @@ async function cargarColaPrioritaria() {
 // ==============================
 // ACTIVIDAD RECIENTE (TIMELINE)
 // ==============================
-async function cargarActividadReciente() {
+async function cargarActividadReciente(pagina = 1) {
   const timeline = document.getElementById('timelineAuditor');
+  const paginacion = document.getElementById('paginacionActividadReciente');
   
   if (!timeline) {
     console.warn('Elemento timelineAuditor no encontrado');
     return;
   }
 
+  actividadPagina = Math.max(1, parseInt(pagina) || 1);
+
   try {
     const headers = {
       'Authorization': `Bearer ${token}`
     };
 
-    // Obtener los últimos 15 eventos
-    const res = await fetch('http://localhost:3000/api/auditoria/recientes?limit=15', { headers });
+    const offset = (actividadPagina - 1) * limiteActividad;
+    const res = await fetch(`http://localhost:3000/api/auditoria?limit=${limiteActividad}&offset=${offset}`, { headers });
     
     if (!res.ok) {
       throw new Error(`HTTP Error: ${res.status}`);
@@ -859,11 +865,13 @@ async function cargarActividadReciente() {
 
     const data = await res.json();
     const eventos = data.eventos || [];
+    actividadTotal = Number.isFinite(data.total) ? data.total : (eventos.length + offset);
 
     timeline.innerHTML = '';
 
     if (eventos.length === 0) {
       timeline.innerHTML = '<p style="color: #94a3b8; text-align: center; padding: 20px;">Sin eventos registrados</p>';
+      renderActividadPaginacion();
       return;
     }
 
@@ -878,30 +886,30 @@ async function cargarActividadReciente() {
       });
 
       // Determinar icono y color según la acción
-      let iconoColor = '#94a3b8'; // gris por defecto
+      let iconoColor = '#94a3b8';
       let icono = '●';
       const entidadTexto = String(evento.entidad || '').replace(/_/g, ' ');
 
       if (evento.accion === 'crear') {
-        iconoColor = '#10b981'; // verde
+        iconoColor = '#10b981';
         icono = '✚';
       } else if (evento.accion === 'actualizar') {
-        iconoColor = '#3b82f6'; // azul
+        iconoColor = '#3b82f6';
         icono = '⟳';
       } else if (evento.accion === 'eliminar') {
-        iconoColor = '#ef4444'; // rojo
+        iconoColor = '#ef4444';
         icono = '✕';
       } else if (evento.accion === 'validar' || evento.accion === 'aprobar' || evento.accion === 'revisar') {
-        iconoColor = '#8b5cf6'; // púrpura
+        iconoColor = '#8b5cf6';
         icono = '✓';
       } else if (evento.accion === 'descargar') {
-        iconoColor = '#0ea5e9'; // azul claro
+        iconoColor = '#0ea5e9';
         icono = '↓';
       } else if (evento.accion === 'subir') {
-        iconoColor = '#f59e0b'; // naranja
+        iconoColor = '#f59e0b';
         icono = '↑';
       } else if (evento.accion === 'asignar') {
-        iconoColor = '#f59e0b'; // naranja
+        iconoColor = '#f59e0b';
         icono = '→';
       } else if (entidadTexto.toLowerCase().includes('documento')) {
         iconoColor = '#f97316';
@@ -910,7 +918,6 @@ async function cargarActividadReciente() {
 
       const usuarioNombre = evento.usuario_nombre || 'Sistema';
       
-      // Crear elemento del timeline
       const timelineItem = document.createElement('div');
       timelineItem.style.cssText = `
         display: flex;
@@ -919,7 +926,6 @@ async function cargarActividadReciente() {
         border-bottom: 1px solid #e2e8f0;
       `;
 
-      // Icono del timeline
       const iconEl = document.createElement('div');
       iconEl.style.cssText = `
         display: flex;
@@ -937,14 +943,12 @@ async function cargarActividadReciente() {
       `;
       iconEl.textContent = icono;
 
-      // Contenido del evento
       const contentEl = document.createElement('div');
       contentEl.style.cssText = `
         flex: 1;
         min-width: 0;
       `;
 
-      // Descripción del evento
       const descEl = document.createElement('div');
       descEl.style.cssText = `
         font-size: 14px;
@@ -961,7 +965,6 @@ async function cargarActividadReciente() {
       }
       descEl.textContent = descripcion;
 
-      // Detalles (usuario y fecha)
       const detallesEl = document.createElement('div');
       detallesEl.style.cssText = `
         display: flex;
@@ -989,11 +992,30 @@ async function cargarActividadReciente() {
       timeline.appendChild(timelineItem);
     });
 
+    renderActividadPaginacion();
   } catch (err) {
     console.error('Error cargando actividad reciente:', err);
     timeline.innerHTML = '<p style="color: #ef4444; text-align: center; padding: 20px;">Error cargando actividad reciente</p>';
+    renderActividadPaginacion();
   }
 }
+
+function renderActividadPaginacion() {
+  const container = document.getElementById('paginacionActividadReciente');
+  if (!container) return;
+  const totalPaginas = Math.max(1, Math.ceil(actividadTotal / limiteActividad));
+  container.innerHTML = `
+    <button onclick="cambiarPaginaActividad(-1)" ${actividadPagina === 1 ? 'disabled' : ''}>⬅</button>
+    <span>Página ${actividadPagina} de ${totalPaginas}</span>
+    <button onclick="cambiarPaginaActividad(1)" ${actividadPagina === totalPaginas ? 'disabled' : ''}>➡</button>
+  `;
+}
+
+window.cambiarPaginaActividad = function (direccion) {
+  const totalPaginas = Math.max(1, Math.ceil(actividadTotal / limiteActividad));
+  actividadPagina = Math.min(totalPaginas, Math.max(1, actividadPagina + direccion));
+  cargarActividadReciente(actividadPagina);
+};
 
 // ==============================
 // INIT
@@ -1001,8 +1023,8 @@ async function cargarActividadReciente() {
 document.addEventListener('DOMContentLoaded', () => {
   cargarEmpresas();
   cargarColaPrioritaria();
-  cargarActividadReciente();
-  window.actividadRecienteInterval = setInterval(cargarActividadReciente, 15000);
+  cargarActividadReciente(actividadPagina);
+  window.actividadRecienteInterval = setInterval(() => cargarActividadReciente(actividadPagina), 15000);
 
   document.querySelectorAll('.modal').forEach((modal) => {
     modal.addEventListener('click', (event) => {

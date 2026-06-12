@@ -569,7 +569,34 @@ tbody tr:hover {
   display: grid;
   gap: 12px;
 }
+.paginacion {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
 
+.paginacion button {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.paginacion button:disabled {
+  background: var(--muted);
+  cursor: not-allowed;
+}
+
+.paginacion span {
+  color: var(--text-strong);
+  font-weight: 500;
+}
 .timeline-item {
   display: grid;
   grid-template-columns: 32px 1fr;
