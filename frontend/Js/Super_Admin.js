@@ -219,7 +219,7 @@ function renderUsuarios() {
       <td>
         <div style="display:flex; align-items:center; gap:8px; width:100%;">
           <div class="progress-bar" style="flex:1;">
-            <div class="progress" style="width:${progressPercent}%"></div>
+            <div class="progress-fill" style="width:${progressPercent}%"></div>
           </div>
           <span style="font-size:12px; font-weight:700; min-width:40px;">${progressPercent}%</span>
         </div>
@@ -501,10 +501,10 @@ async function cargarKPIs() {
     const data = await res.json();
 
     document.getElementById('kpiDocsPendientes').textContent = data.length;
-
-// ==============================
-// PROGRESO DE DOCUMENTACIÓN Y PERSONAS
-// ==============================
+  } catch (error) {
+    console.error('Error KPI:', error);
+  }
+}
 
 function actualizarBarrasProgreso() {
   if (!documentosGlobal || documentosGlobal.length === 0) {
@@ -593,10 +593,6 @@ function actualizarBarrasProgreso() {
   document.getElementById('usuariosProgreso').textContent = usuariosEnProgresoCount;
 }
 
-  } catch (error) {
-    console.error('Error KPI:', error);
-  }
-};
 
 
 document.addEventListener('DOMContentLoaded', () => {
