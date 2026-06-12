@@ -33,6 +33,7 @@ const listarDocumentos = async () => {
       COALESCE(ds.ruta_archivo, '/api/documentos/' || ds.id || '/descargar') AS ruta_archivo,
       ds.estado,
       ds.validado_por,
+      vu.nombre AS validado_por_nombre,
       ds.comentarios,
       ds.fecha_subida,
       ds.fecha_validacion,
@@ -43,6 +44,7 @@ const listarDocumentos = async () => {
     FROM documentos_subidos ds
     JOIN empresas e ON ds.empresa_id = e.id
     JOIN usuarios u ON ds.usuario_id = u.id
+    LEFT JOIN usuarios vu ON ds.validado_por = vu.id
     JOIN tipos_documentos td ON ds.tipo_documento_id = td.id
     ORDER BY ds.fecha_subida DESC;
   `);
@@ -61,11 +63,13 @@ const listarDocumentosPorUsuario = async (usuario_id) => {
         COALESCE(ds.ruta_archivo, '/api/documentos/' || ds.id || '/descargar') AS ruta_archivo,
         ds.estado,
         ds.validado_por,
+        vu.nombre AS validado_por_nombre,
         ds.comentarios,
         ds.fecha_subida,
         ds.fecha_validacion,
         ds.fecha_actualizacion
       FROM documentos_subidos ds
+      LEFT JOIN usuarios vu ON ds.validado_por = vu.id
       WHERE ds.usuario_id = $1
       ORDER BY ds.fecha_subida DESC;
     `,
@@ -86,11 +90,13 @@ const listarDocumentosPorEmpresa = async (empresa_id) => {
         COALESCE(ds.ruta_archivo, '/api/documentos/' || ds.id || '/descargar') AS ruta_archivo,
         ds.estado,
         ds.validado_por,
+        vu.nombre AS validado_por_nombre,
         ds.comentarios,
         ds.fecha_subida,
         ds.fecha_validacion,
         ds.fecha_actualizacion
       FROM documentos_subidos ds
+      LEFT JOIN usuarios vu ON ds.validado_por = vu.id
       WHERE ds.empresa_id = $1
       ORDER BY ds.fecha_subida DESC;
     `,
@@ -110,11 +116,13 @@ const obtenerDocumentoPorId = async (id) => {
       COALESCE(ds.ruta_archivo, '/api/documentos/' || ds.id || '/descargar') AS ruta_archivo,
       ds.estado,
       ds.validado_por,
+      vu.nombre AS validado_por_nombre,
       ds.comentarios,
       ds.fecha_subida,
       ds.fecha_validacion,
       ds.fecha_actualizacion
     FROM documentos_subidos ds
+    LEFT JOIN usuarios vu ON ds.validado_por = vu.id
     WHERE ds.id = $1;
   `, [id]);
   return rows[0];
@@ -133,11 +141,13 @@ const obtenerDocumentoArchivoPorId = async (id) => {
       ds.mime_type,
       ds.estado,
       ds.validado_por,
+      vu.nombre AS validado_por_nombre,
       ds.comentarios,
       ds.fecha_subida,
       ds.fecha_validacion,
       ds.fecha_actualizacion
     FROM documentos_subidos ds
+    LEFT JOIN usuarios vu ON ds.validado_por = vu.id
     WHERE ds.id = $1;
   `, [id]);
   return rows[0];
@@ -207,12 +217,14 @@ const listarPendientesValidacionConJoin = async () => {
       ds.fecha_subida,
       ds.fecha_validacion,
       ds.validado_por,
+      vu.nombre AS validado_por_nombre,
       e.nombre AS empresa_nombre,
       u.nombre AS usuario_nombre,
       td.nombre AS tipo_documento_nombre
     FROM documentos_subidos ds
     LEFT JOIN empresas e ON ds.empresa_id = e.id
     LEFT JOIN usuarios u ON ds.usuario_id = u.id
+    LEFT JOIN usuarios vu ON ds.validado_por = vu.id
     LEFT JOIN tipos_documentos td ON ds.tipo_documento_id = td.id
     WHERE ds.estado = 'subido'
     ORDER BY ds.fecha_subida DESC;

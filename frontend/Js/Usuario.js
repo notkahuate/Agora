@@ -12,9 +12,6 @@ function obtenerNombreValidador(documento) {
   if (documento.validator_name) return documento.validator_name;
   if (documento.auditor) return documento.auditor;
   if (documento.revisor) return documento.revisor;
-  if (documento.validado_por) return `Auditor #${documento.validado_por}`;
-  if (documento.revisor_id) return `Usuario #${documento.revisor_id}`;
-  if (documento.auditor_id) return `Usuario #${documento.auditor_id}`;
   return 'No disponible';
 }
 
@@ -34,6 +31,7 @@ function obtenerEstadoDocumentoVisual(documento) {
 
 function obtenerNombreValidadorDesdeMapa(doc, auditorMap) {
   if (!doc) return 'No disponible';
+  if (doc.validado_por_nombre) return doc.validado_por_nombre;
   if (doc.validado_por && auditorMap.has(doc.validado_por)) {
     return auditorMap.get(doc.validado_por);
   }
