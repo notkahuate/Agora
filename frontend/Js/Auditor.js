@@ -281,6 +281,7 @@ async function crearEmpresa() {
     alert('Empresa creada correctamente');
     cerrarModal('modalCrearEmpresa');
     cargarEmpresas();
+    cargarActividadReciente();
   } catch (err) {
     console.error('Error creando empresa:', err);
     alert('Error creando empresa');
@@ -333,6 +334,7 @@ async function crearUsuario() {
     alert('Usuario creado correctamente');
     cerrarModal('modalCrearUsuario');
     cargarEmpresas();
+    cargarActividadReciente();
   } catch (err) {
     console.error('Error creando usuario:', err);
     alert('Error creando usuario');
@@ -497,6 +499,7 @@ async function asignarDocumentosEmpresa() {
 
     abrirModalAsignarDocumentos(selectedEmpresaId, selectedEmpresaNombre);
     cargarEmpresas();
+    cargarActividadReciente();
   } catch (err) {
     console.error('Error asignando documentos a la empresa:', err);
     alert('Error asignando documentos a la empresa. Revisa la consola o recarga la página.');
@@ -583,6 +586,7 @@ window.validarDocumento = async function(id, action) {
     if (res.ok) {
       alert(`Documento ${action === 'aprobar' ? 'aprobado' : 'rechazado'}`);
       cargarDocumentos(); // Recargar la tabla
+      cargarActividadReciente();
 
       // Actualizar KPI si se aprobó
       if (action === 'aprobar') {
@@ -998,6 +1002,7 @@ document.addEventListener('DOMContentLoaded', () => {
   cargarEmpresas();
   cargarColaPrioritaria();
   cargarActividadReciente();
+  window.actividadRecienteInterval = setInterval(cargarActividadReciente, 15000);
 
   document.querySelectorAll('.modal').forEach((modal) => {
     modal.addEventListener('click', (event) => {
