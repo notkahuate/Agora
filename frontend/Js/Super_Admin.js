@@ -14,6 +14,12 @@ const limiteDocumentos = 5;
 
 let selectedDocumentoId = null;
 
+// Actividad reciente
+let actividadPagina = 1;
+const limiteActividad = 10;
+let actividadTotal = 0;
+let empresasMap = {};
+
 console.log("USER:", user);
 
 if (!token || !user) {
@@ -595,7 +601,204 @@ function actualizarBarrasProgreso() {
 
 
 
-document.addEventListener('DOMContentLoaded', () => {
+// ==============================
+// ACTIVIDAD RECIENTE (SUPER ADMIN)
+// ==============================
+async function cargarEmpresasMap() {
+  try {
+    const res = await fetch('/api/empresas', { headers: { 'Authorization': `Bearer ${token}` } });
+    if (!res.ok) return;
+    const list = await res.json();
+    empresasMap = {};
+    list.forEach(e => { empresasMap[e.id] = e.nombre; });
+  } catch (err) {
+    console.error('Error cargando mapa de empresas:', err);
+  }
+}
+
+async function cargarActividadReciente(pagina = 1) {
+  const timeline = document.getElementById('timelineSuperAdmin');
+  if (!timeline) return;
+
+  actividadPagina = Math.max(1, parseInt(pagina) || 1);
+  const offset = (actividadPagina - 1) * limiteActividad;
+
+  try {
+    const headers = { 'Authorization': `Bearer ${token}` };
+    const res = await fetch(`http://localhost:3000/api/auditoria?limit=${limiteActividad}&offset=${offset}`, { headers });
+    if (!res.ok) throw new Error('Error cargando actividad');
+    const data = await res.json();
+    const eventos = data.eventos || [];
+    actividadTotal = Number.isFinite(data.total) ? data.total : (eventos.length + offset);
+
+    timeline.innerHTML = '';
+    if (!eventos.length) {
+      timeline.innerHTML = '<p style="color:#94a3b8; text-align:center; padding:16px;">Sin eventos registrados</p>';
+      renderActividadPaginacion();
+      return;
+    }
+
+    // Agrupar eventos por empresa
+    const agrupados = eventos.reduce((acc, ev) => {
+      const key = ev.empresa_id ? String(ev.empresa_id) : '__sin_empresa';
+      acc[key] = acc[key] || [];
+      acc[key].push(ev);
+      return acc;
+    }, {});
+
+    const companyKeys = Object.keys(agrupados).sort((a, b) => {
+      const nameA = a === '__sin_empresa' ? 'Sin empresa' : (empresasMap[a] || `ID ${a}`);
+      const nameB = b === '__sin_empresa' ? 'Sin empresa' : (empresasMap[b] || `ID ${b}`);
+      return nameA.localeCompare(nameB);
+    });
+
+    companyKeys.forEach(companyKey => {
+      const events = agrupados[companyKey];
+      const header = document.createElement('div');
+      header.style.cssText = 'margin-top:12px; margin-bottom:8px; font-weight:700; color:#0f172a;';
+      const companyName = companyKey === '__sin_empresa' ? 'Sin empresa' : (empresasMap[companyKey] || `Empresa ${companyKey}`);
+      header.textContent = companyName;
+      timeline.appendChild(header);
+
+      events.forEach(evento => {
+        const fecha = new Date(evento.fecha_evento || Date.now());
+        const fechaFormato = fecha.toLocaleString('es-ES', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+        const item = document.createElement('div');
+        item.style.cssText = 'display:flex; gap:12px; padding:12px 0; border-bottom:1px solid #eee;';
+
+        const icon = document.createElement('div');
+        icon.style.cssText = 'width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:#f3f4f6; color:#334155; flex-shrink:0;';
+        icon.textContent = evento.accion ? evento.accion.charAt(0).toUpperCase() : 'E';
+
+        const content = document.createElement('div');
+        const title = document.createElement('div');
+        title.style.fontWeight = '600';
+        title.textContent = evento.descripcion || `${evento.accion || 'Evento'} en ${evento.entidad || 'sistema'}`;
+
+        const meta = document.createElement('div');
+        meta.style.color = '#64748b';
+        meta.style.fontSize = '12px';
+        const usuario = evento.usuario_nombre || evento.usuario_id || 'Sistema';
+        const empresaNombre = evento.empresa_id ? (empresasMap[evento.empresa_id] || `ID ${evento.empresa_id}`) : '';
+        const empresa = empresaNombre ? ` | Empresa: ${empresaNombre}` : '';
+        meta.textContent = `Por: ${usuario}${empresa} • ${fechaFormato}`;
+
+        // Details toggle
+        const acciones = document.createElement('div');
+        acciones.style.marginTop = '8px';
+        const btnDetalles = document.createElement('button');
+        btnDetalles.className = 'btn btn-secondary';
+        btnDetalles.style.marginRight = '8px';
+        btnDetalles.textContent = 'Ver detalles';
+
+        const detallesDiv = document.createElement('div');
+        detallesDiv.style.marginTop = '8px';
+        detallesDiv.style.display = 'none';
+
+        function safeCloneAndResolveEmpresa(obj) {
+          if (!obj) return null;
+          try {
+            const cloned = typeof obj === 'string' ? JSON.parse(obj) : JSON.parse(JSON.stringify(obj));
+            if (cloned && cloned.empresa_id) {
+              cloned.empresa_nombre = empresasMap[cloned.empresa_id] || `ID ${cloned.empresa_id}`;
+            }
+            return cloned;
+          } catch (e) {
+            return obj;
+          }
+        }
+
+        btnDetalles.addEventListener('click', () => {
+          if (detallesDiv.style.display === 'none') {
+            detallesDiv.style.display = 'block';
+            btnDetalles.textContent = 'Ocultar detalles';
+          } else {
+            detallesDiv.style.display = 'none';
+            btnDetalles.textContent = 'Ver detalles';
+          }
+        });
+
+        const datosAnteriores = safeCloneAndResolveEmpresa(evento.datos_anteriores);
+        const datosNuevos = safeCloneAndResolveEmpresa(evento.datos_nuevos);
+        const detallesContent = document.createElement('div');
+        detallesContent.style.marginTop = '6px';
+        detallesContent.style.fontSize = '13px';
+        detallesContent.style.color = '#334155';
+
+        if (datosAnteriores) {
+          const t1 = document.createElement('div');
+          t1.style.fontWeight = '700';
+          t1.textContent = 'Datos anteriores:';
+          const pre1 = document.createElement('pre');
+          pre1.style.background = '#f8fafc';
+          pre1.style.padding = '8px';
+          pre1.style.overflowX = 'auto';
+          pre1.textContent = JSON.stringify(datosAnteriores, null, 2);
+          detallesContent.appendChild(t1);
+          detallesContent.appendChild(pre1);
+        }
+
+        if (datosNuevos) {
+          const t2 = document.createElement('div');
+          t2.style.fontWeight = '700';
+          t2.textContent = 'Datos nuevos:';
+          const pre2 = document.createElement('pre');
+          pre2.style.background = '#f8fafc';
+          pre2.style.padding = '8px';
+          pre2.style.overflowX = 'auto';
+          pre2.textContent = JSON.stringify(datosNuevos, null, 2);
+          detallesContent.appendChild(t2);
+          detallesContent.appendChild(pre2);
+        }
+
+        if (!datosAnteriores && !datosNuevos) {
+          const none = document.createElement('div');
+          none.style.color = '#64748b';
+          none.textContent = 'Sin detalles adicionales';
+          detallesContent.appendChild(none);
+        }
+
+        detallesDiv.appendChild(detallesContent);
+        acciones.appendChild(btnDetalles);
+
+        content.appendChild(title);
+        content.appendChild(meta);
+        content.appendChild(acciones);
+        content.appendChild(detallesDiv);
+
+        item.appendChild(icon);
+        item.appendChild(content);
+        timeline.appendChild(item);
+      });
+    });
+
+    renderActividadPaginacion();
+
+  } catch (err) {
+    console.error('Error cargando actividad reciente (superadmin):', err);
+    timeline.innerHTML = '<p style="color:#ef4444; text-align:center; padding:16px;">Error cargando actividad reciente</p>';
+  }
+}
+
+function renderActividadPaginacion() {
+  const container = document.getElementById('paginacionActividadReciente');
+  if (!container) return;
+  const totalPaginas = Math.max(1, Math.ceil(actividadTotal / limiteActividad));
+  container.innerHTML = `
+    <button onclick="cambiarPaginaActividad(-1)" ${actividadPagina === 1 ? 'disabled' : ''}>⬅</button>
+    <span>Página ${actividadPagina} de ${totalPaginas}</span>
+    <button onclick="cambiarPaginaActividad(1)" ${actividadPagina === totalPaginas ? 'disabled' : ''}>➡</button>
+  `;
+}
+
+window.cambiarPaginaActividad = function (direccion) {
+  const totalPaginas = Math.max(1, Math.ceil(actividadTotal / limiteActividad));
+  actividadPagina = Math.min(totalPaginas, Math.max(1, actividadPagina + direccion));
+  cargarActividadReciente(actividadPagina);
+};
+
+document.addEventListener('DOMContentLoaded', async () => {
   cargarUsuariosEmpresa();
   cargarColaRevision();
   cargarKPIs();
@@ -603,4 +806,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 🔥 NUEVOS
   cargarCumplimientoGlobal();
   cargarDocumentos();
+  await cargarEmpresasMap();
+  cargarActividadReciente(actividadPagina);
+  window.actividadRecienteInterval = setInterval(() => cargarActividadReciente(actividadPagina), 15000);
 });

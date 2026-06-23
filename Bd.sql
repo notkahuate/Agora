@@ -90,6 +90,8 @@ CREATE TABLE auditoria_sistema (
 
     usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
 
+    empresa_id INTEGER REFERENCES empresas(id) ON DELETE SET NULL,
+
     descripcion TEXT,
 
     datos_anteriores JSONB,
