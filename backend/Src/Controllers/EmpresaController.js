@@ -19,7 +19,8 @@ const crearEmpresa = async (req, res) => {
         accion: 'crear',
         usuario_id: req.user ? req.user.id : null,
         descripcion: `Empresa creada: ${nueva.nombre}`,
-        datos_nuevos: nueva
+        datos_nuevos: nueva,
+        empresa_id: nueva.id
       });
     } catch (e) {
       console.error('auditoria crearEmpresa error:', e.message);

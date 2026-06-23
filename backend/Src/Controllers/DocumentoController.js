@@ -55,7 +55,8 @@ exports.crearDocumento = async (req, res) => {
         accion: 'subir',
         usuario_id: resolvedUsuarioId,
         descripcion: `Documento '${info.tipo_nombre || creado.nombre_archivo}' subido para empresa '${info.empresa_nombre || resolvedEmpresaId}'`,
-        datos_nuevos: creado
+        datos_nuevos: creado,
+        empresa_id: resolvedEmpresaId
       });
     } catch (e) {
       console.error('auditoria crearDocumento error:', e.message);
@@ -147,7 +148,8 @@ exports.actualizarDocumento = async (req, res) => {
         usuario_id: requester.id,
         descripcion: `Documento '${info.tipo_nombre || actualizado.nombre_archivo}' actualizado para empresa '${info.empresa_nombre || doc.empresa_id}'`,
         datos_anteriores: doc,
-        datos_nuevos: actualizado
+        datos_nuevos: actualizado,
+        empresa_id: doc.empresa_id
       });
     } catch (e) {
       console.error('auditoria actualizarDocumento error:', e.message);
@@ -185,7 +187,8 @@ exports.eliminarDocumento = async (req, res) => {
         accion: 'eliminar',
         usuario_id: req.user ? req.user.id : null,
         descripcion: `Documento '${info.tipo_nombre || doc.nombre_archivo}' eliminado de empresa '${info.empresa_nombre || doc.empresa_id}'`,
-        datos_anteriores: doc
+        datos_anteriores: doc,
+        empresa_id: doc.empresa_id
       });
     } catch (e) {
       console.error('auditoria eliminarDocumento error:', e.message);
@@ -230,7 +233,8 @@ exports.validarDocumento = async (req, res) => {
         usuario_id: requester.id,
         descripcion: `Documento '${info.tipo_nombre || actualizado.nombre_archivo}' de empresa '${info.empresa_nombre || doc.empresa_id}' cambió a estado ${actualizado.estado}`,
         datos_anteriores: doc,
-        datos_nuevos: actualizado
+        datos_nuevos: actualizado,
+        empresa_id: doc.empresa_id
       });
     } catch (e) {
       console.error('auditoria validarDocumento error:', e.message);
@@ -319,7 +323,8 @@ exports.descargarDocumento = async (req, res) => {
         accion: 'descargar',
         usuario_id: requester.id,
         descripcion: `Descargado documento '${info.tipo_nombre || doc.nombre_archivo}' de empresa '${info.empresa_nombre || doc.empresa_id}'`,
-        datos_anteriores: doc
+        datos_anteriores: doc,
+        empresa_id: doc.empresa_id
       });
     } catch (e) {
       console.error('auditoria descargarDocumento error:', e.message);

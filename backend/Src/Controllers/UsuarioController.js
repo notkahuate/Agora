@@ -55,7 +55,8 @@ exports.crearUsuarioPublico = async (req, res) => {
         accion: 'registro_publico',
         usuario_id: nuevo.id,
         descripcion: `Registro público de usuario: ${nuevo.email}`,
-        datos_nuevos: nuevo
+        datos_nuevos: nuevo,
+        empresa_id: nuevo.empresa_id || null
       });
     } catch (e) {
       console.error('auditoria crearUsuarioPublico error:', e.message);
@@ -137,7 +138,8 @@ exports.crearUsuario = async (req, res) => {
         accion: 'crear',
         usuario_id: requester ? requester.id : null,
         descripcion: `Usuario creado: ${nuevoUsuario.email}`,
-        datos_nuevos: nuevoUsuario
+        datos_nuevos: nuevoUsuario,
+        empresa_id: nuevoUsuario.empresa_id || null
       });
     } catch (e) {
       console.error('auditoria crearUsuario error:', e.message);

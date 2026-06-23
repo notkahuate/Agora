@@ -11,12 +11,12 @@ const { pool } = require('../configures/db');
  *  - datos_anteriores: object | null
  *  - datos_nuevos: object | null
  */
-const registrar = async ({ entidad, entidad_id = null, accion, usuario_id = null, descripcion = null, datos_anteriores = null, datos_nuevos = null }) => {
+const registrar = async ({ entidad, entidad_id = null, accion, usuario_id = null, descripcion = null, datos_anteriores = null, datos_nuevos = null, empresa_id = null }) => {
   try {
     const texto = `
       INSERT INTO auditoria_sistema
-        (entidad, entidad_id, accion, usuario_id, descripcion, datos_anteriores, datos_nuevos)
-      VALUES ($1,$2,$3,$4,$5,$6,$7)
+        (entidad, entidad_id, accion, usuario_id, descripcion, datos_anteriores, datos_nuevos, empresa_id)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
       RETURNING *;
     `;
 
@@ -28,6 +28,7 @@ const registrar = async ({ entidad, entidad_id = null, accion, usuario_id = null
       descripcion,
       datos_anteriores ? JSON.stringify(datos_anteriores) : null,
       datos_nuevos ? JSON.stringify(datos_nuevos) : null,
+      empresa_id,
     ];
 
     const { rows } = await pool.query(texto, valores);

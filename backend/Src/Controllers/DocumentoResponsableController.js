@@ -28,7 +28,8 @@ const asignar = async (req, res) => {
           accion: 'asignar',
           usuario_id: req.user ? req.user.id : null,
           descripcion: `Asignado documento '${info.tipo_nombre || data.documento_requerido_id}' de la empresa '${info.empresa_nombre || info.empresa_id}' al usuario ${usuario_id}`,
-          datos_nuevos: data
+          datos_nuevos: data,
+          empresa_id: info.empresa_id || data.empresa_id || null
         });
       } catch (e) {
         console.error('auditoria asignarResponsable error:', e.message);

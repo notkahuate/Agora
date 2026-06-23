@@ -23,7 +23,8 @@ const crear = async (req, res) => {
         accion: 'asignar',
         usuario_id: req.user ? req.user.id : null,
         descripcion: `Asignado documento requerido '${info.tipo_nombre || data.tipo_documento_id}' a empresa '${info.empresa_nombre || data.empresa_id}'`,
-        datos_nuevos: data
+        datos_nuevos: data,
+        empresa_id: info.empresa_id || data.empresa_id || null
       });
     } catch (e) {
       console.error('auditoria crearDocumentoRequerido error:', e.message);
