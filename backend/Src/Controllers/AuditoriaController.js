@@ -92,7 +92,14 @@ const obtenerEventos = async (req, res) => {
     const { limit = 20, offset = 0, empresa_id } = req.query;
     const limitNum = Math.min(parseInt(limit) || 20, 100); // Max 100
     const offsetNum = Math.max(parseInt(offset) || 0, 0);
-    const empresaIdNum = empresa_id ? parseInt(empresa_id) : null;
+    const requestedEmpresaId = empresa_id ? parseInt(empresa_id) : null;
+
+    let empresaIdNum = null;
+    if (req.user && req.user.rol === 'usuario') {
+      empresaIdNum = req.user.empresa_id || null;
+    } else {
+      empresaIdNum = requestedEmpresaId;
+    }
 
     let query = `
       SELECT 
@@ -116,12 +123,15 @@ const obtenerEventos = async (req, res) => {
     let params = [];
     let paramIndex = 1;
 
-    // Si se proporciona empresa_id, filtrar por esa empresa
+    // Usuarios solo ven su propia empresa; otros roles pueden filtrar opcionalmente
     if (empresaIdNum) {
       query += ` WHERE a.empresa_id = $${paramIndex}`;
       countQuery += ` WHERE a.empresa_id = $1`;
       params.push(empresaIdNum);
       paramIndex++;
+    } else if (req.user && req.user.rol === 'usuario') {
+      // si el usuario no tiene empresa asignada, devolver vacío
+      return res.json({ eventos: [], total: 0, limit: limitNum, offset: offsetNum, hasMore: false });
     }
 
     query += ` ORDER BY a.fecha_evento DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;

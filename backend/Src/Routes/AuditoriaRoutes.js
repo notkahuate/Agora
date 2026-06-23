@@ -5,10 +5,10 @@ const controller = require('../Controllers/AuditoriaController');
 const { authenticate, authorize } = require('../milddlewares/authMiddleware');
 
 // Obtener todos los eventos (con paginación)
-router.get('/', authenticate, authorize('auditor', 'super_admin'), controller.obtenerEventos);
+router.get('/', authenticate, authorize('auditor', 'super_admin', 'usuario'), controller.obtenerEventos);
 
 // Obtener eventos recientes (timeline)
-router.get('/recientes', authenticate, authorize('auditor', 'super_admin'), controller.obtenerEventosRecientes);
+router.get('/recientes', authenticate, authorize('auditor', 'super_admin', 'usuario'), controller.obtenerEventosRecientes);
 
 // Obtener eventos por entidad
 router.get('/:entidad', authenticate, authorize('auditor', 'super_admin'), controller.obtenerEventosPorEntidad);

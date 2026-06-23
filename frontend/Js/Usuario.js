@@ -7,6 +7,11 @@ const limiteHistorial = 5;
 let historialGlobal = [];
 let auditorMapHistorial = new Map();
 
+let actividadPagina = 1;
+const limiteActividad = 5;
+let actividadTotal = 0;
+let empresaMapActividad = {};
+
 function obtenerNombreValidador(documento) {
   if (!documento) return 'No disponible';
   if (documento.validado_por_nombre) return documento.validado_por_nombre;
@@ -159,7 +164,10 @@ function reuploadRejectedDocument(tipoDocumentoId, nombre, docId = null) {
   uploadDocumentGeneric(tipoDocumentoId, `Re-subido tras rechazo: ${nombre}`, docId);
 }
 
-document.addEventListener('DOMContentLoaded', loadDocumentos);
+document.addEventListener('DOMContentLoaded', () => {
+  loadDocumentos();
+  cargarActividadReciente();
+});
 
 async function loadDocumentos() {
   showStatus('Cargando documentos...');
@@ -393,4 +401,106 @@ function uploadDocumentForPending(tipoDocumentoId, nombre) {
 
   input.click();
 }
+
+async function cargarActividadReciente(pagina = 1) {
+  const timeline = document.getElementById('timelineUsuario');
+  if (!timeline) return;
+
+  actividadPagina = Math.max(1, parseInt(pagina) || 1);
+  const offset = (actividadPagina - 1) * limiteActividad;
+
+  try {
+    const headers = { 'Authorization': `Bearer ${token}` };
+    let url = `http://localhost:3000/api/auditoria?limit=${limiteActividad}&offset=${offset}`;
+
+    if (user && user.empresa_id) {
+      url += `&empresa_id=${user.empresa_id}`;
+    }
+
+    const res = await fetch(url, { headers });
+    if (!res.ok) throw new Error('Error cargando actividad');
+    const data = await res.json();
+
+    const eventos = data.eventos || [];
+    actividadTotal = Number.isFinite(data.total) ? data.total : (eventos.length + offset);
+
+    timeline.innerHTML = '';
+    if (!eventos.length) {
+      timeline.innerHTML = '<p style="color:#94a3b8; text-align:center; padding:16px;">Sin eventos recientes</p>';
+      renderActividadPaginacion();
+      return;
+    }
+
+    const empresaIds = Array.from(new Set(eventos.map(ev => ev.empresa_id).filter(Boolean)));
+    await Promise.all(empresaIds.map(async (empresaId) => {
+      if (!empresaMapActividad[empresaId]) {
+        try {
+          const empresaRes = await fetch(`http://localhost:3000/api/empresas/${empresaId}`, { headers });
+          if (empresaRes.ok) {
+            const empresaData = await empresaRes.json();
+            empresaMapActividad[empresaId] = empresaData.nombre || `Empresa ${empresaId}`;
+          } else {
+            empresaMapActividad[empresaId] = `Empresa ${empresaId}`;
+          }
+        } catch (e) {
+          empresaMapActividad[empresaId] = `Empresa ${empresaId}`;
+        }
+      }
+    }));
+
+    eventos.forEach(evento => {
+      const fecha = new Date(evento.fecha_evento || Date.now());
+      const fechaFormato = fecha.toLocaleString('es-ES', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+      const item = document.createElement('div');
+      item.style.cssText = 'display:flex; gap:12px; padding:12px 0; border-bottom:1px solid #eee;';
+
+      const icon = document.createElement('div');
+      icon.style.cssText = 'width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:#f3f4f6; color:#334155; flex-shrink:0;';
+      icon.textContent = evento.accion ? evento.accion.charAt(0).toUpperCase() : 'E';
+
+      const content = document.createElement('div');
+      const title = document.createElement('div');
+      title.style.fontWeight = '600';
+      title.textContent = evento.descripcion || `${evento.accion || 'Evento'} en ${evento.entidad || 'sistema'}`;
+
+      const meta = document.createElement('div');
+      meta.style.color = '#64748b';
+      meta.style.fontSize = '12px';
+      const usuario = evento.usuario_nombre || evento.usuario_id || 'Sistema';
+      const empresaTexto = evento.empresa_id ? ` | Empresa: ${empresaMapActividad[evento.empresa_id] || `Empresa ${evento.empresa_id}`}` : '';
+      meta.textContent = `Por: ${usuario}${empresaTexto} • ${fechaFormato}`;
+
+      content.appendChild(title);
+      content.appendChild(meta);
+      item.appendChild(icon);
+      item.appendChild(content);
+      timeline.appendChild(item);
+    });
+
+    renderActividadPaginacion();
+  } catch (error) {
+    console.error('Error cargando actividad reciente:', error);
+    timeline.innerHTML = '<p style="color:#f87171; text-align:center; padding:16px;">No se pudo cargar la actividad reciente.</p>';
+    renderActividadPaginacion();
+  }
+}
+
+function renderActividadPaginacion() {
+  const container = document.getElementById('paginacionActividadReciente');
+  if (!container) return;
+
+  const totalPaginas = Math.max(1, Math.ceil(actividadTotal / limiteActividad));
+  container.innerHTML = `
+    <button onclick="cambiarPaginaActividad(-1)" ${actividadPagina === 1 ? 'disabled' : ''}>⬅</button>
+    <span>Página ${actividadPagina} de ${totalPaginas}</span>
+    <button onclick="cambiarPaginaActividad(1)" ${actividadPagina === totalPaginas ? 'disabled' : ''}>➡</button>
+  `;
+}
+
+window.cambiarPaginaActividad = function (direccion) {
+  const totalPaginas = Math.max(1, Math.ceil(actividadTotal / limiteActividad));
+  actividadPagina = Math.min(totalPaginas, Math.max(1, actividadPagina + direccion));
+  cargarActividadReciente(actividadPagina);
+};
 
