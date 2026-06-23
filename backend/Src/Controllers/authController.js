@@ -67,3 +67,23 @@ exports.login = async (req, res) => {
     return res.status(500).json({ message: 'Error interno' });
   }
 };
+
+exports.me = async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ message: 'No autenticado' });
+    }
+
+    return res.json({
+      id: user.id,
+      nombre: user.nombre,
+      email: user.email,
+      rol: user.rol,
+      empresa_id: user.empresa_id
+    });
+  } catch (err) {
+    console.error('Error me:', err);
+    return res.status(500).json({ message: 'Error interno' });
+  }
+};

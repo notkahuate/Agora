@@ -20,33 +20,39 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
             return;
         }
 
-        // Guardar token y usuario en localStorage
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
-
-        // Redirigir por rol
-        switch (data.user.rol) {
-            case "super_admin":
-                window.location.href = "superadmin-dashboard.html";
-                break;
-
-            case "auditor":
-                window.location.href = "auditor-dashboard.html";
-                break;
-
-            case "usuario":
-                window.location.href = "usuario-dashboard.html";
-                break;
-
-            default:
-                alert("Rol desconocido, consulta al administrador.");
-                break;
-        }
+        redirectByRole(data.user.rol);
 
     } catch (error) {
         console.error("Error:", error);
         alert("Hubo un problema al conectar con el servidor.");
     }
 });
+
+function redirectByRole(rol) {
+    switch (rol) {
+        case "super_admin":
+            window.location.href = "superadmin-dashboard.html";
+            break;
+        case "auditor":
+            window.location.href = "auditor-dashboard.html";
+            break;
+        case "usuario":
+            window.location.href = "usuario-dashboard.html";
+            break;
+        default:
+            alert("Rol desconocido, consulta al administrador.");
+            break;
+    }
+}
+
+(async function checkExistingSession() {
+    if (!window.Auth) return;
+    const user = await window.Auth.validateSession();
+    if (user) {
+        redirectByRole(user.rol);
+    }
+})();
 
 

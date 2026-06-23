@@ -1,7 +1,7 @@
 // ==============================
 // CONFIG INICIAL
 // ==============================
-const token = localStorage.getItem('token');
+const token = window.Auth ? window.Auth.getToken() : localStorage.getItem('token');
 const params = new URLSearchParams(window.location.search);
 const empresaId = params.get('id');
 
@@ -22,7 +22,7 @@ const limiteAprobados = 5;
 // ==============================
 if (!token) {
   alert("Sesión expirada");
-  window.location.href = "http://localhost:3000";
+  window.location.replace("/");
 }
 
 // ==============================

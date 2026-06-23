@@ -64,8 +64,7 @@
     <form id="formCrearUsuario">
       <input type="text" id="nombre" placeholder="Nombre" required />
       <input type="email" id="email" placeholder="Correo" required />
-      <input type="password" id="password" placeholder="Contraseña" required />
-
+      <input type="password" id="password" placeholder="Contraseña (mín. 6 caracteres)" minlength="6" required />
       <button type="submit">Crear</button>
     </form>
   </div>
@@ -208,7 +207,6 @@
                 <thead>
                   <tr>
                     <th>Documento</th>
-                    <th>Empresa</th>
                     <th>Prioridad</th>
                     <th>SLA</th>
                     <th>Acción</th>

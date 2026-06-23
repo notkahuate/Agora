@@ -1,8 +1,8 @@
 // ==============================
-// AUTH SIMPLE (SIN Auth.js)
+// AUTH (Auth.js valida sesión con backend)
 // ==============================
-const token = localStorage.getItem('token');
-const user = JSON.parse(localStorage.getItem('user'));
+const token = window.Auth ? window.Auth.getToken() : localStorage.getItem('token');
+const user = window.Auth ? window.Auth.getUser() : null;
 
 let usuariosGlobal = [];
 let paginaUsuarios = 1;
@@ -16,20 +16,23 @@ let selectedDocumentoId = null;
 
 // Actividad reciente
 let actividadPagina = 1;
-const limiteActividad = 10;
+const limiteActividad = 5;
 let actividadTotal = 0;
+let actividadGlobal = [];
+let actividadCargando = false;
+let actividadInicializada = false;
+const ACTIVIDAD_FETCH_LIMIT = 100;
 let empresasMap = {};
 
 console.log("USER:", user);
 
 if (!token || !user) {
-  alert('Sesión expirada');
-  window.location.href = 'http://localhost:3000';
+  window.location.replace('/');
 }
 
 if (user && user.rol !== 'super_admin') {
   alert('No autorizado');
-  window.location.href = 'http://localhost:3000';
+  window.location.replace('/');
 }
 
 
@@ -58,7 +61,7 @@ const btnAbrir = document.getElementById('btnAbrirModal');
 const cerrar = document.getElementById('cerrarModal');
 const cerrarResponsable = document.getElementById('cerrarModalResponsable');
 
-btnAbrir.onclick = () => modal.style.display = 'block';
+btnAbrir.onclick = () => { modal.style.display = 'block'; };
 cerrar.onclick = () => modal.style.display = 'none';
 modalResponsable && cerrarResponsable && (cerrarResponsable.onclick = () => modalResponsable.style.display = 'none');
 
@@ -136,10 +139,22 @@ document.getElementById('formCrearUsuario')
   .addEventListener('submit', async (e) => {
     e.preventDefault();
 
+    const password = document.getElementById('password').value;
+
+    if (password.length < 6) {
+      return alert('La contraseña debe tener al menos 6 caracteres.');
+    }
+
+    if (!user.empresa_id) {
+      return alert('Tu cuenta no tiene empresa asignada. Contacta al administrador.');
+    }
+
     const data = {
       nombre: document.getElementById('nombre').value.trim(),
       email: document.getElementById('email').value.trim(),
-      password: document.getElementById('password').value
+      password,
+      rol: 'usuario',
+      empresa_id: user.empresa_id
     };
 
     try {
@@ -155,7 +170,7 @@ document.getElementById('formCrearUsuario')
       const result = await resp.json();
 
       if (!resp.ok) {
-        alert(result.message || 'Error al crear usuario');
+        alert(window.Auth.parseApiError(result) || 'Error al crear usuario');
         return;
       }
 
@@ -164,7 +179,6 @@ document.getElementById('formCrearUsuario')
       modal.style.display = 'none';
       e.target.reset();
 
-      // 🔥 ESTA ES LA CLAVE
       await cargarUsuariosEmpresa();
 
     } catch (err) {
@@ -175,17 +189,27 @@ document.getElementById('formCrearUsuario')
 
 async function cargarUsuariosEmpresa() {
   try {
-    const res = await fetch('/api/usuarios/empresa/mios', {
+    const res = await fetch('/api/usuarios', {
       headers: {
         'Authorization': `Bearer ${token}`
       }
     });
 
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error('Error cargando usuarios:', window.Auth.parseApiError(err));
+      return;
+    }
+
     const data = await res.json();
+    const todos = Array.isArray(data) ? data : (data.usuarios || []);
+    const usuarios = user.empresa_id
+      ? todos.filter(u => String(u.empresa_id) === String(user.empresa_id))
+      : todos;
 
-    document.getElementById('kpiUsuarios').textContent = data.cantidad;
+    document.getElementById('kpiUsuarios').textContent = usuarios.length;
 
-    usuariosGlobal = data.usuarios; // 🔥 GUARDAR
+    usuariosGlobal = usuarios;
     paginaUsuarios = 1;
 
     renderUsuarios();
@@ -253,7 +277,8 @@ function renderControlesUsuarios() {
 }
 
 function cambiarPaginaUsuarios(direccion) {
-  paginaUsuarios += direccion;
+  const totalPaginas = Math.max(1, Math.ceil(usuariosGlobal.length / limiteUsuarios));
+  paginaUsuarios = Math.min(totalPaginas, Math.max(1, paginaUsuarios + direccion));
   renderUsuarios();
 }
 
@@ -304,13 +329,12 @@ async function cargarColaRevision() {
     console.log("COLA PENDIENTES SIN ASIGNAR:", unassigned);
 
     unassigned.forEach(doc => {
-      const dias = calcularDias(doc.fecha_limite);
+      const sla = formatearSLA(doc.fecha_limite);
 
       const tr = document.createElement('tr');
 
       tr.innerHTML = `
         <td>${doc.nombre} (${doc.frecuencia || '-'})</td>
-        <td>${doc.responsable_email ? doc.responsable_email : 'Sin asignar'}</td>
         <td>
           <span class="badge ${
             doc.prioridad === 'alta'
@@ -319,10 +343,10 @@ async function cargarColaRevision() {
               ? 'badge-warning'
               : 'badge-success'
           }">
-            ${doc.prioridad}
+            ${doc.prioridad || '—'}
           </span>
         </td>
-        <td>${dias} días</td>
+        <td>${sla}</td>
         <td>
           <button class="btn btn-primary" onclick="abrirModalAsignarResponsable(${doc.id}, '${String(doc.nombre).replace(/'/g, "\\'")}')">
             Asignar
@@ -372,11 +396,7 @@ async function cargarCumplimientoGlobal() {
     console.error('Error cumplimiento:', error);
   }
 }
-function calcularDias(fecha) {
-  const hoy = new Date();
-  const f = new Date(fecha);
-  return Math.floor((hoy - f) / (1000 * 60 * 60 * 24));
-};
+
 async function cargarDocumentos() {
   try {
     const res = await fetch(
@@ -467,8 +487,23 @@ function renderControlesDocumentos() {
 }
 
 function cambiarPaginaDocumentos(direccion) {
-  paginaDocumentos += direccion;
+  const totalPaginas = Math.max(1, Math.ceil(documentosGlobal.length / limiteDocumentos));
+  paginaDocumentos = Math.min(totalPaginas, Math.max(1, paginaDocumentos + direccion));
   renderDocumentos();
+}
+
+function formatearSLA(fechaLimite) {
+  if (!fechaLimite) return '—';
+  const f = new Date(fechaLimite);
+  if (Number.isNaN(f.getTime())) return '—';
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  f.setHours(0, 0, 0, 0);
+  const dias = Math.round((f - hoy) / (1000 * 60 * 60 * 24));
+  if (dias > 0) return `${dias} ${dias === 1 ? 'día faltante' : 'días faltantes'}`;
+  if (dias === 0) return 'Vence hoy';
+  const atraso = Math.abs(dias);
+  return `${atraso} ${atraso === 1 ? 'día atrasado' : 'días atrasado'}`;
 }
 function getColorPrioridad(prioridad) {
   if (prioridad === 'alta') return 'badge-danger';
@@ -616,204 +651,134 @@ async function cargarEmpresasMap() {
   }
 }
 
-async function cargarActividadReciente(pagina = 1) {
+async function fetchActividadGlobal(force = false) {
+  if (!force && actividadGlobal.length) return actividadGlobal;
+  if (actividadCargando) return actividadGlobal;
+
+  actividadCargando = true;
+  try {
+    const headers = { Authorization: `Bearer ${token}` };
+    let url = `http://localhost:3000/api/auditoria?limit=${ACTIVIDAD_FETCH_LIMIT}&offset=0`;
+    if (user.empresa_id) url += `&empresa_id=${user.empresa_id}`;
+
+    const res = await fetch(url, { headers });
+    if (!res.ok) throw new Error('Error cargando actividad');
+    const data = await res.json();
+    actividadGlobal = data.eventos || [];
+    actividadTotal = actividadGlobal.length;
+    return actividadGlobal;
+  } finally {
+    actividadCargando = false;
+  }
+}
+
+function renderActividadPagina() {
+  const timeline = document.getElementById('timelineSuperAdmin');
+  if (!timeline) return;
+
+  const inicio = (actividadPagina - 1) * limiteActividad;
+  const eventos = actividadGlobal.slice(inicio, inicio + limiteActividad);
+
+  if (!eventos.length) {
+    timeline.innerHTML = '<p style="color:#94a3b8; text-align:center; padding:16px;">Sin eventos registrados</p>';
+    renderActividadPaginacion();
+    return;
+  }
+
+  timeline.innerHTML = eventos.map(evento => {
+    const fecha = new Date(evento.fecha_evento || Date.now());
+    const fechaFormato = fecha.toLocaleString('es-ES', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+    const usuario = evento.usuario_nombre || 'Sistema';
+    const titulo = evento.descripcion || `${evento.accion || 'Evento'} en ${evento.entidad || 'sistema'}`;
+    const inicial = evento.accion ? evento.accion.charAt(0).toUpperCase() : 'E';
+
+    return `
+      <div style="display:flex; gap:12px; padding:12px 0; border-bottom:1px solid #eee;">
+        <div style="width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:#f3f4f6; color:#334155; flex-shrink:0;">${inicial}</div>
+        <div>
+          <div style="font-weight:600;">${titulo}</div>
+          <div style="color:#64748b; font-size:12px;">${usuario} • ${fechaFormato}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  renderActividadPaginacion();
+}
+
+async function cargarActividadReciente(pagina = 1, forceFetch = false, silent = false) {
   const timeline = document.getElementById('timelineSuperAdmin');
   if (!timeline) return;
 
   actividadPagina = Math.max(1, parseInt(pagina) || 1);
-  const offset = (actividadPagina - 1) * limiteActividad;
 
   try {
-    const headers = { 'Authorization': `Bearer ${token}` };
-    
-    // Si el super admin tiene empresa_id, filtrar por esa empresa
-    let url = `http://localhost:3000/api/auditoria?limit=${limiteActividad}&offset=${offset}`;
-    if (user.empresa_id) {
-      url += `&empresa_id=${user.empresa_id}`;
-    }
-    
-    const res = await fetch(url, { headers });
-    if (!res.ok) throw new Error('Error cargando actividad');
-    const data = await res.json();
-    const eventos = data.eventos || [];
-    actividadTotal = Number.isFinite(data.total) ? data.total : (eventos.length + offset);
-
-    timeline.innerHTML = '';
-    if (!eventos.length) {
-      timeline.innerHTML = '<p style="color:#94a3b8; text-align:center; padding:16px;">Sin eventos registrados</p>';
-      renderActividadPaginacion();
-      return;
+    const needsFetch = forceFetch || !actividadGlobal.length;
+    if (needsFetch) {
+      if (!silent && !actividadInicializada) {
+        timeline.innerHTML = '<p style="color:#94a3b8; text-align:center; padding:16px;">Cargando actividad...</p>';
+      }
+      await fetchActividadGlobal(true);
+      actividadInicializada = true;
     }
 
-    // Agrupar eventos por empresa
-    const agrupados = eventos.reduce((acc, ev) => {
-      const key = ev.empresa_id ? String(ev.empresa_id) : '__sin_empresa';
-      acc[key] = acc[key] || [];
-      acc[key].push(ev);
-      return acc;
-    }, {});
-
-    const companyKeys = Object.keys(agrupados).sort((a, b) => {
-      const nameA = a === '__sin_empresa' ? 'Sin empresa' : (empresasMap[a] || `ID ${a}`);
-      const nameB = b === '__sin_empresa' ? 'Sin empresa' : (empresasMap[b] || `ID ${b}`);
-      return nameA.localeCompare(nameB);
-    });
-
-    companyKeys.forEach(companyKey => {
-      const events = agrupados[companyKey];
-      const header = document.createElement('div');
-      header.style.cssText = 'margin-top:12px; margin-bottom:8px; font-weight:700; color:#0f172a;';
-      const companyName = companyKey === '__sin_empresa' ? 'Sin empresa' : (empresasMap[companyKey] || `Empresa ${companyKey}`);
-      header.textContent = companyName;
-      timeline.appendChild(header);
-
-      events.forEach(evento => {
-        const fecha = new Date(evento.fecha_evento || Date.now());
-        const fechaFormato = fecha.toLocaleString('es-ES', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-        const item = document.createElement('div');
-        item.style.cssText = 'display:flex; gap:12px; padding:12px 0; border-bottom:1px solid #eee;';
-
-        const icon = document.createElement('div');
-        icon.style.cssText = 'width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:#f3f4f6; color:#334155; flex-shrink:0;';
-        icon.textContent = evento.accion ? evento.accion.charAt(0).toUpperCase() : 'E';
-
-        const content = document.createElement('div');
-        const title = document.createElement('div');
-        title.style.fontWeight = '600';
-        title.textContent = evento.descripcion || `${evento.accion || 'Evento'} en ${evento.entidad || 'sistema'}`;
-
-        const meta = document.createElement('div');
-        meta.style.color = '#64748b';
-        meta.style.fontSize = '12px';
-        const usuario = evento.usuario_nombre || evento.usuario_id || 'Sistema';
-        const empresaNombre = evento.empresa_id ? (empresasMap[evento.empresa_id] || `ID ${evento.empresa_id}`) : '';
-        const empresa = empresaNombre ? ` | Empresa: ${empresaNombre}` : '';
-        meta.textContent = `Por: ${usuario}${empresa} • ${fechaFormato}`;
-
-        // Details toggle
-        const acciones = document.createElement('div');
-        acciones.style.marginTop = '8px';
-        const btnDetalles = document.createElement('button');
-        btnDetalles.className = 'btn btn-secondary';
-        btnDetalles.style.marginRight = '8px';
-        btnDetalles.textContent = 'Ver detalles';
-
-        const detallesDiv = document.createElement('div');
-        detallesDiv.style.marginTop = '8px';
-        detallesDiv.style.display = 'none';
-
-        function safeCloneAndResolveEmpresa(obj) {
-          if (!obj) return null;
-          try {
-            const cloned = typeof obj === 'string' ? JSON.parse(obj) : JSON.parse(JSON.stringify(obj));
-            if (cloned && cloned.empresa_id) {
-              cloned.empresa_nombre = empresasMap[cloned.empresa_id] || `ID ${cloned.empresa_id}`;
-            }
-            return cloned;
-          } catch (e) {
-            return obj;
-          }
-        }
-
-        btnDetalles.addEventListener('click', () => {
-          if (detallesDiv.style.display === 'none') {
-            detallesDiv.style.display = 'block';
-            btnDetalles.textContent = 'Ocultar detalles';
-          } else {
-            detallesDiv.style.display = 'none';
-            btnDetalles.textContent = 'Ver detalles';
-          }
-        });
-
-        const datosAnteriores = safeCloneAndResolveEmpresa(evento.datos_anteriores);
-        const datosNuevos = safeCloneAndResolveEmpresa(evento.datos_nuevos);
-        const detallesContent = document.createElement('div');
-        detallesContent.style.marginTop = '6px';
-        detallesContent.style.fontSize = '13px';
-        detallesContent.style.color = '#334155';
-
-        if (datosAnteriores) {
-          const t1 = document.createElement('div');
-          t1.style.fontWeight = '700';
-          t1.textContent = 'Datos anteriores:';
-          const pre1 = document.createElement('pre');
-          pre1.style.background = '#f8fafc';
-          pre1.style.padding = '8px';
-          pre1.style.overflowX = 'auto';
-          pre1.textContent = JSON.stringify(datosAnteriores, null, 2);
-          detallesContent.appendChild(t1);
-          detallesContent.appendChild(pre1);
-        }
-
-        if (datosNuevos) {
-          const t2 = document.createElement('div');
-          t2.style.fontWeight = '700';
-          t2.textContent = 'Datos nuevos:';
-          const pre2 = document.createElement('pre');
-          pre2.style.background = '#f8fafc';
-          pre2.style.padding = '8px';
-          pre2.style.overflowX = 'auto';
-          pre2.textContent = JSON.stringify(datosNuevos, null, 2);
-          detallesContent.appendChild(t2);
-          detallesContent.appendChild(pre2);
-        }
-
-        if (!datosAnteriores && !datosNuevos) {
-          const none = document.createElement('div');
-          none.style.color = '#64748b';
-          none.textContent = 'Sin detalles adicionales';
-          detallesContent.appendChild(none);
-        }
-
-        detallesDiv.appendChild(detallesContent);
-        acciones.appendChild(btnDetalles);
-
-        content.appendChild(title);
-        content.appendChild(meta);
-        content.appendChild(acciones);
-        content.appendChild(detallesDiv);
-
-        item.appendChild(icon);
-        item.appendChild(content);
-        timeline.appendChild(item);
-      });
-    });
-
-    renderActividadPaginacion();
-
+    const totalPaginas = Math.max(1, Math.ceil(actividadGlobal.length / limiteActividad));
+    actividadPagina = Math.min(actividadPagina, totalPaginas);
+    actividadTotal = actividadGlobal.length;
+    renderActividadPagina();
   } catch (err) {
     console.error('Error cargando actividad reciente (superadmin):', err);
-    timeline.innerHTML = '<p style="color:#ef4444; text-align:center; padding:16px;">Error cargando actividad reciente</p>';
+    if (!actividadInicializada) {
+      timeline.innerHTML = '<p style="color:#ef4444; text-align:center; padding:16px;">Error cargando actividad reciente</p>';
+    }
+    renderActividadPaginacion();
   }
+}
+
+async function refrescarActividadSilenciosa() {
+  if (actividadCargando) return;
+  await cargarActividadReciente(actividadPagina, true, true);
 }
 
 function renderActividadPaginacion() {
   const container = document.getElementById('paginacionActividadReciente');
   if (!container) return;
-  const totalPaginas = Math.max(1, Math.ceil(actividadTotal / limiteActividad));
+  const total = actividadGlobal.length || actividadTotal;
+  const totalPaginas = Math.max(1, Math.ceil(total / limiteActividad));
+  if (total <= limiteActividad) {
+    container.innerHTML = '';
+    return;
+  }
   container.innerHTML = `
-    <button onclick="cambiarPaginaActividad(-1)" ${actividadPagina === 1 ? 'disabled' : ''}>⬅</button>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaActividad(-1)" ${actividadPagina === 1 ? 'disabled' : ''}>⬅ Anterior</button>
     <span>Página ${actividadPagina} de ${totalPaginas}</span>
-    <button onclick="cambiarPaginaActividad(1)" ${actividadPagina === totalPaginas ? 'disabled' : ''}>➡</button>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaActividad(1)" ${actividadPagina === totalPaginas ? 'disabled' : ''}>Siguiente ➡</button>
   `;
 }
 
 window.cambiarPaginaActividad = function (direccion) {
-  const totalPaginas = Math.max(1, Math.ceil(actividadTotal / limiteActividad));
-  actividadPagina = Math.min(totalPaginas, Math.max(1, actividadPagina + direccion));
-  cargarActividadReciente(actividadPagina);
+  const totalPaginas = Math.max(1, Math.ceil(actividadGlobal.length / limiteActividad));
+  const nuevaPagina = Math.min(totalPaginas, Math.max(1, actividadPagina + direccion));
+  if (nuevaPagina === actividadPagina) return;
+  actividadPagina = nuevaPagina;
+  renderActividadPagina();
 };
 
+function invalidarCacheActividad() {
+  actividadGlobal = [];
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
+  await cargarEmpresasMap();
   cargarUsuariosEmpresa();
   cargarColaRevision();
   cargarKPIs();
 
-  // 🔥 NUEVOS
   cargarCumplimientoGlobal();
   cargarDocumentos();
-  await cargarEmpresasMap();
-  cargarActividadReciente(actividadPagina);
-  window.actividadRecienteInterval = setInterval(() => cargarActividadReciente(actividadPagina), 15000);
+  cargarActividadReciente(1, true);
+  window.actividadRecienteInterval = setInterval(refrescarActividadSilenciosa, 15000);
 });

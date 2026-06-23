@@ -1,21 +1,28 @@
 // ==============================
-// AUTH SIMPLE (SIN auth.js)
+// AUTH (Auth.js valida sesión con backend)
 // ==============================
-const token = localStorage.getItem('token');
-const user = JSON.parse(localStorage.getItem('user'));
+const token = window.Auth ? window.Auth.getToken() : localStorage.getItem('token');
+const user = window.Auth ? window.Auth.getUser() : null;
 let actividadPagina = 1;
 const limiteActividad = 5;
 let actividadTotal = 0;
+let actividadGlobal = [];
+let actividadCargando = false;
+let actividadInicializada = false;
+const ACTIVIDAD_FETCH_LIMIT = 100;
+
+let historialGlobal = [];
+let paginaHistorial = 1;
+const limiteHistorial = 5;
+let historialCargando = false;
 
 if (!token || !user) {
-  alert('Sesión expirada');
-  window.location.href = 'http://localhost:3000';
+  window.location.replace('/');
 }
 
-// solo auditor o super admin
 if (!['auditor', 'super_admin'].includes(user.rol)) {
   alert('No autorizado');
-  window.location.href = 'http://localhost:3000/';
+  window.location.replace('/');
 }
 
 // ==============================
@@ -43,6 +50,8 @@ window.switchTab = function (tabName, evt) {
   // Cargar datos según el tab
   if (tabName === 'documentos') {
     cargarDocumentos();
+  } else if (tabName === 'historial') {
+    cargarHistorial();
   }
 };
 
@@ -117,9 +126,9 @@ async function cargarEmpresas() {
             sumaCumplimiento += cumplimiento;
 
       // ==============================
-      // 🚨 RIESGO
+      // 🚨 RIESGO (solo si hay pendientes reales)
       // ==============================
-      const enRiesgo = cumplimiento < 70;
+      const enRiesgo = totalPendientes > 0 && cumplimiento < 70;
 
       if (enRiesgo) {
         empresasRiesgo.push({
@@ -284,7 +293,8 @@ async function crearEmpresa() {
     alert('Empresa creada correctamente');
     cerrarModal('modalCrearEmpresa');
     cargarEmpresas();
-    cargarActividadReciente();
+    cargarColaPrioritaria();
+    cargarActividadReciente(actividadPagina, true, true);
   } catch (err) {
     console.error('Error creando empresa:', err);
     alert('Error creando empresa');
@@ -318,6 +328,9 @@ async function crearUsuario() {
   if (!nombre || !email || !password) {
     return alert('Nombre, email y contraseña son obligatorios.');
   }
+  if (password.length < 6) {
+    return alert('La contraseña debe tener al menos 6 caracteres.');
+  }
 
   try {
     const res = await fetch('http://localhost:3000/api/usuarios', {
@@ -331,13 +344,14 @@ async function crearUsuario() {
 
     const data = await res.json();
     if (!res.ok) {
-      return alert(data.message || 'Error creando usuario');
+      return alert(window.Auth.parseApiError(data) || 'Error creando usuario');
     }
 
     alert('Usuario creado correctamente');
     cerrarModal('modalCrearUsuario');
     cargarEmpresas();
-    cargarActividadReciente();
+    cargarColaPrioritaria();
+    cargarActividadReciente(actividadPagina, true, true);
   } catch (err) {
     console.error('Error creando usuario:', err);
     alert('Error creando usuario');
@@ -502,7 +516,8 @@ async function asignarDocumentosEmpresa() {
 
     abrirModalAsignarDocumentos(selectedEmpresaId, selectedEmpresaNombre);
     cargarEmpresas();
-    cargarActividadReciente();
+    cargarColaPrioritaria();
+    cargarActividadReciente(actividadPagina, true, true);
   } catch (err) {
     console.error('Error asignando documentos a la empresa:', err);
     alert('Error asignando documentos a la empresa. Revisa la consola o recarga la página.');
@@ -571,6 +586,115 @@ async function cargarDocumentos() {
   }
 }
 
+function estadoHistorialBadge(estado) {
+  const e = String(estado || 'pendiente').toLowerCase();
+  if (['revisado', 'validado', 'aprobado'].includes(e)) {
+    return { clase: 'badge-success', texto: 'Revisado' };
+  }
+  if (e === 'rechazado') {
+    return { clase: 'badge-danger', texto: 'Rechazado' };
+  }
+  return { clase: 'badge-warning', texto: e };
+}
+
+async function cargarHistorial(forceReload = false) {
+  const tbody = document.getElementById('tablaHistorial');
+  if (!tbody) return;
+
+  if (historialCargando) return;
+  historialCargando = true;
+
+  try {
+    if (forceReload || historialGlobal.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7">Cargando historial...</td></tr>';
+
+      const res = await fetch('http://localhost:3000/api/documentos', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) throw new Error('Error al cargar historial');
+
+      const docs = await res.json();
+      historialGlobal = docs
+        .filter(d => ['revisado', 'validado', 'rechazado', 'aprobado'].includes(String(d.estado).toLowerCase()))
+        .sort((a, b) => new Date(b.fecha_validacion || b.fecha_subida) - new Date(a.fecha_validacion || a.fecha_subida));
+    }
+
+    const totalPaginas = Math.max(1, Math.ceil(historialGlobal.length / limiteHistorial));
+    paginaHistorial = Math.min(paginaHistorial, totalPaginas);
+
+    renderHistorialAuditor();
+  } catch (err) {
+    console.error('Error cargando historial:', err);
+    tbody.innerHTML = '<tr><td colspan="7">Error al cargar historial</td></tr>';
+  } finally {
+    historialCargando = false;
+  }
+}
+
+function renderHistorialAuditor() {
+  const tbody = document.getElementById('tablaHistorial');
+  if (!tbody) return;
+
+  const inicio = (paginaHistorial - 1) * limiteHistorial;
+  const pagina = historialGlobal.slice(inicio, inicio + limiteHistorial);
+
+  tbody.innerHTML = '';
+
+  if (!pagina.length) {
+    tbody.innerHTML = '<tr><td colspan="7">No hay documentos en el historial</td></tr>';
+    renderPaginacionHistorialAuditor();
+    return;
+  }
+
+  pagina.forEach(doc => {
+    const badge = estadoHistorialBadge(doc.estado);
+    const fecha = doc.fecha_validacion || doc.fecha_subida;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${doc.id}</td>
+      <td>${doc.tipo_documento_nombre || doc.nombre_archivo || '—'}</td>
+      <td>${doc.empresa_nombre || '—'}</td>
+      <td>${doc.usuario_nombre || '—'}</td>
+      <td>${fecha ? new Date(fecha).toLocaleDateString() : '—'}</td>
+      <td><span class="badge ${badge.clase}">${badge.texto}</span></td>
+      <td>
+        <button class="btn btn-sm btn-secondary" onclick="descargarDocumento('${doc.id}', '${String(doc.nombre_archivo || 'documento').replace(/'/g, "\\'")}')">
+          Descargar
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  renderPaginacionHistorialAuditor();
+}
+
+function renderPaginacionHistorialAuditor() {
+  const container = document.getElementById('paginacionHistorialAuditor');
+  if (!container) return;
+
+  const totalPaginas = Math.max(1, Math.ceil(historialGlobal.length / limiteHistorial));
+  if (historialGlobal.length <= limiteHistorial) {
+    container.innerHTML = '';
+    return;
+  }
+
+  container.innerHTML = `
+    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaHistorialAuditor(-1)" ${paginaHistorial === 1 ? 'disabled' : ''}>⬅ Anterior</button>
+    <span>Página ${paginaHistorial} de ${totalPaginas}</span>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaHistorialAuditor(1)" ${paginaHistorial === totalPaginas ? 'disabled' : ''}>Siguiente ➡</button>
+  `;
+}
+
+window.cambiarPaginaHistorialAuditor = function (direccion) {
+  const totalPaginas = Math.max(1, Math.ceil(historialGlobal.length / limiteHistorial));
+  const nuevaPagina = Math.min(totalPaginas, Math.max(1, paginaHistorial + direccion));
+  if (nuevaPagina === paginaHistorial) return;
+  paginaHistorial = nuevaPagina;
+  renderHistorialAuditor();
+};
+
 window.validarDocumento = async function(id, action) {
   try {
     const headers = {
@@ -588,10 +712,13 @@ window.validarDocumento = async function(id, action) {
 
     if (res.ok) {
       alert(`Documento ${action === 'aprobar' ? 'aprobado' : 'rechazado'}`);
-      cargarDocumentos(); // Recargar la tabla
-      cargarActividadReciente();
+      historialGlobal = [];
+      invalidarCacheActividad();
+      cargarDocumentos();
+      cargarColaPrioritaria();
+      cargarActividadReciente(actividadPagina, true, true);
+      cargarEmpresas();
 
-      // Actualizar KPI si se aprobó
       if (action === 'aprobar') {
         actualizarKpiRevisados();
       }
@@ -787,20 +914,20 @@ async function cargarColaPrioritaria() {
 
     const top5 = ordenados.slice(0, 5);
 
+    const sectionCola = document.getElementById('sectionColaRevision');
     const tbody = document.getElementById('tablaColaPrioritaria');
     const badge = document.getElementById('badgeCola');
 
-    tbody.innerHTML = '';
-    badge.textContent = top5.length;
-
     if (top5.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="5">No hay documentos pendientes</td>
-        </tr>
-      `;
+      if (sectionCola) sectionCola.style.display = 'none';
+      if (badge) badge.textContent = '0';
       return;
     }
+
+    if (sectionCola) sectionCola.style.display = '';
+
+    tbody.innerHTML = '';
+    badge.textContent = top5.length;
 
     top5.forEach(doc => {
       const tr = document.createElement('tr');
@@ -819,7 +946,7 @@ async function cargarColaPrioritaria() {
             ${doc.prioridad}
           </span>
         </td>
-        <td>${new Date(doc.fecha_limite).toLocaleDateString()}</td>
+        <td>${doc.fecha_limite ? new Date(doc.fecha_limite).toLocaleDateString() : '—'}</td>
         <td>
           <button class="btn btn-primary">
             Revisar
@@ -840,181 +967,137 @@ async function cargarColaPrioritaria() {
 // ==============================
 // ACTIVIDAD RECIENTE (TIMELINE)
 // ==============================
-async function cargarActividadReciente(pagina = 1) {
+function iconoActividad(evento) {
+  const entidadTexto = String(evento.entidad || '').replace(/_/g, ' ');
+  if (evento.accion === 'crear') return { color: '#10b981', icono: '✚' };
+  if (evento.accion === 'actualizar') return { color: '#3b82f6', icono: '⟳' };
+  if (evento.accion === 'eliminar') return { color: '#ef4444', icono: '✕' };
+  if (['validar', 'aprobar', 'revisar'].includes(evento.accion)) return { color: '#8b5cf6', icono: '✓' };
+  if (evento.accion === 'descargar') return { color: '#0ea5e9', icono: '↓' };
+  if (evento.accion === 'subir') return { color: '#f59e0b', icono: '↑' };
+  if (evento.accion === 'asignar') return { color: '#f59e0b', icono: '→' };
+  if (entidadTexto.toLowerCase().includes('documento')) return { color: '#f97316', icono: '📄' };
+  return { color: '#94a3b8', icono: '●' };
+}
+
+async function fetchActividadGlobal(force = false) {
+  if (!force && actividadGlobal.length) return actividadGlobal;
+  if (actividadCargando) return actividadGlobal;
+
+  actividadCargando = true;
+  try {
+    const res = await fetch(
+      `http://localhost:3000/api/auditoria?limit=${ACTIVIDAD_FETCH_LIMIT}&offset=0`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+    const data = await res.json();
+    actividadGlobal = data.eventos || [];
+    actividadTotal = actividadGlobal.length;
+    return actividadGlobal;
+  } finally {
+    actividadCargando = false;
+  }
+}
+
+function renderActividadPagina() {
   const timeline = document.getElementById('timelineAuditor');
-  const paginacion = document.getElementById('paginacionActividadReciente');
-  
-  if (!timeline) {
-    console.warn('Elemento timelineAuditor no encontrado');
+  if (!timeline) return;
+
+  const inicio = (actividadPagina - 1) * limiteActividad;
+  const eventos = actividadGlobal.slice(inicio, inicio + limiteActividad);
+
+  if (!eventos.length) {
+    timeline.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:20px;">Sin eventos registrados</p>';
+    renderActividadPaginacion();
     return;
   }
+
+  timeline.innerHTML = eventos.map(evento => {
+    const fecha = new Date(evento.fecha_evento || Date.now());
+    const fechaFormato = fecha.toLocaleString('es-ES', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+    const { color, icono } = iconoActividad(evento);
+    const entidadLabel = String(evento.entidad || 'Evento').replace(/_/g, ' ');
+    const descripcion = evento.descripcion || `${evento.accion || 'Evento'} en ${entidadLabel}`;
+    const usuario = evento.usuario_nombre || 'Sistema';
+
+    return `
+      <div style="display:flex;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #e2e8f0;">
+        <div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;min-width:32px;background:${color}20;color:${color};border-radius:50%;font-weight:bold;margin-right:12px;flex-shrink:0;">${icono}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;color:#1e293b;font-weight:500;">${descripcion}</div>
+          <div style="font-size:12px;color:#64748b;margin-top:4px;">${usuario} • ${fechaFormato}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  renderActividadPaginacion();
+}
+
+async function cargarActividadReciente(pagina = 1, forceFetch = false, silent = false) {
+  const timeline = document.getElementById('timelineAuditor');
+  if (!timeline) return;
 
   actividadPagina = Math.max(1, parseInt(pagina) || 1);
 
   try {
-    const headers = {
-      'Authorization': `Bearer ${token}`
-    };
-
-    const offset = (actividadPagina - 1) * limiteActividad;
-    const res = await fetch(`http://localhost:3000/api/auditoria?limit=${limiteActividad}&offset=${offset}`, { headers });
-    
-    if (!res.ok) {
-      throw new Error(`HTTP Error: ${res.status}`);
+    const needsFetch = forceFetch || !actividadGlobal.length;
+    if (needsFetch) {
+      if (!silent && !actividadInicializada) {
+        timeline.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:20px;">Cargando actividad...</p>';
+      }
+      await fetchActividadGlobal(true);
+      actividadInicializada = true;
     }
 
-    const data = await res.json();
-    const eventos = data.eventos || [];
-    actividadTotal = Number.isFinite(data.total) ? data.total : (eventos.length + offset);
-
-    timeline.innerHTML = '';
-
-    if (eventos.length === 0) {
-      timeline.innerHTML = '<p style="color: #94a3b8; text-align: center; padding: 20px;">Sin eventos registrados</p>';
-      renderActividadPaginacion();
-      return;
-    }
-
-    eventos.forEach((evento) => {
-      const fecha = new Date(evento.fecha_evento);
-      const fechaFormato = fecha.toLocaleDateString('es-ES', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-
-      // Determinar icono y color según la acción
-      let iconoColor = '#94a3b8';
-      let icono = '●';
-      const entidadTexto = String(evento.entidad || '').replace(/_/g, ' ');
-
-      if (evento.accion === 'crear') {
-        iconoColor = '#10b981';
-        icono = '✚';
-      } else if (evento.accion === 'actualizar') {
-        iconoColor = '#3b82f6';
-        icono = '⟳';
-      } else if (evento.accion === 'eliminar') {
-        iconoColor = '#ef4444';
-        icono = '✕';
-      } else if (evento.accion === 'validar' || evento.accion === 'aprobar' || evento.accion === 'revisar') {
-        iconoColor = '#8b5cf6';
-        icono = '✓';
-      } else if (evento.accion === 'descargar') {
-        iconoColor = '#0ea5e9';
-        icono = '↓';
-      } else if (evento.accion === 'subir') {
-        iconoColor = '#f59e0b';
-        icono = '↑';
-      } else if (evento.accion === 'asignar') {
-        iconoColor = '#f59e0b';
-        icono = '→';
-      } else if (entidadTexto.toLowerCase().includes('documento')) {
-        iconoColor = '#f97316';
-        icono = '📄';
-      }
-
-      const usuarioNombre = evento.usuario_nombre || 'Sistema';
-      
-      const timelineItem = document.createElement('div');
-      timelineItem.style.cssText = `
-        display: flex;
-        margin-bottom: 16px;
-        padding-bottom: 16px;
-        border-bottom: 1px solid #e2e8f0;
-      `;
-
-      const iconEl = document.createElement('div');
-      iconEl.style.cssText = `
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 32px;
-        height: 32px;
-        min-width: 32px;
-        background: ${iconoColor}20;
-        color: ${iconoColor};
-        border-radius: 50%;
-        font-weight: bold;
-        margin-right: 12px;
-        flex-shrink: 0;
-      `;
-      iconEl.textContent = icono;
-
-      const contentEl = document.createElement('div');
-      contentEl.style.cssText = `
-        flex: 1;
-        min-width: 0;
-      `;
-
-      const descEl = document.createElement('div');
-      descEl.style.cssText = `
-        font-size: 14px;
-        color: #1e293b;
-        font-weight: 500;
-      `;
-      
-      const entidadLabel = entidadTexto
-        ? entidadTexto.charAt(0).toUpperCase() + entidadTexto.slice(1)
-        : 'Evento';
-      let descripcion = evento.descripcion || `${evento.accion} en ${entidadLabel}`;
-      if (evento.entidad_id) {
-        descripcion += ` (#${evento.entidad_id})`;
-      }
-      descEl.textContent = descripcion;
-
-      const detallesEl = document.createElement('div');
-      detallesEl.style.cssText = `
-        display: flex;
-        gap: 12px;
-        margin-top: 4px;
-        font-size: 12px;
-        color: #64748b;
-      `;
-      
-      const usuarioSpan = document.createElement('span');
-      usuarioSpan.textContent = `Por: ${usuarioNombre}`;
-      
-      const fechaSpan = document.createElement('span');
-      fechaSpan.textContent = fechaFormato;
-
-      detallesEl.appendChild(usuarioSpan);
-      detallesEl.appendChild(fechaSpan);
-
-      contentEl.appendChild(descEl);
-      contentEl.appendChild(detallesEl);
-
-      timelineItem.appendChild(iconEl);
-      timelineItem.appendChild(contentEl);
-
-      timeline.appendChild(timelineItem);
-    });
-
-    renderActividadPaginacion();
+    const totalPaginas = Math.max(1, Math.ceil(actividadGlobal.length / limiteActividad));
+    actividadPagina = Math.min(actividadPagina, totalPaginas);
+    actividadTotal = actividadGlobal.length;
+    renderActividadPagina();
   } catch (err) {
     console.error('Error cargando actividad reciente:', err);
-    timeline.innerHTML = '<p style="color: #ef4444; text-align: center; padding: 20px;">Error cargando actividad reciente</p>';
+    if (!actividadInicializada) {
+      timeline.innerHTML = '<p style="color:#ef4444;text-align:center;padding:20px;">Error cargando actividad reciente</p>';
+    }
     renderActividadPaginacion();
   }
+}
+
+async function refrescarActividadSilenciosa() {
+  if (actividadCargando) return;
+  await cargarActividadReciente(actividadPagina, true, true);
+}
+
+function invalidarCacheActividad() {
+  actividadGlobal = [];
 }
 
 function renderActividadPaginacion() {
   const container = document.getElementById('paginacionActividadReciente');
   if (!container) return;
-  const totalPaginas = Math.max(1, Math.ceil(actividadTotal / limiteActividad));
+  const total = actividadGlobal.length || actividadTotal;
+  const totalPaginas = Math.max(1, Math.ceil(total / limiteActividad));
+  if (total <= limiteActividad) {
+    container.innerHTML = '';
+    return;
+  }
   container.innerHTML = `
-    <button onclick="cambiarPaginaActividad(-1)" ${actividadPagina === 1 ? 'disabled' : ''}>⬅</button>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaActividad(-1)" ${actividadPagina === 1 ? 'disabled' : ''}>⬅ Anterior</button>
     <span>Página ${actividadPagina} de ${totalPaginas}</span>
-    <button onclick="cambiarPaginaActividad(1)" ${actividadPagina === totalPaginas ? 'disabled' : ''}>➡</button>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaActividad(1)" ${actividadPagina === totalPaginas ? 'disabled' : ''}>Siguiente ➡</button>
   `;
 }
 
 window.cambiarPaginaActividad = function (direccion) {
-  const totalPaginas = Math.max(1, Math.ceil(actividadTotal / limiteActividad));
-  actividadPagina = Math.min(totalPaginas, Math.max(1, actividadPagina + direccion));
-  cargarActividadReciente(actividadPagina);
+  const totalPaginas = Math.max(1, Math.ceil(actividadGlobal.length / limiteActividad));
+  const nuevaPagina = Math.min(totalPaginas, Math.max(1, actividadPagina + direccion));
+  if (nuevaPagina === actividadPagina) return;
+  actividadPagina = nuevaPagina;
+  renderActividadPagina();
 };
 
 // ==============================
@@ -1023,8 +1106,9 @@ window.cambiarPaginaActividad = function (direccion) {
 document.addEventListener('DOMContentLoaded', () => {
   cargarEmpresas();
   cargarColaPrioritaria();
-  cargarActividadReciente(actividadPagina);
-  window.actividadRecienteInterval = setInterval(() => cargarActividadReciente(actividadPagina), 15000);
+  cargarActividadReciente(1, true);
+  window.actividadRecienteInterval = setInterval(refrescarActividadSilenciosa, 15000);
+  window.colaPrioritariaInterval = setInterval(cargarColaPrioritaria, 15000);
 
   document.querySelectorAll('.modal').forEach((modal) => {
     modal.addEventListener('click', (event) => {

@@ -102,9 +102,13 @@ exports.crearUsuario = async (req, res) => {
     }
 
     const validRoles = new Set(['usuario', 'super_admin']);
-    const rol = validRoles.has(bodyRol) ? bodyRol : 'usuario';
+    let rol = validRoles.has(bodyRol) ? bodyRol : 'usuario';
 
-    if (requester.rol === 'auditor' && !validRoles.has(bodyRol)) {
+    if (requester.rol === 'super_admin') {
+      rol = 'usuario';
+    }
+
+    if (requester.rol === 'auditor' && bodyRol && !validRoles.has(bodyRol)) {
       return res.status(400).json({ message: 'Rol inválido. Debe ser usuario o super_admin.' });
     }
 
@@ -113,6 +117,11 @@ exports.crearUsuario = async (req, res) => {
       empresaId = bodyEmpresaId;
       if (!empresaId) {
         return res.status(400).json({ message: 'empresa_id es obligatorio para auditores' });
+      }
+    } else if (requester.rol === 'super_admin') {
+      empresaId = requester.empresa_id || bodyEmpresaId || null;
+      if (!empresaId) {
+        return res.status(400).json({ message: 'El super admin debe tener una empresa asignada para crear usuarios' });
       }
     } else {
       empresaId = bodyEmpresaId || requester.empresa_id || null;

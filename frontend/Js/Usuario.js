@@ -1,7 +1,7 @@
 // ==============================
 // AUTH SIMPLE (SIN Auth.js)
 // ==============================
-const token = localStorage.getItem('token');
+const token = window.Auth ? window.Auth.getToken() : localStorage.getItem('token');
 let paginaHistorial = 1;
 const limiteHistorial = 5;
 let historialGlobal = [];
@@ -10,6 +10,10 @@ let auditorMapHistorial = new Map();
 let actividadPagina = 1;
 const limiteActividad = 5;
 let actividadTotal = 0;
+let actividadGlobal = [];
+let actividadCargando = false;
+let actividadInicializada = false;
+const ACTIVIDAD_FETCH_LIMIT = 100;
 let empresaMapActividad = {};
 
 function obtenerNombreValidador(documento) {
@@ -47,53 +51,21 @@ function obtenerNombreValidadorDesdeMapa(doc, auditorMap) {
   return obtenerNombreValidador(doc);
 }
 
-const user = JSON.parse(localStorage.getItem('user'));
+const user = window.Auth ? window.Auth.getUser() : null;
 
 if (!token || !user) {
-  alert('Sesión expirada');
-  window.location.href = 'http://localhost:3000';
+  window.location.replace('/');
 }
 
 if (!['usuario'].includes(user.rol)) {
   alert('No autorizado');
-  window.location.href = 'http://localhost:3000/';
+  window.location.replace('/');
 }
 
-// Definir window.Auth para compatibilidad
-window.Auth = {
-  requireAuth: (roles) => {
-    if (!roles.includes(user.rol)) {
-      window.location.href = 'http://localhost:3000';
-      return null;
-    }
-    return user;
-  },
-  apiFetch: async (url, options = {}) => {
-    const fetchOptions = {
-      ...options,
-      headers: {
-        ...options.headers,
-        Authorization: `Bearer ${token}`
-      }
-    };
-
-    if (options.body) {
-      fetchOptions.headers['Content-Type'] = 'application/json';
-    }
-
-    return fetch(`http://localhost:3000${url}`, fetchOptions);
-  }
-};
-
-const authUser = window.Auth.requireAuth(['usuario']);
-if (!authUser) {
-  window.location.href = 'http://localhost:3000';
-}
-
-if (authUser && document.getElementById('userAvatar')) {
-  document.getElementById('userAvatar').textContent = authUser.nombre
-    ? authUser.nombre.charAt(0).toUpperCase()
-    : authUser.email.charAt(0).toUpperCase();
+if (user && document.getElementById('userAvatar')) {
+  document.getElementById('userAvatar').textContent = user.nombre
+    ? user.nombre.charAt(0).toUpperCase()
+    : user.email.charAt(0).toUpperCase();
 }
 
 const statusMessage = document.createElement('div');
@@ -166,7 +138,8 @@ function reuploadRejectedDocument(tipoDocumentoId, nombre, docId = null) {
 
 document.addEventListener('DOMContentLoaded', () => {
   loadDocumentos();
-  cargarActividadReciente();
+  cargarActividadReciente(1, true);
+  window.actividadRecienteInterval = setInterval(refrescarActividadSilenciosa, 15000);
 });
 
 async function loadDocumentos() {
@@ -309,6 +282,8 @@ async function loadDocumentos() {
     } else {
       showStatus('No tienes documentos pendientes asignados.');
     }
+
+    refrescarActividadSilenciosa();
   } catch (error) {
     console.error('Error cargando documentos:', error);
     showStatus('No se pudo cargar los documentos. Revisa la consola.');
@@ -349,16 +324,23 @@ function renderPaginacionHistorial(totalItems) {
   if (!container) return;
 
   const totalPaginas = Math.max(1, Math.ceil(totalItems / limiteHistorial));
+  if (totalItems <= limiteHistorial) {
+    container.innerHTML = '';
+    return;
+  }
+
   container.innerHTML = `
-    <button onclick="cambiarPaginaHistorial(-1)" ${paginaHistorial === 1 ? 'disabled' : ''}>⬅</button>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaHistorial(-1)" ${paginaHistorial === 1 ? 'disabled' : ''}>⬅ Anterior</button>
     <span>Página ${paginaHistorial} de ${totalPaginas}</span>
-    <button onclick="cambiarPaginaHistorial(1)" ${paginaHistorial === totalPaginas ? 'disabled' : ''}>➡</button>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaHistorial(1)" ${paginaHistorial === totalPaginas ? 'disabled' : ''}>Siguiente ➡</button>
   `;
 }
 
 window.cambiarPaginaHistorial = function (direccion) {
   const totalPaginas = Math.max(1, Math.ceil(historialGlobal.length / limiteHistorial));
-  paginaHistorial = Math.min(totalPaginas, Math.max(1, paginaHistorial + direccion));
+  const nuevaPagina = Math.min(totalPaginas, Math.max(1, paginaHistorial + direccion));
+  if (nuevaPagina === paginaHistorial) return;
+  paginaHistorial = nuevaPagina;
   renderHistorial(historialGlobal, auditorMapHistorial);
 };
 
@@ -402,17 +384,14 @@ function uploadDocumentForPending(tipoDocumentoId, nombre) {
   input.click();
 }
 
-async function cargarActividadReciente(pagina = 1) {
-  const timeline = document.getElementById('timelineUsuario');
-  if (!timeline) return;
+async function fetchActividadGlobal(force = false) {
+  if (!force && actividadGlobal.length) return actividadGlobal;
+  if (actividadCargando) return actividadGlobal;
 
-  actividadPagina = Math.max(1, parseInt(pagina) || 1);
-  const offset = (actividadPagina - 1) * limiteActividad;
-
+  actividadCargando = true;
   try {
-    const headers = { 'Authorization': `Bearer ${token}` };
-    let url = `http://localhost:3000/api/auditoria?limit=${limiteActividad}&offset=${offset}`;
-
+    const headers = { Authorization: `Bearer ${token}` };
+    let url = `http://localhost:3000/api/auditoria?limit=${ACTIVIDAD_FETCH_LIMIT}&offset=0`;
     if (user && user.empresa_id) {
       url += `&empresa_id=${user.empresa_id}`;
     }
@@ -420,87 +399,112 @@ async function cargarActividadReciente(pagina = 1) {
     const res = await fetch(url, { headers });
     if (!res.ok) throw new Error('Error cargando actividad');
     const data = await res.json();
+    actividadGlobal = data.eventos || [];
+    actividadTotal = actividadGlobal.length;
+    return actividadGlobal;
+  } finally {
+    actividadCargando = false;
+  }
+}
 
-    const eventos = data.eventos || [];
-    actividadTotal = Number.isFinite(data.total) ? data.total : (eventos.length + offset);
+function renderActividadPagina() {
+  const timeline = document.getElementById('timelineUsuario');
+  if (!timeline) return;
 
-    timeline.innerHTML = '';
-    if (!eventos.length) {
-      timeline.innerHTML = '<p style="color:#94a3b8; text-align:center; padding:16px;">Sin eventos recientes</p>';
-      renderActividadPaginacion();
-      return;
+  const inicio = (actividadPagina - 1) * limiteActividad;
+  const eventos = actividadGlobal.slice(inicio, inicio + limiteActividad);
+
+  if (!eventos.length) {
+    timeline.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:16px;">Sin eventos recientes</p>';
+    renderActividadPaginacion();
+    return;
+  }
+
+  timeline.innerHTML = eventos.map(evento => {
+    const fecha = new Date(evento.fecha_evento || Date.now());
+    const fechaFormato = fecha.toLocaleString('es-ES', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+    const usuario = evento.usuario_nombre || 'Sistema';
+    const titulo = evento.descripcion || `${evento.accion || 'Evento'} en ${evento.entidad || 'sistema'}`;
+    const inicial = evento.accion ? evento.accion.charAt(0).toUpperCase() : 'E';
+
+    return `
+      <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #eee;">
+        <div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#f3f4f6;color:#334155;flex-shrink:0;">${inicial}</div>
+        <div>
+          <div style="font-weight:600;">${titulo}</div>
+          <div style="color:#64748b;font-size:12px;">${usuario} • ${fechaFormato}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  renderActividadPaginacion();
+}
+
+async function cargarActividadReciente(pagina = 1, forceFetch = false, silent = false) {
+  const timeline = document.getElementById('timelineUsuario');
+  if (!timeline) return;
+
+  actividadPagina = Math.max(1, parseInt(pagina) || 1);
+
+  try {
+    const needsFetch = forceFetch || !actividadGlobal.length;
+    if (needsFetch) {
+      if (!silent && !actividadInicializada) {
+        timeline.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:16px;">Cargando actividad...</p>';
+      }
+      await fetchActividadGlobal(true);
+      actividadInicializada = true;
     }
 
-    const empresaIds = Array.from(new Set(eventos.map(ev => ev.empresa_id).filter(Boolean)));
-    await Promise.all(empresaIds.map(async (empresaId) => {
-      if (!empresaMapActividad[empresaId]) {
-        try {
-          const empresaRes = await fetch(`http://localhost:3000/api/empresas/${empresaId}`, { headers });
-          if (empresaRes.ok) {
-            const empresaData = await empresaRes.json();
-            empresaMapActividad[empresaId] = empresaData.nombre || `Empresa ${empresaId}`;
-          } else {
-            empresaMapActividad[empresaId] = `Empresa ${empresaId}`;
-          }
-        } catch (e) {
-          empresaMapActividad[empresaId] = `Empresa ${empresaId}`;
-        }
-      }
-    }));
-
-    eventos.forEach(evento => {
-      const fecha = new Date(evento.fecha_evento || Date.now());
-      const fechaFormato = fecha.toLocaleString('es-ES', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-      const item = document.createElement('div');
-      item.style.cssText = 'display:flex; gap:12px; padding:12px 0; border-bottom:1px solid #eee;';
-
-      const icon = document.createElement('div');
-      icon.style.cssText = 'width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:#f3f4f6; color:#334155; flex-shrink:0;';
-      icon.textContent = evento.accion ? evento.accion.charAt(0).toUpperCase() : 'E';
-
-      const content = document.createElement('div');
-      const title = document.createElement('div');
-      title.style.fontWeight = '600';
-      title.textContent = evento.descripcion || `${evento.accion || 'Evento'} en ${evento.entidad || 'sistema'}`;
-
-      const meta = document.createElement('div');
-      meta.style.color = '#64748b';
-      meta.style.fontSize = '12px';
-      const usuario = evento.usuario_nombre || evento.usuario_id || 'Sistema';
-      const empresaTexto = evento.empresa_id ? ` | Empresa: ${empresaMapActividad[evento.empresa_id] || `Empresa ${evento.empresa_id}`}` : '';
-      meta.textContent = `Por: ${usuario}${empresaTexto} • ${fechaFormato}`;
-
-      content.appendChild(title);
-      content.appendChild(meta);
-      item.appendChild(icon);
-      item.appendChild(content);
-      timeline.appendChild(item);
-    });
-
-    renderActividadPaginacion();
+    const totalPaginas = Math.max(1, Math.ceil(actividadGlobal.length / limiteActividad));
+    actividadPagina = Math.min(actividadPagina, totalPaginas);
+    actividadTotal = actividadGlobal.length;
+    renderActividadPagina();
   } catch (error) {
     console.error('Error cargando actividad reciente:', error);
-    timeline.innerHTML = '<p style="color:#f87171; text-align:center; padding:16px;">No se pudo cargar la actividad reciente.</p>';
+    if (!actividadInicializada) {
+      timeline.innerHTML = '<p style="color:#f87171;text-align:center;padding:16px;">No se pudo cargar la actividad reciente.</p>';
+    }
     renderActividadPaginacion();
   }
+}
+
+async function refrescarActividadSilenciosa() {
+  if (actividadCargando) return;
+  await cargarActividadReciente(actividadPagina, true, true);
+}
+
+function invalidarCacheActividad() {
+  actividadGlobal = [];
 }
 
 function renderActividadPaginacion() {
   const container = document.getElementById('paginacionActividadReciente');
   if (!container) return;
 
-  const totalPaginas = Math.max(1, Math.ceil(actividadTotal / limiteActividad));
+  const total = actividadGlobal.length || actividadTotal;
+  const totalPaginas = Math.max(1, Math.ceil(total / limiteActividad));
+  if (total <= limiteActividad) {
+    container.innerHTML = '';
+    return;
+  }
+
   container.innerHTML = `
-    <button onclick="cambiarPaginaActividad(-1)" ${actividadPagina === 1 ? 'disabled' : ''}>⬅</button>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaActividad(-1)" ${actividadPagina === 1 ? 'disabled' : ''}>⬅ Anterior</button>
     <span>Página ${actividadPagina} de ${totalPaginas}</span>
-    <button onclick="cambiarPaginaActividad(1)" ${actividadPagina === totalPaginas ? 'disabled' : ''}>➡</button>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaActividad(1)" ${actividadPagina === totalPaginas ? 'disabled' : ''}>Siguiente ➡</button>
   `;
 }
 
 window.cambiarPaginaActividad = function (direccion) {
-  const totalPaginas = Math.max(1, Math.ceil(actividadTotal / limiteActividad));
-  actividadPagina = Math.min(totalPaginas, Math.max(1, actividadPagina + direccion));
-  cargarActividadReciente(actividadPagina);
+  const totalPaginas = Math.max(1, Math.ceil(actividadGlobal.length / limiteActividad));
+  const nuevaPagina = Math.min(totalPaginas, Math.max(1, actividadPagina + direccion));
+  if (nuevaPagina === actividadPagina) return;
+  actividadPagina = nuevaPagina;
+  renderActividadPagina();
 };
 

@@ -4,6 +4,7 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const rateLimit = require('express-rate-limit');
 const authController = require('../Controllers/authController');
+const { authenticate } = require('../milddlewares/authMiddleware');
 
 // Rate limiter para login (protección básica brute-force)
 // const loginLimiter = rateLimit({
@@ -31,5 +32,7 @@ router.post('/login', loginLimiter, loginValidation, (req, res, next) => {
   }
   return authController.login(req, res, next);
 });
+
+router.get('/me', authenticate, authController.me);
 
 module.exports = router;
