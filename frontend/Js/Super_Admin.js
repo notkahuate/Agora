@@ -625,7 +625,14 @@ async function cargarActividadReciente(pagina = 1) {
 
   try {
     const headers = { 'Authorization': `Bearer ${token}` };
-    const res = await fetch(`http://localhost:3000/api/auditoria?limit=${limiteActividad}&offset=${offset}`, { headers });
+    
+    // Si el super admin tiene empresa_id, filtrar por esa empresa
+    let url = `http://localhost:3000/api/auditoria?limit=${limiteActividad}&offset=${offset}`;
+    if (user.empresa_id) {
+      url += `&empresa_id=${user.empresa_id}`;
+    }
+    
+    const res = await fetch(url, { headers });
     if (!res.ok) throw new Error('Error cargando actividad');
     const data = await res.json();
     const eventos = data.eventos || [];

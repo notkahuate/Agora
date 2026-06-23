@@ -85,21 +85,23 @@ async function enriquecerEvento(evento) {
 
 /**
  * Obtener todos los eventos de auditoría con paginación
- * Query params: limit, offset
+ * Query params: limit, offset, empresa_id (opcional)
  */
 const obtenerEventos = async (req, res) => {
   try {
-    const { limit = 20, offset = 0 } = req.query;
+    const { limit = 20, offset = 0, empresa_id } = req.query;
     const limitNum = Math.min(parseInt(limit) || 20, 100); // Max 100
     const offsetNum = Math.max(parseInt(offset) || 0, 0);
+    const empresaIdNum = empresa_id ? parseInt(empresa_id) : null;
 
-    const query = `
+    let query = `
       SELECT 
         a.id,
         a.entidad,
         a.entidad_id,
         a.accion,
         a.usuario_id,
+        a.empresa_id,
         a.descripcion,
         a.datos_anteriores,
         a.datos_nuevos,
@@ -108,17 +110,29 @@ const obtenerEventos = async (req, res) => {
         u.email as usuario_email
       FROM auditoria_sistema a
       LEFT JOIN usuarios u ON a.usuario_id = u.id
-      ORDER BY a.fecha_evento DESC
-      LIMIT $1
-      OFFSET $2
     `;
 
-    const { rows } = await pool.query(query, [limitNum, offsetNum]);
+    let countQuery = 'SELECT COUNT(*) as total FROM auditoria_sistema a';
+    let params = [];
+    let paramIndex = 1;
+
+    // Si se proporciona empresa_id, filtrar por esa empresa
+    if (empresaIdNum) {
+      query += ` WHERE a.empresa_id = $${paramIndex}`;
+      countQuery += ` WHERE a.empresa_id = $1`;
+      params.push(empresaIdNum);
+      paramIndex++;
+    }
+
+    query += ` ORDER BY a.fecha_evento DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    params.push(limitNum, offsetNum);
+
+    const { rows } = await pool.query(query, params);
     const eventos = await Promise.all(rows.map(enriquecerEvento));
 
     // Contar total de eventos
-    const countQuery = 'SELECT COUNT(*) as total FROM auditoria_sistema';
-    const countResult = await pool.query(countQuery);
+    const countParams = empresaIdNum ? [empresaIdNum] : [];
+    const countResult = await pool.query(countQuery, countParams);
     const total = parseInt(countResult.rows[0].total);
 
     return res.json({
