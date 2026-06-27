@@ -3,17 +3,11 @@
 // ==============================
 const token = window.Auth ? window.Auth.getToken() : localStorage.getItem('token');
 const user = window.Auth ? window.Auth.getUser() : null;
-let actividadPagina = 1;
-const limiteActividad = 5;
-let actividadTotal = 0;
-let actividadGlobal = [];
-let actividadCargando = false;
-let actividadInicializada = false;
-const ACTIVIDAD_FETCH_LIMIT = 100;
+let actividadWidget = null;
 
 let historialGlobal = [];
 let paginaHistorial = 1;
-const limiteHistorial = 5;
+const limiteHistorial = 7;
 let historialCargando = false;
 
 if (!token || !user) {
@@ -294,7 +288,7 @@ async function crearEmpresa() {
     cerrarModal('modalCrearEmpresa');
     cargarEmpresas();
     cargarColaPrioritaria();
-    cargarActividadReciente(actividadPagina, true, true);
+    invalidarCacheActividad();
   } catch (err) {
     console.error('Error creando empresa:', err);
     alert('Error creando empresa');
@@ -351,7 +345,7 @@ async function crearUsuario() {
     cerrarModal('modalCrearUsuario');
     cargarEmpresas();
     cargarColaPrioritaria();
-    cargarActividadReciente(actividadPagina, true, true);
+    invalidarCacheActividad();
   } catch (err) {
     console.error('Error creando usuario:', err);
     alert('Error creando usuario');
@@ -517,7 +511,7 @@ async function asignarDocumentosEmpresa() {
     abrirModalAsignarDocumentos(selectedEmpresaId, selectedEmpresaNombre);
     cargarEmpresas();
     cargarColaPrioritaria();
-    cargarActividadReciente(actividadPagina, true, true);
+    invalidarCacheActividad();
   } catch (err) {
     console.error('Error asignando documentos a la empresa:', err);
     alert('Error asignando documentos a la empresa. Revisa la consola o recarga la página.');
@@ -568,6 +562,9 @@ async function cargarDocumentos() {
         <td>
           <button class="btn btn-sm btn-secondary" onclick="descargarDocumento('${doc.id}', '${doc.nombre_archivo}')" style="margin-right:5px;">
             Descargar
+          </button>
+          <button class="btn btn-sm btn-primary" onclick="abrirPreviewAuditor('${doc.id}', '${String(doc.nombre_archivo || 'documento').replace(/'/g, "\\'")}')" style="margin-right:5px;">
+            Ver
           </button>
           <button class="btn btn-success btn-sm" onclick="validarDocumento('${doc.id}', 'aprobar')" style="margin-right:5px;">
             Aprobar
@@ -659,6 +656,9 @@ function renderHistorialAuditor() {
       <td>${fecha ? new Date(fecha).toLocaleDateString() : '—'}</td>
       <td><span class="badge ${badge.clase}">${badge.texto}</span></td>
       <td>
+        <button class="btn btn-sm btn-primary" onclick="abrirPreviewAuditor('${doc.id}', '${String(doc.nombre_archivo || 'documento').replace(/'/g, "\\'")}')" style="margin-right:5px;">
+          Ver
+        </button>
         <button class="btn btn-sm btn-secondary" onclick="descargarDocumento('${doc.id}', '${String(doc.nombre_archivo || 'documento').replace(/'/g, "\\'")}')">
           Descargar
         </button>
@@ -695,6 +695,19 @@ window.cambiarPaginaHistorialAuditor = function (direccion) {
   renderHistorialAuditor();
 };
 
+window.refrescarTrasEliminarDocumentoAuditor = function () {
+  historialGlobal = [];
+  invalidarCacheActividad();
+  cargarDocumentos();
+  cargarColaPrioritaria();
+  cargarHistorial(true);
+  cargarEmpresas();
+};
+
+window.abrirPreviewAuditor = function (id, nombre) {
+  previewDocumento(id, nombre, { onDeleted: refrescarTrasEliminarDocumentoAuditor });
+};
+
 window.validarDocumento = async function(id, action) {
   try {
     const headers = {
@@ -716,7 +729,7 @@ window.validarDocumento = async function(id, action) {
       invalidarCacheActividad();
       cargarDocumentos();
       cargarColaPrioritaria();
-      cargarActividadReciente(actividadPagina, true, true);
+      invalidarCacheActividad();
       cargarEmpresas();
 
       if (action === 'aprobar') {
@@ -761,118 +774,6 @@ window.descargarDocumento = async function(id, nombreArchivo) {
   } catch (err) {
     console.error('Error descargando documento:', err);
     alert('Error al descargar documento');
-  }
-};
-
-window.previewDocumento = async function(id, nombreArchivo) {
-  try {
-    const headers = {
-      'Authorization': `Bearer ${token}`
-    };
-
-    // Obtener info del documento
-    const docRes = await fetch(`http://localhost:3000/api/documentos/${id}`, {
-      method: 'GET',
-      headers
-    });
-
-    if (!docRes.ok) {
-      alert('Error al obtener documento');
-      return;
-    }
-
-    const doc = await docRes.json();
-    const extension = nombreArchivo.split('.').pop().toLowerCase();
-    const isImage = ['jpg', 'jpeg', 'png', 'gif'].includes(extension);
-    const isPdf = extension === 'pdf';
-
-    let previewUrl = null;
-    if (isImage || isPdf) {
-      const token = localStorage.getItem('token');
-      const previewRes = await fetch(`http://localhost:3000/api/documentos/${id}/descargar`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      if (!previewRes.ok) {
-        throw new Error('No se pudo obtener el archivo para previsualizar');
-      }
-      const blob = await previewRes.blob();
-      previewUrl = URL.createObjectURL(blob);
-    }
-
-    const modal = document.createElement('div');
-    modal.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.5);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 10000;
-    `;
-
-    const content = document.createElement('div');
-    content.style.cssText = `
-      background: white;
-      padding: 20px;
-      border-radius: 8px;
-      max-width: 80%;
-      max-height: 80vh;
-      overflow: auto;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-    `;
-
-    if (isImage && previewUrl) {
-      const img = document.createElement('img');
-      img.style.cssText = 'max-width: 100%; max-height: 70vh;';
-      img.src = previewUrl;
-      content.appendChild(img);
-    } else if (isPdf && previewUrl) {
-      const iframe = document.createElement('iframe');
-      iframe.style.cssText = 'width: 100%; height: 70vh; border: none;';
-      iframe.src = previewUrl;
-      content.appendChild(iframe);
-    } else {
-      const p = document.createElement('p');
-      p.textContent = `Documento: ${nombreArchivo} (no se puede previsualizar)`;
-      p.style.cssText = 'margin-bottom: 20px;';
-      content.appendChild(p);
-    }
-
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = 'Cerrar';
-    closeBtn.style.cssText = `
-      margin-top: 20px;
-      padding: 8px 16px;
-      background: #334155;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    `;
-    closeBtn.onclick = () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      modal.remove();
-    };
-    content.appendChild(closeBtn);
-
-    modal.appendChild(content);
-    modal.onclick = (e) => {
-      if (e.target === modal) {
-        if (previewUrl) URL.revokeObjectURL(previewUrl);
-        modal.remove();
-      }
-    };
-
-    document.body.appendChild(modal);
-  } catch (err) {
-    console.error('Error en preview:', err);
-    alert('Error al previsualizar documento');
   }
 };
 
@@ -964,141 +865,20 @@ async function cargarColaPrioritaria() {
 
 
 
-// ==============================
-// ACTIVIDAD RECIENTE (TIMELINE)
-// ==============================
-function iconoActividad(evento) {
-  const entidadTexto = String(evento.entidad || '').replace(/_/g, ' ');
-  if (evento.accion === 'crear') return { color: '#10b981', icono: '✚' };
-  if (evento.accion === 'actualizar') return { color: '#3b82f6', icono: '⟳' };
-  if (evento.accion === 'eliminar') return { color: '#ef4444', icono: '✕' };
-  if (['validar', 'aprobar', 'revisar'].includes(evento.accion)) return { color: '#8b5cf6', icono: '✓' };
-  if (evento.accion === 'descargar') return { color: '#0ea5e9', icono: '↓' };
-  if (evento.accion === 'subir') return { color: '#f59e0b', icono: '↑' };
-  if (evento.accion === 'asignar') return { color: '#f59e0b', icono: '→' };
-  if (entidadTexto.toLowerCase().includes('documento')) return { color: '#f97316', icono: '📄' };
-  return { color: '#94a3b8', icono: '●' };
-}
-
-async function fetchActividadGlobal(force = false) {
-  if (!force && actividadGlobal.length) return actividadGlobal;
-  if (actividadCargando) return actividadGlobal;
-
-  actividadCargando = true;
-  try {
-    const res = await fetch(
-      `http://localhost:3000/api/auditoria?limit=${ACTIVIDAD_FETCH_LIMIT}&offset=0`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
-    const data = await res.json();
-    actividadGlobal = data.eventos || [];
-    actividadTotal = actividadGlobal.length;
-    return actividadGlobal;
-  } finally {
-    actividadCargando = false;
-  }
-}
-
-function renderActividadPagina() {
-  const timeline = document.getElementById('timelineAuditor');
-  if (!timeline) return;
-
-  const inicio = (actividadPagina - 1) * limiteActividad;
-  const eventos = actividadGlobal.slice(inicio, inicio + limiteActividad);
-
-  if (!eventos.length) {
-    timeline.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:20px;">Sin eventos registrados</p>';
-    renderActividadPaginacion();
-    return;
-  }
-
-  timeline.innerHTML = eventos.map(evento => {
-    const fecha = new Date(evento.fecha_evento || Date.now());
-    const fechaFormato = fecha.toLocaleString('es-ES', {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    });
-    const { color, icono } = iconoActividad(evento);
-    const entidadLabel = String(evento.entidad || 'Evento').replace(/_/g, ' ');
-    const descripcion = evento.descripcion || `${evento.accion || 'Evento'} en ${entidadLabel}`;
-    const usuario = evento.usuario_nombre || 'Sistema';
-
-    return `
-      <div style="display:flex;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #e2e8f0;">
-        <div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;min-width:32px;background:${color}20;color:${color};border-radius:50%;font-weight:bold;margin-right:12px;flex-shrink:0;">${icono}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:14px;color:#1e293b;font-weight:500;">${descripcion}</div>
-          <div style="font-size:12px;color:#64748b;margin-top:4px;">${usuario} • ${fechaFormato}</div>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  renderActividadPaginacion();
-}
-
-async function cargarActividadReciente(pagina = 1, forceFetch = false, silent = false) {
-  const timeline = document.getElementById('timelineAuditor');
-  if (!timeline) return;
-
-  actividadPagina = Math.max(1, parseInt(pagina) || 1);
-
-  try {
-    const needsFetch = forceFetch || !actividadGlobal.length;
-    if (needsFetch) {
-      if (!silent && !actividadInicializada) {
-        timeline.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:20px;">Cargando actividad...</p>';
-      }
-      await fetchActividadGlobal(true);
-      actividadInicializada = true;
-    }
-
-    const totalPaginas = Math.max(1, Math.ceil(actividadGlobal.length / limiteActividad));
-    actividadPagina = Math.min(actividadPagina, totalPaginas);
-    actividadTotal = actividadGlobal.length;
-    renderActividadPagina();
-  } catch (err) {
-    console.error('Error cargando actividad reciente:', err);
-    if (!actividadInicializada) {
-      timeline.innerHTML = '<p style="color:#ef4444;text-align:center;padding:20px;">Error cargando actividad reciente</p>';
-    }
-    renderActividadPaginacion();
-  }
-}
-
-async function refrescarActividadSilenciosa() {
-  if (actividadCargando) return;
-  await cargarActividadReciente(actividadPagina, true, true);
-}
-
 function invalidarCacheActividad() {
-  actividadGlobal = [];
+  actividadWidget?.invalidarYRecargar();
 }
 
-function renderActividadPaginacion() {
-  const container = document.getElementById('paginacionActividadReciente');
-  if (!container) return;
-  const total = actividadGlobal.length || actividadTotal;
-  const totalPaginas = Math.max(1, Math.ceil(total / limiteActividad));
-  if (total <= limiteActividad) {
-    container.innerHTML = '';
-    return;
-  }
-  container.innerHTML = `
-    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaActividad(-1)" ${actividadPagina === 1 ? 'disabled' : ''}>⬅ Anterior</button>
-    <span>Página ${actividadPagina} de ${totalPaginas}</span>
-    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaActividad(1)" ${actividadPagina === totalPaginas ? 'disabled' : ''}>Siguiente ➡</button>
-  `;
+function initActividadAuditor() {
+  if (!window.ActividadReciente) return;
+  actividadWidget = ActividadReciente.crearWidget({
+    timelineId: 'timelineAuditor',
+    paginacionId: 'paginacionActividadReciente',
+    buildUrl: (limit) => `http://localhost:3000/api/auditoria?limit=${limit}&offset=0`,
+    mensajeVacio: 'Sin eventos registrados'
+  });
+  actividadWidget.init();
 }
-
-window.cambiarPaginaActividad = function (direccion) {
-  const totalPaginas = Math.max(1, Math.ceil(actividadGlobal.length / limiteActividad));
-  const nuevaPagina = Math.min(totalPaginas, Math.max(1, actividadPagina + direccion));
-  if (nuevaPagina === actividadPagina) return;
-  actividadPagina = nuevaPagina;
-  renderActividadPagina();
-};
 
 // ==============================
 // INIT
@@ -1106,8 +886,7 @@ window.cambiarPaginaActividad = function (direccion) {
 document.addEventListener('DOMContentLoaded', () => {
   cargarEmpresas();
   cargarColaPrioritaria();
-  cargarActividadReciente(1, true);
-  window.actividadRecienteInterval = setInterval(refrescarActividadSilenciosa, 15000);
+  initActividadAuditor();
   window.colaPrioritariaInterval = setInterval(cargarColaPrioritaria, 15000);
 
   document.querySelectorAll('.modal').forEach((modal) => {

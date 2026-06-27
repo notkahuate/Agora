@@ -6,23 +6,22 @@ const user = window.Auth ? window.Auth.getUser() : null;
 
 let usuariosGlobal = [];
 let paginaUsuarios = 1;
-const limiteUsuarios = 5;
+const limiteUsuarios = 7;
 
 let documentosGlobal = [];
 let paginaDocumentos = 1;
-const limiteDocumentos = 5;
+const limiteDocumentos = 7;
 
 let selectedDocumentoId = null;
-
-// Actividad reciente
-let actividadPagina = 1;
-const limiteActividad = 5;
-let actividadTotal = 0;
-let actividadGlobal = [];
-let actividadCargando = false;
-let actividadInicializada = false;
-const ACTIVIDAD_FETCH_LIMIT = 100;
+let actividadWidget = null;
 let empresasMap = {};
+
+const saludState = {
+  documentos: [],
+  resultado: null,
+  vista: 'categorias',
+  categoriaId: null
+};
 
 console.log("USER:", user);
 
@@ -264,15 +263,19 @@ function renderUsuarios() {
 }
 
 function renderControlesUsuarios() {
-  const totalPaginas = Math.ceil(usuariosGlobal.length / limiteUsuarios);
-
   const container = document.getElementById('paginacionUsuarios');
   if (!container) return;
 
+  const totalPaginas = Math.max(1, Math.ceil(usuariosGlobal.length / limiteUsuarios));
+  if (usuariosGlobal.length <= limiteUsuarios) {
+    container.innerHTML = '';
+    return;
+  }
+
   container.innerHTML = `
-    <button onclick="cambiarPaginaUsuarios(-1)" ${paginaUsuarios === 1 ? 'disabled' : ''}>⬅</button>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaUsuarios(-1)" ${paginaUsuarios === 1 ? 'disabled' : ''}>⬅ Anterior</button>
     <span>Página ${paginaUsuarios} de ${totalPaginas}</span>
-    <button onclick="cambiarPaginaUsuarios(1)" ${paginaUsuarios === totalPaginas ? 'disabled' : ''}>➡</button>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaUsuarios(1)" ${paginaUsuarios === totalPaginas ? 'disabled' : ''}>Siguiente ➡</button>
   `;
 }
 
@@ -362,39 +365,234 @@ async function cargarColaRevision() {
   }
 }
 async function cargarCumplimientoGlobal() {
-  try {
-    const headers = {
-      'Authorization': `Bearer ${token}`
-    };
-
-    // 🔥 TRAER TODOS LOS DOCUMENTOS (NO SOLO PENDIENTES)
-    const res = await fetch(
-      `http://localhost:3000/api/documentos-requeridos/empresa/${user.empresa_id}`,
-      { headers }
-    );
-
-    const documentos = await res.json();
-
-    if (!documentos.length) {
-      document.getElementById('kpiCumplimiento').textContent = '100%';
-      return;
-    }
-
-    // 🔥 CONTAR PENDIENTES
-    const pendientes = documentos.filter(doc =>
-      doc.estado && doc.estado.toLowerCase() === 'pendiente'
-    ).length;
-
-    const total = documentos.length;
-
-    // ✅ FORMULA REAL
-    const cumplimiento = Math.round(((total - pendientes) / total) * 100);
-
-    document.getElementById('kpiCumplimiento').textContent = `${cumplimiento}%`;
-
-  } catch (error) {
-    console.error('Error cumplimiento:', error);
+  if (saludState.documentos.length) {
+    aplicarSaludDesdeCache();
+    return;
   }
+  await cargarDocumentos();
+}
+
+function actualizarCacheSalud(documentos) {
+  saludState.documentos = Array.isArray(documentos) ? documentos : [];
+  saludState.resultado = window.SgsstStructure
+    ? window.SgsstStructure.calcularCumplimientoSgsst(saludState.documentos)
+    : null;
+}
+
+function aplicarSaludDesdeCache() {
+  const { documentos, resultado } = saludState;
+  const porcentajeEmpresa = resultado?.porcentajeEmpresa ?? 0;
+
+  document.getElementById('kpiCumplimiento').textContent = documentos.length
+    ? `${porcentajeEmpresa}%`
+    : '0%';
+
+  renderSaludSistema();
+}
+
+function estadoCumplimiento(porcentaje) {
+  if (porcentaje >= 100) return { texto: 'Cumple', clase: 'badge-success' };
+  if (porcentaje > 0) return { texto: 'En progreso', clase: 'badge-warning' };
+  return { texto: 'Pendiente', clase: 'badge-danger' };
+}
+
+function redondear(valor) {
+  return Math.round(valor * 10) / 10;
+}
+
+function calcularPorcentajeSub(stats, pesoEsperado) {
+  if (!window.SgsstStructure || !stats) return 0;
+  return window.SgsstStructure.calcularPorcentajeCategoria(
+    stats.ganado,
+    stats.asignado,
+    pesoEsperado
+  );
+}
+
+function crearTarjetaSalud({ id, titulo, subtitulo, porcentaje, pesoLabel, estado, clickable }) {
+  const attrs = clickable
+    ? `class="section-card salud-card is-clickable" data-salud-id="${id}" tabindex="0" role="button"`
+    : 'class="section-card salud-card"';
+
+  return `
+    <article ${attrs}>
+      <div class="section-card-header">
+        <div>
+          <div class="section-card-title">${titulo}</div>
+          ${subtitulo ? `<div class="section-card-sub">${subtitulo}</div>` : ''}
+        </div>
+        <span class="section-percentage">${porcentaje}%</span>
+      </div>
+      <div class="section-progress-bar">
+        <div class="section-progress-fill" style="width:${Math.min(100, porcentaje)}%"></div>
+      </div>
+      <div class="section-card-footer">
+        <span class="badge ${estado.clase}">${estado.texto}</span>
+        <span class="section-card-meta">${pesoLabel}</span>
+      </div>
+    </article>`;
+}
+
+function renderSaludNav() {
+  const nav = document.getElementById('saludNav');
+  if (!nav) return;
+
+  if (saludState.vista === 'categorias') {
+    nav.hidden = true;
+    nav.innerHTML = '';
+    return;
+  }
+
+  const categoria = window.SgsstStructure?.SG_SST_CATEGORIAS
+    .find(c => c.id === saludState.categoriaId);
+
+  nav.hidden = false;
+  nav.innerHTML = `
+    <button type="button" class="salud-back" id="saludBtnVolver">
+      <span aria-hidden="true">←</span> ${categoria?.nombre || 'Volver'}
+    </button>`;
+}
+
+function renderSaludCategorias(porSeccion) {
+  const categoriasActivas = window.SgsstStructure.SG_SST_CATEGORIAS.filter(categoria => {
+    const stats = porSeccion[categoria.id];
+    return stats && stats.asignado > 0;
+  });
+
+  if (!categoriasActivas.length) {
+    return '<p class="salud-empty">No hay categorías con documentos asignados.</p>';
+  }
+
+  return categoriasActivas.map(categoria => {
+    const stats = porSeccion[categoria.id];
+    const porcentaje = stats.porcentaje;
+    const estado = estadoCumplimiento(porcentaje);
+    const pesoLabel = stats.esCompleta
+      ? `${redondear(stats.contribucion)}% / ${categoria.peso}%`
+      : `${redondear(stats.contribucion)}% ganado`;
+
+    return crearTarjetaSalud({
+      id: categoria.id,
+      titulo: `${categoria.id}. ${categoria.nombre}`,
+      subtitulo: `Peso total ${categoria.peso}%`,
+      porcentaje,
+      pesoLabel,
+      estado,
+      clickable: true
+    });
+  }).join('');
+}
+
+function renderSaludSubcategorias(porSubseccion, categoriaId) {
+  const categoria = window.SgsstStructure.SG_SST_CATEGORIAS.find(c => c.id === categoriaId);
+  if (!categoria) return '<p class="salud-empty">Categoría no encontrada.</p>';
+
+  const subcategoriasActivas = categoria.subcategorias.filter(sub => {
+    const stats = porSubseccion[sub.id];
+    return stats && stats.asignado > 0;
+  });
+
+  if (!subcategoriasActivas.length) {
+    return '<p class="salud-empty">No hay subcategorías con documentos asignados.</p>';
+  }
+
+  return subcategoriasActivas.map(sub => {
+    const stats = porSubseccion[sub.id];
+    const porcentaje = calcularPorcentajeSub(stats, sub.peso);
+    const estado = estadoCumplimiento(porcentaje);
+    const esCompleta = stats.asignado > 0
+      && window.SgsstStructure.esAsignacionCompleta(stats.asignado, sub.peso);
+    const pesoLabel = esCompleta
+      ? `${redondear(stats.ganado)}% / ${sub.peso}%`
+      : `${redondear(stats.ganado)}% ganado`;
+
+    return crearTarjetaSalud({
+      id: sub.id,
+      titulo: `${sub.id} ${sub.nombre}`,
+      subtitulo: `${stats.completados}/${stats.docs} documentos`,
+      porcentaje,
+      pesoLabel,
+      estado,
+      clickable: false
+    });
+  }).join('');
+}
+
+function renderSaludSistema() {
+  const container = document.getElementById('listaSaludSistema');
+  const badgeGlobal = document.getElementById('badgeSaludGlobal');
+  if (!container || !window.SgsstStructure) return;
+
+  const { documentos, resultado } = saludState;
+  if (!resultado) {
+    container.innerHTML = '<p class="salud-empty">No hay datos de cumplimiento.</p>';
+    renderSaludNav();
+    return;
+  }
+
+  const { porSeccion, porSubseccion, porcentajeEmpresa, esAsignacionTotalCompleta } = resultado;
+  const estadoGlobal = estadoCumplimiento(porcentajeEmpresa);
+
+  if (badgeGlobal) {
+    if (!documentos.length) {
+      badgeGlobal.textContent = 'Sin datos';
+      badgeGlobal.className = 'badge badge-info';
+    } else {
+      const etiqueta = esAsignacionTotalCompleta ? '' : ' · ajustado';
+      badgeGlobal.textContent = `${porcentajeEmpresa}%${etiqueta}`;
+      badgeGlobal.className = `badge ${estadoGlobal.clase}`;
+    }
+  }
+
+  renderSaludNav();
+
+  const contenido = saludState.vista === 'subcategorias'
+    ? renderSaludSubcategorias(porSubseccion, saludState.categoriaId)
+    : renderSaludCategorias(porSeccion);
+
+  container.classList.remove('is-entering');
+  void container.offsetWidth;
+  container.classList.add('is-entering');
+  container.innerHTML = contenido;
+}
+
+function saludIrAtras() {
+  if (saludState.vista === 'categorias') return;
+  saludState.vista = 'categorias';
+  saludState.categoriaId = null;
+  renderSaludSistema();
+}
+
+function saludAbrirCategoria(categoriaId) {
+  saludState.vista = 'subcategorias';
+  saludState.categoriaId = categoriaId;
+  renderSaludSistema();
+}
+
+function initSaludNavegacion() {
+  const container = document.getElementById('listaSaludSistema');
+  const nav = document.getElementById('saludNav');
+  if (!container) return;
+
+  container.addEventListener('click', (event) => {
+    const card = event.target.closest('[data-salud-id]');
+    if (!card || saludState.vista !== 'categorias') return;
+    saludAbrirCategoria(card.dataset.saludId);
+  });
+
+  container.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const card = event.target.closest('[data-salud-id]');
+    if (!card || saludState.vista !== 'categorias') return;
+    event.preventDefault();
+    saludAbrirCategoria(card.dataset.saludId);
+  });
+
+  nav?.addEventListener('click', (event) => {
+    if (event.target.closest('#saludBtnVolver')) {
+      saludIrAtras();
+    }
+  });
 }
 
 async function cargarDocumentos() {
@@ -410,12 +608,15 @@ async function cargarDocumentos() {
 
     const documentos = await res.json();
 
-    documentosGlobal = documentos; // 🔥 GUARDAR
+    documentosGlobal = documentos;
     paginaDocumentos = 1;
+
+    actualizarCacheSalud(documentos);
 
     renderDocumentos();
     renderUsuarios();
     actualizarBarrasProgreso();
+    aplicarSaludDesdeCache();
 
   } catch (error) {
     console.error('Error cargando documentos:', error);
@@ -474,15 +675,19 @@ function renderDocumentos() {
 
 
 function renderControlesDocumentos() {
-  const totalPaginas = Math.ceil(documentosGlobal.length / limiteDocumentos);
-
   const container = document.getElementById('paginacionDocumentos');
   if (!container) return;
 
+  const totalPaginas = Math.max(1, Math.ceil(documentosGlobal.length / limiteDocumentos));
+  if (documentosGlobal.length <= limiteDocumentos) {
+    container.innerHTML = '';
+    return;
+  }
+
   container.innerHTML = `
-    <button onclick="cambiarPaginaDocumentos(-1)" ${paginaDocumentos === 1 ? 'disabled' : ''}>⬅</button>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaDocumentos(-1)" ${paginaDocumentos === 1 ? 'disabled' : ''}>⬅ Anterior</button>
     <span>Página ${paginaDocumentos} de ${totalPaginas}</span>
-    <button onclick="cambiarPaginaDocumentos(1)" ${paginaDocumentos === totalPaginas ? 'disabled' : ''}>➡</button>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaDocumentos(1)" ${paginaDocumentos === totalPaginas ? 'disabled' : ''}>Siguiente ➡</button>
   `;
 }
 
@@ -651,134 +856,31 @@ async function cargarEmpresasMap() {
   }
 }
 
-async function fetchActividadGlobal(force = false) {
-  if (!force && actividadGlobal.length) return actividadGlobal;
-  if (actividadCargando) return actividadGlobal;
-
-  actividadCargando = true;
-  try {
-    const headers = { Authorization: `Bearer ${token}` };
-    let url = `http://localhost:3000/api/auditoria?limit=${ACTIVIDAD_FETCH_LIMIT}&offset=0`;
-    if (user.empresa_id) url += `&empresa_id=${user.empresa_id}`;
-
-    const res = await fetch(url, { headers });
-    if (!res.ok) throw new Error('Error cargando actividad');
-    const data = await res.json();
-    actividadGlobal = data.eventos || [];
-    actividadTotal = actividadGlobal.length;
-    return actividadGlobal;
-  } finally {
-    actividadCargando = false;
-  }
-}
-
-function renderActividadPagina() {
-  const timeline = document.getElementById('timelineSuperAdmin');
-  if (!timeline) return;
-
-  const inicio = (actividadPagina - 1) * limiteActividad;
-  const eventos = actividadGlobal.slice(inicio, inicio + limiteActividad);
-
-  if (!eventos.length) {
-    timeline.innerHTML = '<p style="color:#94a3b8; text-align:center; padding:16px;">Sin eventos registrados</p>';
-    renderActividadPaginacion();
-    return;
-  }
-
-  timeline.innerHTML = eventos.map(evento => {
-    const fecha = new Date(evento.fecha_evento || Date.now());
-    const fechaFormato = fecha.toLocaleString('es-ES', {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    });
-    const usuario = evento.usuario_nombre || 'Sistema';
-    const titulo = evento.descripcion || `${evento.accion || 'Evento'} en ${evento.entidad || 'sistema'}`;
-    const inicial = evento.accion ? evento.accion.charAt(0).toUpperCase() : 'E';
-
-    return `
-      <div style="display:flex; gap:12px; padding:12px 0; border-bottom:1px solid #eee;">
-        <div style="width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:#f3f4f6; color:#334155; flex-shrink:0;">${inicial}</div>
-        <div>
-          <div style="font-weight:600;">${titulo}</div>
-          <div style="color:#64748b; font-size:12px;">${usuario} • ${fechaFormato}</div>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  renderActividadPaginacion();
-}
-
-async function cargarActividadReciente(pagina = 1, forceFetch = false, silent = false) {
-  const timeline = document.getElementById('timelineSuperAdmin');
-  if (!timeline) return;
-
-  actividadPagina = Math.max(1, parseInt(pagina) || 1);
-
-  try {
-    const needsFetch = forceFetch || !actividadGlobal.length;
-    if (needsFetch) {
-      if (!silent && !actividadInicializada) {
-        timeline.innerHTML = '<p style="color:#94a3b8; text-align:center; padding:16px;">Cargando actividad...</p>';
-      }
-      await fetchActividadGlobal(true);
-      actividadInicializada = true;
-    }
-
-    const totalPaginas = Math.max(1, Math.ceil(actividadGlobal.length / limiteActividad));
-    actividadPagina = Math.min(actividadPagina, totalPaginas);
-    actividadTotal = actividadGlobal.length;
-    renderActividadPagina();
-  } catch (err) {
-    console.error('Error cargando actividad reciente (superadmin):', err);
-    if (!actividadInicializada) {
-      timeline.innerHTML = '<p style="color:#ef4444; text-align:center; padding:16px;">Error cargando actividad reciente</p>';
-    }
-    renderActividadPaginacion();
-  }
-}
-
-async function refrescarActividadSilenciosa() {
-  if (actividadCargando) return;
-  await cargarActividadReciente(actividadPagina, true, true);
-}
-
-function renderActividadPaginacion() {
-  const container = document.getElementById('paginacionActividadReciente');
-  if (!container) return;
-  const total = actividadGlobal.length || actividadTotal;
-  const totalPaginas = Math.max(1, Math.ceil(total / limiteActividad));
-  if (total <= limiteActividad) {
-    container.innerHTML = '';
-    return;
-  }
-  container.innerHTML = `
-    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaActividad(-1)" ${actividadPagina === 1 ? 'disabled' : ''}>⬅ Anterior</button>
-    <span>Página ${actividadPagina} de ${totalPaginas}</span>
-    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaActividad(1)" ${actividadPagina === totalPaginas ? 'disabled' : ''}>Siguiente ➡</button>
-  `;
-}
-
-window.cambiarPaginaActividad = function (direccion) {
-  const totalPaginas = Math.max(1, Math.ceil(actividadGlobal.length / limiteActividad));
-  const nuevaPagina = Math.min(totalPaginas, Math.max(1, actividadPagina + direccion));
-  if (nuevaPagina === actividadPagina) return;
-  actividadPagina = nuevaPagina;
-  renderActividadPagina();
-};
-
 function invalidarCacheActividad() {
-  actividadGlobal = [];
+  actividadWidget?.invalidarYRecargar();
+}
+
+function initActividadSuperAdmin() {
+  if (!window.ActividadReciente) return;
+  actividadWidget = ActividadReciente.crearWidget({
+    timelineId: 'timelineSuperAdmin',
+    paginacionId: 'paginacionActividadReciente',
+    buildUrl: (limit) => {
+      let url = `http://localhost:3000/api/auditoria?limit=${limit}&offset=0`;
+      if (user?.empresa_id) url += `&empresa_id=${user.empresa_id}`;
+      return url;
+    },
+    mensajeVacio: 'Sin eventos registrados'
+  });
+  actividadWidget.init();
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  initSaludNavegacion();
   await cargarEmpresasMap();
   cargarUsuariosEmpresa();
   cargarColaRevision();
   cargarKPIs();
-
-  cargarCumplimientoGlobal();
   cargarDocumentos();
-  cargarActividadReciente(1, true);
-  window.actividadRecienteInterval = setInterval(refrescarActividadSilenciosa, 15000);
+  initActividadSuperAdmin();
 });

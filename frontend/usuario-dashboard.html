@@ -42,12 +42,9 @@
             <h1 class="page-title">Mi panel</h1>
             <p class="page-subtitle">Sube, rastrea y valida tus documentos al día.</p>
           </div>
-          <div class="actions-row">
-            <button class="btn btn-primary" onclick="uploadDocument('nuevo')">Subir documento</button>
-          </div>
         </div>
 
-        <div class="kpi-grid">
+        <div class="kpi-grid kpi-grid-3">
           <div class="kpi-card"><div class="kpi-icon"><i data-lucide="alert-triangle" class="icon"></i></div><div class="kpi-value" id="kpiPendientes">-</div><div class="kpi-label">Pendientes</div><div class="delta" id="kpiPendientesDetalle">-</div></div>
           <div class="kpi-card"><div class="kpi-icon"><i data-lucide="check-circle-2" class="icon"></i></div><div class="kpi-value" id="kpiCompletados">-</div><div class="kpi-label">Completados</div><div class="delta up">▲ +4</div></div>
           <div class="kpi-card"><div class="kpi-icon"><i data-lucide="bar-chart-3" class="icon"></i></div><div class="kpi-value" id="kpiProgreso">-</div><div class="kpi-label">Progreso</div><div class="delta" id="kpiProgresoDetalle">-</div></div>
@@ -99,11 +96,12 @@
                   <th>Fecha de subida</th>
                   <th>Estado</th>
                   <th>Validado por</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody id="tablaHistorial"></tbody>
             </table>
-            <div id="paginacionHistorial" class="paginacion" style="margin-top: 12px;"></div>
+            <div id="paginacionHistorial" class="paginacion"></div>
           </div>
         </div>
 
@@ -116,7 +114,7 @@
             <button class="btn btn-secondary">Ver todo</button>
           </div>
           <div class="timeline" id="timelineUsuario"></div>
-          <div id="paginacionActividadReciente" class="paginacion" style="margin-top:12px; display:flex; gap:8px; align-items:center;"></div>
+          <div id="paginacionActividadReciente" class="paginacion"></div>
         </div>
 
         <div class="card" id="sectionSoporte" style="margin-top:18px;">
@@ -138,6 +136,8 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script>lucide.createIcons();</script>
   <script src="Js/Auth.js"></script>
+  <script src="Js/DocumentPreview.js"></script>
+  <script src="Js/ActividadReciente.js"></script>
   <script src="Js/Usuario.js"></script>
   <script src="Js/Sidebar.js"></script>
 </body>

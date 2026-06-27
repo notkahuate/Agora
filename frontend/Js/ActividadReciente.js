@@ -1,0 +1,259 @@
+/**
+ * Widget compartido de actividad reciente — mismo diseño y carga optimizada.
+ */
+const ActividadReciente = (function () {
+  const LIMITE_PAGINA = 7;
+  const FETCH_LIMIT = 100;
+  const REFRESH_MS = 20000;
+  const registry = {};
+
+  function obtenerToken() {
+    return window.Auth?.getToken?.() || localStorage.getItem('token') || '';
+  }
+
+  function iconoActividad(evento) {
+    const entidadTexto = String(evento.entidad || '').replace(/_/g, ' ');
+    if (evento.accion === 'crear') return { color: '#10b981', icono: '✚' };
+    if (evento.accion === 'actualizar') return { color: '#3b82f6', icono: '⟳' };
+    if (evento.accion === 'eliminar') return { color: '#ef4444', icono: '✕' };
+    if (['validar', 'aprobar', 'revisar'].includes(evento.accion)) return { color: '#8b5cf6', icono: '✓' };
+    if (evento.accion === 'descargar') return { color: '#0ea5e9', icono: '↓' };
+    if (evento.accion === 'subir') return { color: '#f59e0b', icono: '↑' };
+    if (evento.accion === 'asignar') return { color: '#f59e0b', icono: '→' };
+    if (entidadTexto.toLowerCase().includes('documento')) return { color: '#f97316', icono: '📄' };
+    return { color: '#94a3b8', icono: '●' };
+  }
+
+  function formatearFecha(fechaStr) {
+    const fecha = new Date(fechaStr || Date.now());
+    if (Number.isNaN(fecha.getTime())) return '-';
+    return fecha.toLocaleString('es-ES', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  function hashEventos(eventos) {
+    if (!eventos?.length) return '';
+    return eventos.map(e => `${e.id}-${e.fecha_evento}`).join('|');
+  }
+
+  function crearWidget(config) {
+    const state = {
+      timelineId: config.timelineId,
+      paginacionId: config.paginacionId,
+      buildUrl: config.buildUrl,
+      limite: config.limite || LIMITE_PAGINA,
+      refreshMs: config.refreshMs || REFRESH_MS,
+      mensajeVacio: config.mensajeVacio || 'Sin eventos registrados',
+      pagina: 1,
+      eventos: [],
+      cargando: false,
+      inicializada: false,
+      abortController: null,
+      lastHash: '',
+      intervalId: null
+    };
+
+    function getTimeline() {
+      return document.getElementById(state.timelineId);
+    }
+
+    function renderMensaje(texto, esError = false) {
+      const timeline = getTimeline();
+      if (!timeline) return;
+      timeline.innerHTML = `<p class="timeline-message${esError ? ' is-error' : ''}">${texto}</p>`;
+    }
+
+    function renderPaginacion() {
+      const container = document.getElementById(state.paginacionId);
+      if (!container) return;
+
+      const total = state.eventos.length;
+      const totalPaginas = Math.max(1, Math.ceil(total / state.limite));
+      if (total <= state.limite) {
+        container.innerHTML = '';
+        return;
+      }
+
+      container.innerHTML = `
+        <button type="button" class="btn btn-secondary btn-sm" onclick="ActividadReciente.cambiarPagina('${state.timelineId}', -1)" ${state.pagina === 1 ? 'disabled' : ''}>⬅ Anterior</button>
+        <span>Página ${state.pagina} de ${totalPaginas}</span>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="ActividadReciente.cambiarPagina('${state.timelineId}', 1)" ${state.pagina === totalPaginas ? 'disabled' : ''}>Siguiente ➡</button>`;
+    }
+
+    function renderEventos(force = false) {
+      const timeline = getTimeline();
+      if (!timeline) return;
+
+      const inicio = (state.pagina - 1) * state.limite;
+      const paginaEventos = state.eventos.slice(inicio, inicio + state.limite);
+      const newHash = `${hashEventos(state.eventos)}:${state.pagina}`;
+
+      if (!force && newHash === state.lastHash && state.inicializada) {
+        renderPaginacion();
+        return;
+      }
+      state.lastHash = newHash;
+
+      if (!paginaEventos.length) {
+        renderMensaje(state.mensajeVacio);
+        renderPaginacion();
+        return;
+      }
+
+      timeline.innerHTML = paginaEventos.map(evento => {
+        const { color, icono } = iconoActividad(evento);
+        const descripcion = evento.descripcion
+          || `${evento.accion || 'Evento'} en ${String(evento.entidad || 'sistema').replace(/_/g, ' ')}`;
+        const usuario = evento.usuario_nombre || 'Sistema';
+
+        return `
+          <article class="timeline-entry">
+            <div class="timeline-entry-icon" style="background:${color}20;color:${color}">${icono}</div>
+            <div class="timeline-entry-body">
+              <p class="timeline-entry-title">${descripcion}</p>
+              <p class="timeline-entry-meta">${usuario} • ${formatearFecha(evento.fecha_evento)}</p>
+            </div>
+          </article>`;
+      }).join('');
+
+      renderPaginacion();
+    }
+
+    async function fetchEventos() {
+      if (state.abortController) state.abortController.abort();
+      state.abortController = new AbortController();
+
+      const res = await fetch(state.buildUrl(FETCH_LIMIT), {
+        headers: { Authorization: `Bearer ${obtenerToken()}` },
+        signal: state.abortController.signal
+      });
+
+      if (!res.ok) throw new Error('Error cargando actividad');
+      const data = await res.json();
+      return data.eventos || [];
+    }
+
+    async function cargar(pagina = 1, forceFetch = false, silent = false) {
+      if (!getTimeline()) return;
+      if (state.cargando) return;
+
+      state.pagina = Math.max(1, parseInt(pagina) || 1);
+
+      try {
+        const needsFetch = forceFetch || !state.eventos.length;
+        if (needsFetch) {
+          state.cargando = true;
+          if (!silent && !state.inicializada) {
+            renderMensaje('Cargando actividad...');
+          }
+          state.eventos = await fetchEventos();
+          state.inicializada = true;
+        }
+
+        const totalPaginas = Math.max(1, Math.ceil(state.eventos.length / state.limite));
+        state.pagina = Math.min(state.pagina, totalPaginas);
+        renderEventos(true);
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        console.error('Error actividad reciente:', err);
+        if (!state.inicializada) {
+          renderMensaje('No se pudo cargar la actividad reciente.', true);
+        }
+        renderPaginacion();
+      } finally {
+        state.cargando = false;
+      }
+    }
+
+    async function refrescarSilenciosa() {
+      if (state.cargando || document.hidden) return;
+
+      const prevHash = hashEventos(state.eventos);
+      try {
+        state.cargando = true;
+        const nuevos = await fetchEventos();
+        if (hashEventos(nuevos) !== prevHash) {
+          state.eventos = nuevos;
+          const totalPaginas = Math.max(1, Math.ceil(state.eventos.length / state.limite));
+          state.pagina = Math.min(state.pagina, totalPaginas);
+          renderEventos(true);
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Error refrescando actividad:', err);
+        }
+      } finally {
+        state.cargando = false;
+      }
+    }
+
+    function invalidar() {
+      state.eventos = [];
+      state.lastHash = '';
+      state.inicializada = false;
+    }
+
+    function invalidarYRecargar() {
+      invalidar();
+      return cargar(1, true);
+    }
+
+    function iniciarAutoRefresh() {
+      detenerAutoRefresh();
+      state.intervalId = setInterval(refrescarSilenciosa, state.refreshMs);
+    }
+
+    function detenerAutoRefresh() {
+      if (state.intervalId) {
+        clearInterval(state.intervalId);
+        state.intervalId = null;
+      }
+    }
+
+    function cambiarPagina(direccion) {
+      const totalPaginas = Math.max(1, Math.ceil(state.eventos.length / state.limite));
+      const nueva = Math.min(totalPaginas, Math.max(1, state.pagina + direccion));
+      if (nueva === state.pagina) return;
+      state.pagina = nueva;
+      renderEventos(true);
+    }
+
+    const api = {
+      init() {
+        cargar(1, true);
+        iniciarAutoRefresh();
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) detenerAutoRefresh();
+          else iniciarAutoRefresh();
+        });
+      },
+      cargar,
+      refrescarSilenciosa,
+      invalidar,
+      invalidarYRecargar,
+      cambiarPagina,
+      detenerAutoRefresh
+    };
+
+    registry[state.timelineId] = api;
+    return api;
+  }
+
+  function cambiarPagina(timelineId, direccion) {
+    registry[timelineId]?.cambiarPagina(direccion);
+  }
+
+  return {
+    crearWidget,
+    cambiarPagina,
+    iconoActividad,
+    LIMITE_PAGINA
+  };
+})();
+
+window.ActividadReciente = ActividadReciente;

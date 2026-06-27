@@ -167,8 +167,17 @@ exports.actualizarDocumento = async (req, res) => {
 exports.eliminarDocumento = async (req, res) => {
   try {
     const { id } = req.params;
+    const requester = req.user;
     const doc = await Documento.obtenerDocumentoPorId(id);
     if (!doc) return res.status(404).json({ message: 'Documento no encontrado' });
+
+    const isAdmin = requester && requester.rol === 'super_admin';
+    const isAuditor = requester && requester.rol === 'auditor';
+    const isOwner = requester && String(doc.usuario_id) === String(requester.id);
+
+    if (!isAdmin && !isAuditor && !isOwner) {
+      return res.status(403).json({ message: 'No autorizado para eliminar este documento' });
+    }
 
     const eliminado = await Documento.eliminarDocumento(id);
     if (!eliminado) return res.status(404).json({ message: 'Documento no encontrado' });

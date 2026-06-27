@@ -144,6 +144,7 @@ img {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-width: 0;
 }
 
 .topbar {
@@ -219,16 +220,18 @@ img {
 }
 
 .content {
-  padding: 28px 28px 40px;
+  padding: clamp(16px, 2vw, 28px) clamp(16px, 2vw, 28px) clamp(24px, 3vw, 40px);
   flex: 1;
+  min-width: 0;
 }
 
 .page-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
-  margin-bottom: 28px;
+  margin-bottom: clamp(18px, 2.5vw, 28px);
 }
 
 .page-title {
@@ -366,6 +369,7 @@ img {
 
 .card-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -385,8 +389,12 @@ img {
 
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(12px, 1.5vw, 16px);
+}
+
+.kpi-grid.kpi-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .kpi-card {
@@ -530,14 +538,14 @@ tbody tr:hover {
 
 .grid-2 {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(12px, 1.5vw, 16px);
 }
 
 .grid-3 {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(12px, 1.5vw, 14px);
 }
 
 .list {
@@ -567,8 +575,65 @@ tbody tr:hover {
 
 .timeline {
   display: grid;
-  gap: 12px;
+  gap: 0;
 }
+
+.timeline-entry {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  align-items: flex-start;
+}
+
+.timeline-entry:last-child {
+  border-bottom: none;
+}
+
+.timeline-entry-icon {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.timeline-entry-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.timeline-entry-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.timeline-entry-meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.timeline-message {
+  text-align: center;
+  color: var(--muted);
+  padding: 20px 16px;
+  margin: 0;
+}
+
+.timeline-message.is-error {
+  color: #ef4444;
+}
+
 .paginacion {
   display: flex;
   justify-content: center;
@@ -578,24 +643,14 @@ tbody tr:hover {
   flex-wrap: wrap;
 }
 
-.paginacion button {
-  background: var(--primary);
-  color: white;
-  border: none;
-  padding: 8px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.paginacion button:disabled {
-  background: var(--muted);
-  cursor: not-allowed;
+.paginacion .btn-sm {
+  min-width: 96px;
 }
 
 .paginacion span {
   color: var(--text-strong);
   font-weight: 500;
+  font-size: 13px;
 }
 .timeline-item {
   display: grid;
@@ -744,7 +799,7 @@ tbody tr:hover {
   gap: 12px;
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 768px) {
   .app-shell {
     grid-template-columns: 1fr;
   }
@@ -752,24 +807,34 @@ tbody tr:hover {
   .sidebar {
     position: relative;
     height: auto;
-    flex-direction: row;
-    flex-wrap: wrap;
+    min-height: unset;
+    flex-direction: column;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .topbar {
     position: sticky;
     top: 0;
+    padding: 0 clamp(14px, 4vw, 18px);
+    height: auto;
+    min-height: 64px;
+    flex-wrap: wrap;
+    gap: 10px;
   }
 
-  .auth-grid {
+  .topbar-right {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .grid-2,
+  .grid-3 {
     grid-template-columns: 1fr;
   }
-}
 
-@media (max-width: 720px) {
-  .content {
-    padding: 18px;
+  .kpi-grid,
+  .kpi-grid.kpi-grid-3 {
+    grid-template-columns: 1fr;
   }
 
   .page-header {
@@ -777,8 +842,19 @@ tbody tr:hover {
     align-items: flex-start;
   }
 
-  .topbar {
-    padding: 0 18px;
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pill-tabs {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+
+  .auth-grid {
+    grid-template-columns: 1fr;
   }
 
   .search-box input {

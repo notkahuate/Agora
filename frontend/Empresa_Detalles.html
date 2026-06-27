@@ -155,6 +155,7 @@
                 <thead><tr><th>Documento</th><th>Tipo</th><th>Usuario</th><th>Fecha subida</th><th>Estado</th><th>Acciones</th></tr></thead>
                 <tbody id="tablaDocumentosSubidos"></tbody>
               </table>
+              <div id="paginacionSubidos" class="paginacion"></div>
             </div>
           </div>
 
@@ -164,7 +165,7 @@
                 <thead><tr><th>Documento</th><th>Tipo</th><th>Usuario</th><th>Fecha subida</th><th>Estado</th><th>Acciones</th></tr></thead>
                 <tbody id="tablaDocumentosAprobados"></tbody>
               </table>
-              <div id="paginacionAprobados" style="margin-top: 10px; text-align: center;"></div>
+              <div id="paginacionAprobados" class="paginacion"></div>
             </div>
           </div>
 
@@ -174,7 +175,7 @@
                 <thead><tr><th>Documento</th><th>Tipo</th><th>Frecuencia</th><th>Fecha límite</th><th>Requerido por</th><th>Prioridad</th></tr></thead>
                 <tbody id="tablaDocumentosPendientes"></tbody>
               </table>
-              <div id="paginacionPendientes" style="margin-top: 10px; text-align: center;"></div>
+              <div id="paginacionPendientes" class="paginacion"></div>
             </div>
           </div>
 
@@ -184,7 +185,7 @@
                 <thead><tr><th>Nombre</th><th>Correo</th><th>Cargo</th><th>Estado</th><th>Documentos cargados</th><th>Última actividad</th></tr></thead>
                 <tbody id="tablaUsuariosEmpresa"></tbody>
               </table>
-              <div id="paginacionUsuarios" style="margin-top: 10px; text-align: center;"></div>
+              <div id="paginacionUsuarios" class="paginacion"></div>
             </div>
           </div>
         </div>
@@ -197,7 +198,7 @@
             </div>
           </div>
           <div class="timeline" id="timelineEmpresa"></div>
-          </div>
+          <div id="paginacionActividadEmpresa" class="paginacion"></div>
         </div>
       </div>
     </div>
@@ -206,6 +207,8 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script>lucide.createIcons();</script>
   <script src="Js/Auth.js"></script>
+  <script src="Js/DocumentPreview.js"></script>
+  <script src="Js/ActividadReciente.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <script src="Js/Empresa_Detalle.js"></script>

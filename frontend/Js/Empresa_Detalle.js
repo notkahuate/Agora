@@ -7,15 +7,72 @@ const empresaId = params.get('id');
 
 let usuariosGlobal = [];
 let paginaUsuarios = 1;
-const limiteUsuarios = 5;
+
+let subidosGlobal = [];
+let paginaSubidos = 1;
 
 let pendientesGlobal = [];
 let paginaPendientes = 1;
-const limitePendientes = 5;
 
 let aprobadosGlobal = [];
 let paginaAprobados = 1;
-const limiteAprobados = 5;
+
+const LIMITE_PAGINA = 7;
+
+let actividadWidget = null;
+
+function renderPaginacionEmpresa(containerId, pagina, totalItems, callbackName, limite = LIMITE_PAGINA) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const totalPaginas = Math.max(1, Math.ceil(totalItems / limite));
+  if (totalItems <= limite) {
+    container.innerHTML = '';
+    return;
+  }
+
+  container.innerHTML = `
+    <button type="button" class="btn btn-secondary btn-sm" onclick="${callbackName}(-1)" ${pagina === 1 ? 'disabled' : ''}>⬅ Anterior</button>
+    <span>Página ${pagina} de ${totalPaginas}</span>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="${callbackName}(1)" ${pagina === totalPaginas ? 'disabled' : ''}>Siguiente ➡</button>
+  `;
+}
+
+function estadoDocumentoBadge(estado) {
+  const e = String(estado || 'pendiente').toLowerCase();
+  if (['validado', 'revisado', 'aprobado'].includes(e)) {
+    return { clase: 'badge-success', texto: 'Aprobado' };
+  }
+  if (e === 'rechazado') {
+    return { clase: 'badge-danger', texto: 'Rechazado' };
+  }
+  if (e === 'subido') {
+    return { clase: 'badge-info', texto: 'Subido' };
+  }
+  if (e === 'pendiente') {
+    return { clase: 'badge-warning', texto: 'Pendiente' };
+  }
+  return { clase: 'badge-info', texto: estado || '—' };
+}
+
+function filaDocumentoSubido(doc) {
+  const estado = estadoDocumentoBadge(doc.estado);
+  const nombreArchivo = doc.nombre_archivo || 'Documento';
+
+  return `
+    <tr>
+      <td>${nombreArchivo}</td>
+      <td>${doc.tipo_documento_nombre || doc.tipo_documento_id || '-'}</td>
+      <td>${doc.usuario_nombre || doc.usuario_id || '-'}</td>
+      <td>${doc.fecha_subida ? new Date(doc.fecha_subida).toLocaleDateString() : '-'}</td>
+      <td><span class="badge ${estado.clase}">${estado.texto}</span></td>
+      <td>
+        <button type="button" class="btn btn-sm btn-secondary btn-descargar-doc" data-descargar-id="${doc.id}" data-descargar-nombre="${encodeURIComponent(nombreArchivo)}">
+          Descargar
+        </button>
+      </td>
+    </tr>`;
+}
 
 // ==============================
 // VALIDACIÓN BÁSICA
@@ -96,7 +153,32 @@ async function cargarEmpresaDetalle() {
 }
 
 let documentosGlobal = [];
+let documentosRequeridosGlobal = [];
 let empresaData = null;
+
+function esDocumentoCompletoEmpresa(doc) {
+  const estado = String(doc.estado_documento || doc.estado || 'pendiente').toLowerCase();
+  return ['validado', 'revisado', 'aprobado', 'subido'].includes(estado);
+}
+
+async function cargarDocumentosRequeridosEmpresa() {
+  try {
+    const res = await fetch(`http://localhost:3000/api/documentos-requeridos/empresa/${empresaId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (res.ok) {
+      documentosRequeridosGlobal = await res.json();
+    } else {
+      documentosRequeridosGlobal = [];
+    }
+  } catch (err) {
+    console.error('Error cargando documentos requeridos:', err);
+    documentosRequeridosGlobal = [];
+  }
+}
 
 // ==============================
 // CARGAR USUARIOS (EMPLEADOS)
@@ -128,7 +210,8 @@ async function loadUsuariosEmpresa() {
 
     document.getElementById('empresaEmpleados').textContent = usuariosEmpresa.length;
 
-    // Cargar documentos una sola vez
+    // Cargar documentos requeridos (estado vigente por tipo) y subidos
+    await cargarDocumentosRequeridosEmpresa();
     await cargarTodosLosDocumentos();
 
     renderUsuarios();
@@ -196,8 +279,9 @@ async function cargarCumplimientoEmpresa() {
 // ACTUALIZAR BARRAS DE PROGRESO
 // ==============================
 function actualizarBarrasProgresoEmpresa() {
-  if (!documentosGlobal || documentosGlobal.length === 0 || !usuariosGlobal) {
-    // Sin datos, mostrar 0%
+  const docs = documentosRequeridosGlobal || [];
+
+  if (!docs.length) {
     document.getElementById('badgeProgresoDocEmpresa').textContent = '0%';
     document.getElementById('barraProgresoDocEmpresa').style.width = '0%';
     document.getElementById('docsCompletadosEmpresa').textContent = '0';
@@ -207,22 +291,19 @@ function actualizarBarrasProgresoEmpresa() {
     document.getElementById('badgeProgresoPersonasEmpresa').textContent = '0%';
     document.getElementById('barraProgresoPersonasEmpresa').style.width = '0%';
     document.getElementById('usuariosCompletosEmpresa').textContent = '0';
-    document.getElementById('usuariosTotalesEmpresa').textContent = '0';
+    document.getElementById('usuariosTotalesEmpresa').textContent = String(usuariosGlobal?.length || 0);
     document.getElementById('usuariosProgresoEmpresa').textContent = '0';
     return;
   }
 
-  // ========== PROGRESO DE DOCUMENTACIÓN ==========
-  const totalDocs = documentosGlobal.length;
-  
-  const docsCompletadosCount = documentosGlobal.filter(d => {
+  // ========== PROGRESO DE DOCUMENTACIÓN (último estado por tipo, sin rechazados obsoletos) ==========
+  const totalDocs = docs.length;
+
+  const docsCompletadosCount = docs.filter(esDocumentoCompletoEmpresa).length;
+
+  const docsValidadosCount = docs.filter(d => {
     const estado = String(d.estado_documento || d.estado || 'pendiente').toLowerCase();
     return ['validado', 'revisado', 'aprobado'].includes(estado);
-  }).length;
-
-  const docsValidadosCount = documentosGlobal.filter(d => {
-    const estado = String(d.estado_documento || d.estado || 'pendiente').toLowerCase();
-    return ['validado', 'revisado'].includes(estado);
   }).length;
 
   const progresoDocs = totalDocs > 0 ? Math.round((docsCompletadosCount / totalDocs) * 100) : 0;
@@ -233,9 +314,9 @@ function actualizarBarrasProgresoEmpresa() {
   document.getElementById('docsTotalesEmpresa').textContent = totalDocs;
   document.getElementById('docsValidadosEmpresa').textContent = docsValidadosCount;
 
-  // ========== PROGRESO DE PERSONAS ==========
+  // ========== PROGRESO DE PERSONAS (según documentos requeridos asignados) ==========
   const totalUsuarios = usuariosGlobal.length;
-  
+
   if (totalUsuarios === 0) {
     document.getElementById('badgeProgresoPersonasEmpresa').textContent = '0%';
     document.getElementById('barraProgresoPersonasEmpresa').style.width = '0%';
@@ -248,18 +329,13 @@ function actualizarBarrasProgresoEmpresa() {
   let usuariosCompletosCount = 0;
   let usuariosEnProgresoCount = 0;
 
-  usuariosGlobal.forEach(usuario => {
-    const docsDelUsuario = documentosGlobal.filter(d => d.responsable_id === usuario.id);
-    
-    if (docsDelUsuario.length === 0) {
-      return;
-    }
+  const usuariosConAsignacion = usuariosGlobal.filter(usuario =>
+    docs.some(d => String(d.responsable_id) === String(usuario.id))
+  );
 
-    const docsCompletadosDelUsuario = docsDelUsuario.filter(d => {
-      const estado = String(d.estado_documento || d.estado || 'pendiente').toLowerCase();
-      return ['validado', 'revisado', 'aprobado'].includes(estado);
-    }).length;
-
+  usuariosConAsignacion.forEach(usuario => {
+    const docsDelUsuario = docs.filter(d => String(d.responsable_id) === String(usuario.id));
+    const docsCompletadosDelUsuario = docsDelUsuario.filter(esDocumentoCompletoEmpresa).length;
     const progresoUsuario = (docsCompletadosDelUsuario / docsDelUsuario.length) * 100;
 
     if (progresoUsuario === 100) {
@@ -269,20 +345,23 @@ function actualizarBarrasProgresoEmpresa() {
     }
   });
 
-  const progresoPersonas = totalUsuarios > 0 ? Math.round((usuariosCompletosCount / totalUsuarios) * 100) : 0;
+  const totalUsuariosConDocs = usuariosConAsignacion.length;
+  const progresoPersonas = totalUsuariosConDocs > 0
+    ? Math.round((usuariosCompletosCount / totalUsuariosConDocs) * 100)
+    : 0;
 
   document.getElementById('badgeProgresoPersonasEmpresa').textContent = progresoPersonas + '%';
   document.getElementById('barraProgresoPersonasEmpresa').style.width = progresoPersonas + '%';
   document.getElementById('usuariosCompletosEmpresa').textContent = usuariosCompletosCount;
-  document.getElementById('usuariosTotalesEmpresa').textContent = totalUsuarios;
+  document.getElementById('usuariosTotalesEmpresa').textContent = totalUsuariosConDocs;
   document.getElementById('usuariosProgresoEmpresa').textContent = usuariosEnProgresoCount;
 }
 
 function renderUsuarios() {
   const tablaUsuarios = document.getElementById('tablaUsuariosEmpresa');
 
-  const inicio = (paginaUsuarios - 1) * limiteUsuarios;
-  const fin = inicio + limiteUsuarios;
+  const inicio = (paginaUsuarios - 1) * LIMITE_PAGINA;
+  const fin = inicio + LIMITE_PAGINA;
 
   const pagina = usuariosGlobal.slice(inicio, fin);
 
@@ -298,6 +377,7 @@ function renderUsuarios() {
           ? docsDelUsuario.map(d => `
               <div style="font-size:12px; padding:6px; background:#f8fafc; border-radius:6px; margin:4px 0; display:flex; justify-content:space-between; align-items:center; gap:8px;">
                 <span>${d.nombre_archivo || d.nombre || 'Documento'}</span>
+                <button class="btn btn-sm btn-secondary" onclick="abrirPreviewEmpresa('${d.id}', '${String(d.nombre_archivo || d.nombre || 'Documento').replace(/'/g, "\\'")}')">Ver</button>
                 <button class="btn btn-sm btn-secondary" onclick="descargarDocumento('${d.id}', '${String(d.nombre_archivo || d.nombre || 'Documento').replace(/'/g, "\\'")}')">Descargar</button>
               </div>
             `).join('')
@@ -329,29 +409,18 @@ function renderUsuarios() {
 }
 
 function renderControlesUsuarios() {
-  const totalPaginas = Math.ceil(usuariosGlobal.length / limiteUsuarios);
-
-  const container = document.getElementById('paginacionUsuarios');
-  if (!container) return;
-
-  container.innerHTML = `
-    <button onclick="cambiarPaginaUsuarios(-1)" ${paginaUsuarios === 1 ? 'disabled' : ''}>⬅</button>
-    <span>Página ${paginaUsuarios} de ${totalPaginas}</span>
-    <button onclick="cambiarPaginaUsuarios(1)" ${paginaUsuarios === totalPaginas ? 'disabled' : ''}>➡</button>
-  `;
+  renderPaginacionEmpresa('paginacionUsuarios', paginaUsuarios, usuariosGlobal.length, 'cambiarPaginaUsuarios');
 }
 
-function cambiarPaginaUsuarios(direccion) {
-  paginaUsuarios += direccion;
+window.cambiarPaginaUsuarios = function (direccion) {
+  const totalPaginas = Math.max(1, Math.ceil(usuariosGlobal.length / LIMITE_PAGINA));
+  paginaUsuarios = Math.min(totalPaginas, Math.max(1, paginaUsuarios + direccion));
   renderUsuarios();
-}
+};
 // ==============================
 // DOCUMENTOS (opcional)
 // ==============================
 async function loadDocumentosEmpresa() {
-  const tablaSubidos = document.getElementById('tablaDocumentosSubidos');
-  const tablaPendientes = document.getElementById('tablaDocumentosPendientes');
-
   try {
     const res = await fetch('http://localhost:3000/api/documentos', {
       headers: {
@@ -369,103 +438,70 @@ async function loadDocumentosEmpresa() {
       String(d.empresa_id) === String(empresaId)
     );
 
-    const aprobados = empresaDocs.filter(d => ['validado','revisado'].includes(d.estado));
-    const pendientes = empresaDocs.filter(d => !['validado','revisado'].includes(d.estado));
+    const aprobados = empresaDocs.filter(d => ['validado', 'revisado', 'aprobado'].includes(String(d.estado || '').toLowerCase()));
 
     document.getElementById('statSubidos').textContent = empresaDocs.length;
     document.getElementById('statAprobados').textContent = aprobados.length;
 
+    subidosGlobal = empresaDocs;
     aprobadosGlobal = aprobados;
+    paginaSubidos = 1;
     paginaAprobados = 1;
 
-    if (tablaSubidos) {
-      tablaSubidos.innerHTML = empresaDocs.length
-        ? empresaDocs.map(doc => `
-            <tr>
-              <td>${doc.nombre_archivo || 'Documento'}</td>
-              <td>${doc.tipo_documento_nombre || doc.tipo_documento_id || '-'}</td>
-              <td>${doc.usuario_nombre || doc.usuario_id || '-'}</td>
-              <td>${doc.fecha_subida ? new Date(doc.fecha_subida).toLocaleDateString() : '-'}</td>
-              <td>${doc.estado}</td>
-              <td>
-                <button class="btn btn-secondary" onclick="descargarDocumento('${doc.id}', '${String(doc.nombre_archivo).replace(/'/g, "\\'")}')">
-                  Descargar
-                </button>
-              </td>
-            </tr>
-          `).join('')
-        : `<tr><td colspan="6">Sin documentos</td></tr>`;
-    }
-
+    renderSubidos();
     renderAprobados();
 
-    if (tablaPendientes) {
-      tablaPendientes.innerHTML = pendientes.length
-        ? pendientes.map(doc => `
-            <tr>
-              <td>${doc.nombre_archivo}</td>
-              <td>${doc.tipo_documento_id}</td>
-              <td>-</td>
-              <td>-</td>
-              <td>-</td>
-              <td><span class="badge badge-warning">Pendiente</span></td>
-            </tr>
-          `).join('')
-        : `<tr><td colspan="6">Sin pendientes</td></tr>`;
-    }
+    await cargarDocumentosRequeridosEmpresa();
+    actualizarBarrasProgresoEmpresa();
 
   } catch (err) {
     console.error("Error documentos:", err);
   }
 }
 
+function renderSubidos() {
+  const tablaSubidos = document.getElementById('tablaDocumentosSubidos');
+  if (!tablaSubidos) return;
+
+  const inicio = (paginaSubidos - 1) * LIMITE_PAGINA;
+  const pagina = subidosGlobal.slice(inicio, inicio + LIMITE_PAGINA);
+
+  tablaSubidos.innerHTML = pagina.length
+    ? pagina.map(filaDocumentoSubido).join('')
+    : `<tr><td colspan="6">Sin documentos</td></tr>`;
+
+  renderPaginacionEmpresa('paginacionSubidos', paginaSubidos, subidosGlobal.length, 'cambiarPaginaSubidos');
+}
+
+window.cambiarPaginaSubidos = function (direccion) {
+  const totalPaginas = Math.max(1, Math.ceil(subidosGlobal.length / LIMITE_PAGINA));
+  paginaSubidos = Math.min(totalPaginas, Math.max(1, paginaSubidos + direccion));
+  renderSubidos();
+};
+
 function renderAprobados() {
   const tablaAprobados = document.getElementById('tablaDocumentosAprobados');
-  const inicio = (paginaAprobados - 1) * limiteAprobados;
-  const fin = inicio + limiteAprobados;
-  const pagina = aprobadosGlobal.slice(inicio, fin);
+  const inicio = (paginaAprobados - 1) * LIMITE_PAGINA;
+  const pagina = aprobadosGlobal.slice(inicio, inicio + LIMITE_PAGINA);
 
   if (!tablaAprobados) return;
 
   tablaAprobados.innerHTML = pagina.length
-    ? pagina.map(doc => `
-        <tr>
-          <td>${doc.nombre_archivo || 'Documento'}</td>
-          <td>${doc.tipo_documento_nombre || doc.tipo_documento_id || '-'}</td>
-          <td>${doc.usuario_nombre || doc.usuario_id || '-'}</td>
-          <td>${doc.fecha_subida ? new Date(doc.fecha_subida).toLocaleDateString() : '-'}</td>
-          <td>${doc.estado}</td>
-          <td>
-            <button class="btn btn-secondary" onclick="descargarDocumento('${doc.id}', '${String(doc.nombre_archivo).replace(/'/g, "\\'")}')">
-              Descargar
-            </button>
-          </td>
-        </tr>
-      `).join('')
+    ? pagina.map(filaDocumentoSubido).join('')
     : `<tr><td colspan="6">No hay documentos aprobados</td></tr>`;
 
   renderControlesAprobados();
 }
 
 function renderControlesAprobados() {
-  const totalPaginas = Math.max(1, Math.ceil(aprobadosGlobal.length / limiteAprobados));
-  const container = document.getElementById('paginacionAprobados');
-  if (!container) return;
-
-  container.innerHTML = `
-    <button onclick="cambiarPaginaAprobados(-1)" ${paginaAprobados === 1 ? 'disabled' : ''}>⬅</button>
-    <span>Página ${paginaAprobados} de ${totalPaginas}</span>
-    <button onclick="cambiarPaginaAprobados(1)" ${paginaAprobados === totalPaginas ? 'disabled' : ''}>➡</button>
-  `;
+  renderPaginacionEmpresa('paginacionAprobados', paginaAprobados, aprobadosGlobal.length, 'cambiarPaginaAprobados');
 }
 
-function cambiarPaginaAprobados(direccion) {
-  paginaAprobados += direccion;
-  if (paginaAprobados < 1) paginaAprobados = 1;
-  const max = Math.max(1, Math.ceil(aprobadosGlobal.length / limiteAprobados));
-  if (paginaAprobados > max) paginaAprobados = max;
+window.cambiarPaginaAprobados = function (direccion) {
+  const totalPaginas = Math.max(1, Math.ceil(aprobadosGlobal.length / LIMITE_PAGINA));
+  paginaAprobados = Math.min(totalPaginas, Math.max(1, paginaAprobados + direccion));
   renderAprobados();
-}
+};
 
 // ==============================
 // TABS
@@ -481,6 +517,7 @@ async function switchTab(tabName, evt) {
   if (panel) panel.classList.add('active');
 
   if (tabName === 'usuarios-empresa') {
+    await cargarDocumentosRequeridosEmpresa();
     await cargarTodosLosDocumentos();
     renderUsuarios();
     actualizarBarrasProgresoEmpresa();
@@ -536,22 +573,20 @@ async function cargarPendientesEmpresa(empresaId) {
 function renderPendientes() {
   const tbody = document.getElementById('tablaDocumentosPendientes');
 
-  const inicio = (paginaPendientes - 1) * limitePendientes;
-  const fin = inicio + limitePendientes;
-
-  const pagina = pendientesGlobal.slice(inicio, fin);
+  const inicio = (paginaPendientes - 1) * LIMITE_PAGINA;
+  const pagina = pendientesGlobal.slice(inicio, inicio + LIMITE_PAGINA);
 
   tbody.innerHTML = pagina.length
     ? pagina.map(doc => `
         <tr>
           <td>${doc.nombre}</td>
           <td>${doc.tipo_documento_id}</td>
-          <td>${doc.frecuencia}</td>
+          <td>${doc.frecuencia || '-'}</td>
           <td>${new Date(doc.fecha_limite).toLocaleDateString()}</td>
-          <td>Empresa</td>
+          <td>${doc.responsable_nombre || 'Sin asignar'}</td>
           <td>
             <span class="badge badge-${doc.prioridad === 'alta' ? 'danger' : doc.prioridad === 'media' ? 'warning' : 'info'}">
-              ${doc.prioridad}
+              ${doc.prioridad || '-'}
             </span>
           </td>
         </tr>
@@ -562,22 +597,14 @@ function renderPendientes() {
 }
 
 function renderControlesPendientes() {
-  const totalPaginas = Math.ceil(pendientesGlobal.length / limitePendientes);
-
-  const container = document.getElementById('paginacionPendientes');
-  if (!container) return;
-
-  container.innerHTML = `
-    <button onclick="cambiarPaginaPendientes(-1)" ${paginaPendientes === 1 ? 'disabled' : ''}>⬅</button>
-    <span>Página ${paginaPendientes} de ${totalPaginas}</span>
-    <button onclick="cambiarPaginaPendientes(1)" ${paginaPendientes === totalPaginas ? 'disabled' : ''}>➡</button>
-  `;
+  renderPaginacionEmpresa('paginacionPendientes', paginaPendientes, pendientesGlobal.length, 'cambiarPaginaPendientes');
 }
 
-function cambiarPaginaPendientes(direccion) {
-  paginaPendientes += direccion;
+window.cambiarPaginaPendientes = function (direccion) {
+  const totalPaginas = Math.max(1, Math.ceil(pendientesGlobal.length / LIMITE_PAGINA));
+  paginaPendientes = Math.min(totalPaginas, Math.max(1, paginaPendientes + direccion));
   renderPendientes();
-}
+};
 
 function formatDate(value) {
   if (!value) return '-';
@@ -793,6 +820,18 @@ async function exportarReporteEmpresa() {
     });
 }
 
+window.abrirPreviewEmpresa = function (id, nombre) {
+  previewDocumento(id, nombre, {
+    onDeleted: async () => {
+      await cargarDocumentosRequeridosEmpresa();
+      loadDocumentosEmpresa();
+      actualizarBarrasProgresoEmpresa();
+      invalidarCacheActividadEmpresa();
+      if (typeof cargarPendientesEmpresa === 'function') cargarPendientesEmpresa(empresaId);
+    }
+  });
+};
+
 window.descargarDocumento = async function (id, nombreArchivo) {
   if (!id) {
     return alert('No se encontró el documento para descargar.');
@@ -827,10 +866,38 @@ window.descargarDocumento = async function (id, nombreArchivo) {
 };
 
 // ==============================
+// ACTIVIDAD RECIENTE (EMPRESA)
+// ==============================
+function invalidarCacheActividadEmpresa() {
+  actividadWidget?.invalidarYRecargar();
+}
+
+function initActividadEmpresa() {
+  if (!window.ActividadReciente || !empresaId) return;
+  actividadWidget = ActividadReciente.crearWidget({
+    timelineId: 'timelineEmpresa',
+    paginacionId: 'paginacionActividadEmpresa',
+    limite: 7,
+    buildUrl: (limit) => `http://localhost:3000/api/auditoria?limit=${limit}&offset=0&empresa_id=${empresaId}`,
+    mensajeVacio: 'Sin actividad registrada para esta empresa'
+  });
+  actividadWidget.init();
+}
+
+// ==============================
 // INIT
 // ==============================
 document.addEventListener('DOMContentLoaded', async () => {
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-descargar-doc');
+    if (!btn) return;
+    const id = btn.dataset.descargarId;
+    const nombre = decodeURIComponent(btn.dataset.descargarNombre || 'Documento');
+    descargarDocumento(id, nombre);
+  });
+
   await cargarEmpresaDetalle();
   await cargarPendientesEmpresa(empresaId);
+  initActividadEmpresa();
 });
 

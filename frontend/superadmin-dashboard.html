@@ -45,7 +45,6 @@
             <i data-lucide="search" class="icon"></i>
             <input type="text" placeholder="Buscar...">
           </div>
-          <button class="btn btn-secondary">Exportar</button>
           <button class="btn btn-danger" onclick="logout()">Cerrar sesión</button>
           <button id="btnAbrirModal" type="button" class="btn btn-primary">Crear usuario</button>
 
@@ -92,7 +91,7 @@
           </div>
         </div>
 
-        <div class="kpi-grid">
+        <div class="kpi-grid kpi-grid-3">
           <div class="kpi-card">
             <div class="kpi-icon"><i data-lucide="users" class="icon"></i></div>
             <div class="kpi-value" id="kpiUsuarios">-</div>
@@ -178,19 +177,20 @@
           </div>
         </div>
 
-        <div class="grid-2" style="margin-top:18px;">
-          <div class="card">
+        <div class="grid-2 grid-salud-row" style="margin-top:18px;">
+          <div class="card card-salud" id="cardSaludSistema">
             <div class="card-header">
               <div>
                 <div class="card-title">Salud del sistema</div>
-                <div class="card-subtitle">Estados clave de infraestructura y seguridad.</div>
+                <div class="card-subtitle">Cumplimiento SG-SST por categorías asignadas.</div>
               </div>
-              <span class="badge badge-success">Operativo</span>
+              <span class="badge badge-info" id="badgeSaludGlobal">-</span>
             </div>
-            <div class="list" id="listaSaludSistema">
-              <div class="list-item"><span>Autenticación y SSO</span><span class="badge badge-success">OK</span></div>
-              <div class="list-item"><span>Alertas y notificaciones</span><span class="badge badge-warning">Retrasos leves</span></div>
-              <div class="list-item"><span>Integraciones externas</span><span class="badge badge-info">Revisión programada</span></div>
+            <div class="salud-panel">
+              <div class="salud-nav" id="saludNav" hidden></div>
+              <div class="sections-grid salud-grid" id="listaSaludSistema">
+                <p class="salud-empty">Cargando...</p>
+              </div>
             </div>
           </div>
 
@@ -319,7 +319,7 @@
             <button class="btn btn-secondary">Ver todo</button>
           </div>
           <div class="timeline" id="timelineSuperAdmin"></div>
-          <div id="paginacionActividadReciente" class="paginacion" style="margin-top:12px; display:flex; gap:8px; align-items:center;"></div>
+          <div id="paginacionActividadReciente" class="paginacion"></div>
         </div>
       </div>
     </div>
@@ -327,6 +327,8 @@
 
 
   <script src="Js/Auth.js"></script>
+  <script src="Js/SgsstStructure.js"></script>
+  <script src="Js/ActividadReciente.js"></script>
   <script src="Js/Super_Admin.js"></script>
   <script src="Js/Sidebar.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>

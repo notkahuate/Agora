@@ -3,18 +3,10 @@
 // ==============================
 const token = window.Auth ? window.Auth.getToken() : localStorage.getItem('token');
 let paginaHistorial = 1;
-const limiteHistorial = 5;
+const limiteHistorial = 7;
 let historialGlobal = [];
 let auditorMapHistorial = new Map();
-
-let actividadPagina = 1;
-const limiteActividad = 5;
-let actividadTotal = 0;
-let actividadGlobal = [];
-let actividadCargando = false;
-let actividadInicializada = false;
-const ACTIVIDAD_FETCH_LIMIT = 100;
-let empresaMapActividad = {};
+let actividadWidget = null;
 
 function obtenerNombreValidador(documento) {
   if (!documento) return 'No disponible';
@@ -138,8 +130,7 @@ function reuploadRejectedDocument(tipoDocumentoId, nombre, docId = null) {
 
 document.addEventListener('DOMContentLoaded', () => {
   loadDocumentos();
-  cargarActividadReciente(1, true);
-  window.actividadRecienteInterval = setInterval(refrescarActividadSilenciosa, 15000);
+  initActividadUsuario();
 });
 
 async function loadDocumentos() {
@@ -283,7 +274,7 @@ async function loadDocumentos() {
       showStatus('No tienes documentos pendientes asignados.');
     }
 
-    refrescarActividadSilenciosa();
+    actividadWidget?.refrescarSilenciosa();
   } catch (error) {
     console.error('Error cargando documentos:', error);
     showStatus('No se pudo cargar los documentos. Revisa la consola.');
@@ -298,7 +289,7 @@ function renderHistorial(historial, auditorMap) {
   tablaHistorial.innerHTML = '';
 
   if (pagina.length === 0) {
-    tablaHistorial.innerHTML = '<tr><td colspan="4">No hay documentos subidos aún.</td></tr>';
+    tablaHistorial.innerHTML = '<tr><td colspan="5">No hay documentos subidos aún.</td></tr>';
   } else {
     pagina.forEach(doc => {
       const row = document.createElement('tr');
@@ -311,6 +302,9 @@ function renderHistorial(historial, auditorMap) {
         <td>${doc.fecha_subida ? new Date(doc.fecha_subida).toLocaleDateString() : '-'}</td>
         <td>${estadoBadge}</td>
         <td>${validado}</td>
+        <td>
+          <button class="btn btn-sm btn-primary" onclick="abrirPreviewUsuario('${doc.id}', '${String(doc.nombre_archivo || doc.nombre || 'Documento').replace(/'/g, "\\'")}')">Ver</button>
+        </td>
       `;
       tablaHistorial.appendChild(row);
     });
@@ -384,127 +378,31 @@ function uploadDocumentForPending(tipoDocumentoId, nombre) {
   input.click();
 }
 
-async function fetchActividadGlobal(force = false) {
-  if (!force && actividadGlobal.length) return actividadGlobal;
-  if (actividadCargando) return actividadGlobal;
-
-  actividadCargando = true;
-  try {
-    const headers = { Authorization: `Bearer ${token}` };
-    let url = `http://localhost:3000/api/auditoria?limit=${ACTIVIDAD_FETCH_LIMIT}&offset=0`;
-    if (user && user.empresa_id) {
-      url += `&empresa_id=${user.empresa_id}`;
-    }
-
-    const res = await fetch(url, { headers });
-    if (!res.ok) throw new Error('Error cargando actividad');
-    const data = await res.json();
-    actividadGlobal = data.eventos || [];
-    actividadTotal = actividadGlobal.length;
-    return actividadGlobal;
-  } finally {
-    actividadCargando = false;
-  }
-}
-
-function renderActividadPagina() {
-  const timeline = document.getElementById('timelineUsuario');
-  if (!timeline) return;
-
-  const inicio = (actividadPagina - 1) * limiteActividad;
-  const eventos = actividadGlobal.slice(inicio, inicio + limiteActividad);
-
-  if (!eventos.length) {
-    timeline.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:16px;">Sin eventos recientes</p>';
-    renderActividadPaginacion();
-    return;
-  }
-
-  timeline.innerHTML = eventos.map(evento => {
-    const fecha = new Date(evento.fecha_evento || Date.now());
-    const fechaFormato = fecha.toLocaleString('es-ES', {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    });
-    const usuario = evento.usuario_nombre || 'Sistema';
-    const titulo = evento.descripcion || `${evento.accion || 'Evento'} en ${evento.entidad || 'sistema'}`;
-    const inicial = evento.accion ? evento.accion.charAt(0).toUpperCase() : 'E';
-
-    return `
-      <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #eee;">
-        <div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#f3f4f6;color:#334155;flex-shrink:0;">${inicial}</div>
-        <div>
-          <div style="font-weight:600;">${titulo}</div>
-          <div style="color:#64748b;font-size:12px;">${usuario} • ${fechaFormato}</div>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  renderActividadPaginacion();
-}
-
-async function cargarActividadReciente(pagina = 1, forceFetch = false, silent = false) {
-  const timeline = document.getElementById('timelineUsuario');
-  if (!timeline) return;
-
-  actividadPagina = Math.max(1, parseInt(pagina) || 1);
-
-  try {
-    const needsFetch = forceFetch || !actividadGlobal.length;
-    if (needsFetch) {
-      if (!silent && !actividadInicializada) {
-        timeline.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:16px;">Cargando actividad...</p>';
-      }
-      await fetchActividadGlobal(true);
-      actividadInicializada = true;
-    }
-
-    const totalPaginas = Math.max(1, Math.ceil(actividadGlobal.length / limiteActividad));
-    actividadPagina = Math.min(actividadPagina, totalPaginas);
-    actividadTotal = actividadGlobal.length;
-    renderActividadPagina();
-  } catch (error) {
-    console.error('Error cargando actividad reciente:', error);
-    if (!actividadInicializada) {
-      timeline.innerHTML = '<p style="color:#f87171;text-align:center;padding:16px;">No se pudo cargar la actividad reciente.</p>';
-    }
-    renderActividadPaginacion();
-  }
-}
-
-async function refrescarActividadSilenciosa() {
-  if (actividadCargando) return;
-  await cargarActividadReciente(actividadPagina, true, true);
-}
-
 function invalidarCacheActividad() {
-  actividadGlobal = [];
+  actividadWidget?.invalidarYRecargar();
 }
 
-function renderActividadPaginacion() {
-  const container = document.getElementById('paginacionActividadReciente');
-  if (!container) return;
-
-  const total = actividadGlobal.length || actividadTotal;
-  const totalPaginas = Math.max(1, Math.ceil(total / limiteActividad));
-  if (total <= limiteActividad) {
-    container.innerHTML = '';
-    return;
-  }
-
-  container.innerHTML = `
-    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaActividad(-1)" ${actividadPagina === 1 ? 'disabled' : ''}>⬅ Anterior</button>
-    <span>Página ${actividadPagina} de ${totalPaginas}</span>
-    <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarPaginaActividad(1)" ${actividadPagina === totalPaginas ? 'disabled' : ''}>Siguiente ➡</button>
-  `;
+function initActividadUsuario() {
+  if (!window.ActividadReciente) return;
+  actividadWidget = ActividadReciente.crearWidget({
+    timelineId: 'timelineUsuario',
+    paginacionId: 'paginacionActividadReciente',
+    buildUrl: (limit) => {
+      let url = `http://localhost:3000/api/auditoria?limit=${limit}&offset=0`;
+      if (user?.empresa_id) url += `&empresa_id=${user.empresa_id}`;
+      return url;
+    },
+    mensajeVacio: 'Sin eventos recientes'
+  });
+  actividadWidget.init();
 }
 
-window.cambiarPaginaActividad = function (direccion) {
-  const totalPaginas = Math.max(1, Math.ceil(actividadGlobal.length / limiteActividad));
-  const nuevaPagina = Math.min(totalPaginas, Math.max(1, actividadPagina + direccion));
-  if (nuevaPagina === actividadPagina) return;
-  actividadPagina = nuevaPagina;
-  renderActividadPagina();
+window.abrirPreviewUsuario = function (id, nombre) {
+  previewDocumento(id, nombre, {
+    onDeleted: () => {
+      invalidarCacheActividad();
+      loadDocumentos();
+    }
+  });
 };
 

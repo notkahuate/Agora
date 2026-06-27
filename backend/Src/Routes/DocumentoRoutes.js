@@ -21,7 +21,7 @@ router.get('/:id', authenticate, controller.obtenerDocumento);
 router.get('/:id/descargar', authenticate, controller.descargarDocumento);
 
 router.put('/:id', authenticate, controller.actualizarDocumento);
-router.delete('/:id', authenticate, authorize('super_admin'), controller.eliminarDocumento);
+router.delete('/:id', authenticate, controller.eliminarDocumento);
 
 // endpoint extra para validar/rechazar
 router.post('/:id/validar', authenticate, authorize('auditor', 'super_admin'), controller.validarDocumento);

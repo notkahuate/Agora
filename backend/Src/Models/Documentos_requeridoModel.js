@@ -25,6 +25,7 @@ const crearDocumentoRequerido = async (data) => {
 const obtenerPorEmpresa = async (empresa_id) => {
   const result = await pool.query(
     `SELECT dr.*, td.nombre as tipo_documento,
+            td.porcentaje AS porcentaje,
             COALESCE(u.nombre, 'Sin asignar') as responsable_nombre,
             COALESCE(u.email, '') as responsable_email,
             dr_resp.usuario_id as responsable_id,
