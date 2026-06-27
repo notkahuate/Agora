@@ -58,7 +58,8 @@ function puedeEliminarDocumento(doc) {
       const docRes = await fetch(`http://localhost:3000/api/documentos/${id}`, { method: 'GET', headers });
 
       if (!docRes.ok) {
-        alert('Error al obtener el documento');
+        const errorData = await docRes.json().catch(() => ({}));
+        alert(parseError(errorData) || 'Error al obtener el documento');
         return;
       }
 

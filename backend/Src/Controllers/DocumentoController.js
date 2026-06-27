@@ -100,9 +100,10 @@ exports.obtenerDocumento = async (req, res) => {
     if (!doc) return res.status(404).json({ message: 'Documento no encontrado' });
     const requester = req.user;
     const isAdmin = requester.rol === 'super_admin';
+    const isAuditor = requester.rol === 'auditor';
     const isOwner = String(doc.usuario_id) === String(requester.id);
-    const sameEmpresa = requester.empresa_id && String(doc.empresa_id) === String(requester.empresa_id);
-    if (!isAdmin && !isOwner && !(requester.rol === 'auditor' && sameEmpresa)) {
+
+    if (!isAdmin && !isAuditor && !isOwner) {
       return res.status(403).json({ message: 'No autorizado para ver este documento' });
     }
     return res.json(doc);

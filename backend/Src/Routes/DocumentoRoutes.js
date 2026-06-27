@@ -15,10 +15,8 @@ router.get('/pendientes-validacion', authenticate, authorize('auditor', 'super_a
 router.get('/revisados-mes', authenticate, authorize('auditor', 'super_admin'), controller.contarRevisadosMes);
 
 router.get('/', authenticate, controller.listarDocumentos);
-router.get('/:id', authenticate, controller.obtenerDocumento);
-
-// endpoint para descargar archivo (antes de put/delete para evitar conflicto)
 router.get('/:id/descargar', authenticate, controller.descargarDocumento);
+router.get('/:id', authenticate, controller.obtenerDocumento);
 
 router.put('/:id', authenticate, controller.actualizarDocumento);
 router.delete('/:id', authenticate, controller.eliminarDocumento);

@@ -58,6 +58,7 @@ function estadoDocumentoBadge(estado) {
 function filaDocumentoSubido(doc) {
   const estado = estadoDocumentoBadge(doc.estado);
   const nombreArchivo = doc.nombre_archivo || 'Documento';
+  const safeName = String(nombreArchivo).replace(/'/g, "\\'");
 
   return `
     <tr>
@@ -67,6 +68,9 @@ function filaDocumentoSubido(doc) {
       <td>${doc.fecha_subida ? new Date(doc.fecha_subida).toLocaleDateString() : '-'}</td>
       <td><span class="badge ${estado.clase}">${estado.texto}</span></td>
       <td>
+        <button type="button" class="btn btn-sm btn-primary" onclick="abrirPreviewEmpresa('${doc.id}', '${safeName}')" style="margin-right:5px;">
+          Ver
+        </button>
         <button type="button" class="btn btn-sm btn-secondary btn-descargar-doc" data-descargar-id="${doc.id}" data-descargar-nombre="${encodeURIComponent(nombreArchivo)}">
           Descargar
         </button>
@@ -374,13 +378,18 @@ function renderUsuarios() {
         const contadorDocumentos = docsDelUsuario.length;
 
         const listaDocumentos = docsDelUsuario.length > 0
-          ? docsDelUsuario.map(d => `
+          ? docsDelUsuario.map(d => {
+              const safeName = String(d.nombre_archivo || d.nombre || 'Documento').replace(/'/g, "\\'");
+              return `
               <div style="font-size:12px; padding:6px; background:#f8fafc; border-radius:6px; margin:4px 0; display:flex; justify-content:space-between; align-items:center; gap:8px;">
                 <span>${d.nombre_archivo || d.nombre || 'Documento'}</span>
-                <button class="btn btn-sm btn-secondary" onclick="abrirPreviewEmpresa('${d.id}', '${String(d.nombre_archivo || d.nombre || 'Documento').replace(/'/g, "\\'")}')">Ver</button>
-                <button class="btn btn-sm btn-secondary" onclick="descargarDocumento('${d.id}', '${String(d.nombre_archivo || d.nombre || 'Documento').replace(/'/g, "\\'")}')">Descargar</button>
+                <span style="display:flex; gap:6px; flex-shrink:0;">
+                  <button type="button" class="btn btn-sm btn-primary" onclick="abrirPreviewEmpresa('${d.id}', '${safeName}')">Ver</button>
+                  <button type="button" class="btn btn-sm btn-secondary btn-descargar-doc" data-descargar-id="${d.id}" data-descargar-nombre="${encodeURIComponent(d.nombre_archivo || d.nombre || 'Documento')}">Descargar</button>
+                </span>
               </div>
-            `).join('')
+            `;
+            }).join('')
           : '<div style="font-size:12px; color:#64748b;">Sin documentos</div>';
 
         const ultimaActividad = docsDelUsuario.length > 0
@@ -397,7 +406,10 @@ function renderUsuarios() {
             <td>${u.email || '-'}</td>
             <td>${u.rol || '-'}</td>
             <td><span class="badge ${estadoUsuario === 'Activo' ? 'badge-success' : 'badge-danger'}">${estadoUsuario}</span></td>
-            <td>${contadorDocumentos}</td>
+            <td style="min-width:280px;">
+              <div style="font-size:12px; color:#64748b; margin-bottom:4px;">${contadorDocumentos} documento(s)</div>
+              ${listaDocumentos}
+            </td>
             <td>${ultimaActividad}</td>
           </tr>
         `;

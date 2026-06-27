@@ -10,6 +10,71 @@ let paginaHistorial = 1;
 const limiteHistorial = 7;
 let historialCargando = false;
 
+function cerrarToastAuditor() {
+  const toast = document.getElementById('toastAuditor');
+  if (!toast) return;
+
+  clearTimeout(mostrarToast._timer);
+  toast.classList.remove('show');
+  toast.classList.add('hidden');
+}
+
+function mostrarToast(input, tipo = 'success') {
+  const toast = document.getElementById('toastAuditor');
+  if (!toast) return;
+
+  let titulo;
+  let mensaje;
+  let type = tipo;
+
+  if (typeof input === 'object' && input !== null) {
+    titulo = input.titulo;
+    mensaje = input.mensaje || '';
+    type = input.tipo || 'success';
+  } else {
+    mensaje = String(input || '');
+  }
+
+  const presets = {
+    success: {
+      titulo: 'Operación exitosa',
+      icon: '✓',
+      accent: 'is-success'
+    },
+    error: {
+      titulo: 'No se pudo completar',
+      icon: '!',
+      accent: 'is-error'
+    }
+  };
+
+  const preset = presets[type] || presets.success;
+  const tituloFinal = titulo || preset.titulo;
+
+  toast.innerHTML = `
+    <div class="toast-card ${preset.accent}">
+      <div class="toast-accent" aria-hidden="true"></div>
+      <div class="toast-icon-wrap" aria-hidden="true">
+        <span class="toast-icon">${preset.icon}</span>
+      </div>
+      <div class="toast-content">
+        <div class="toast-title">${tituloFinal}</div>
+        <div class="toast-message">${mensaje}</div>
+      </div>
+      <button type="button" class="toast-close" aria-label="Cerrar notificación">&times;</button>
+      <div class="toast-progress" aria-hidden="true"><span></span></div>
+    </div>
+  `;
+
+  toast.querySelector('.toast-close')?.addEventListener('click', cerrarToastAuditor);
+
+  toast.classList.remove('hidden');
+  requestAnimationFrame(() => toast.classList.add('show'));
+
+  clearTimeout(mostrarToast._timer);
+  mostrarToast._timer = setTimeout(cerrarToastAuditor, 4200);
+}
+
 if (!token || !user) {
   window.location.replace('/');
 }
@@ -507,18 +572,33 @@ async function asignarDocumentosEmpresa() {
     }
 
     if (failed.length) {
-      alert(`Algunos documentos no se asignaron:\n${failed.join('\n')}`);
+      mostrarToast({
+        titulo: 'Asignación incompleta',
+        mensaje: `Algunos documentos no se asignaron: ${failed.join(', ')}`,
+        tipo: 'error'
+      });
     } else {
-      alert('Documentos asignados correctamente a la empresa.');
+      mostrarToast({
+        titulo: 'Documentos asignados',
+        mensaje: 'Los documentos se asignaron correctamente a la empresa y ya están disponibles para seguimiento.',
+        tipo: 'success'
+      });
+      cerrarModal('modalAsignarDocumentos');
     }
 
-    abrirModalAsignarDocumentos(selectedEmpresaId, selectedEmpresaNombre);
+    if (failed.length) {
+      abrirModalAsignarDocumentos(selectedEmpresaId, selectedEmpresaNombre);
+    }
     cargarEmpresas();
     cargarColaPrioritaria();
     invalidarCacheActividad();
   } catch (err) {
     console.error('Error asignando documentos a la empresa:', err);
-    alert('Error asignando documentos a la empresa. Revisa la consola o recarga la página.');
+    mostrarToast({
+      titulo: 'Error de asignación',
+      mensaje: 'No se pudieron asignar los documentos. Revisa la consola o intenta nuevamente.',
+      tipo: 'error'
+    });
   }
 }
 
@@ -564,7 +644,10 @@ async function cargarDocumentos() {
           <span class="badge badge-warning">Subido</span>
         </td>
         <td>
-          <button class="btn btn-sm btn-secondary" onclick="descargarDocumento('${doc.id}', '${doc.nombre_archivo}')" style="margin-right:5px;">
+          <button class="btn btn-sm btn-primary" onclick="abrirPreviewAuditor('${doc.id}', '${String(doc.nombre_archivo || 'documento').replace(/'/g, "\\'")}')" style="margin-right:5px;">
+            Ver
+          </button>
+          <button class="btn btn-sm btn-secondary" onclick="descargarDocumento('${doc.id}', '${String(doc.nombre_archivo || 'documento').replace(/'/g, "\\'")}')" style="margin-right:5px;">
             Descargar
           </button>
           <button class="btn btn-success btn-sm" onclick="validarDocumento('${doc.id}', 'aprobar')" style="margin-right:5px;">
@@ -657,6 +740,9 @@ function renderHistorialAuditor() {
       <td>${fecha ? new Date(fecha).toLocaleDateString() : '—'}</td>
       <td><span class="badge ${badge.clase}">${badge.texto}</span></td>
       <td>
+        <button class="btn btn-sm btn-primary" onclick="abrirPreviewAuditor('${doc.id}', '${String(doc.nombre_archivo || 'documento').replace(/'/g, "\\'")}')" style="margin-right:5px;">
+          Ver
+        </button>
         <button class="btn btn-sm btn-secondary" onclick="descargarDocumento('${doc.id}', '${String(doc.nombre_archivo || 'documento').replace(/'/g, "\\'")}')">
           Descargar
         </button>
