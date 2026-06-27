@@ -75,8 +75,8 @@ async function cargarEmpresas() {
     window.empresasData = empresas;
 
     let totalPendientesGlobal = 0;
-    let sumaCumplimiento = 0;
-    let totalEmpresas = empresas.length;
+    let totalDocsGlobal = 0;
+    let totalEnviadosGlobal = 0;
 
     tablaEmpresas.innerHTML = '';
     const empresasRiesgo = [];
@@ -113,16 +113,18 @@ async function cargarEmpresas() {
       const enviados = parseInt(resumen.enviados) || 0;
 
       const cumplimiento = totalDocs === 0
-        ? 0
+        ? null
         : Math.round((enviados / totalDocs) * 100);
 
-            // 🔥 SUMAR PARA KPI GLOBAL
-            sumaCumplimiento += cumplimiento;
+      if (totalDocs > 0) {
+        totalDocsGlobal += totalDocs;
+        totalEnviadosGlobal += enviados;
+      }
 
       // ==============================
       // 🚨 RIESGO (solo si hay pendientes reales)
       // ==============================
-      const enRiesgo = totalPendientes > 0 && cumplimiento < 70;
+      const enRiesgo = totalDocs > 0 && totalPendientes > 0 && cumplimiento < 70;
 
       if (enRiesgo) {
         empresasRiesgo.push({
@@ -147,10 +149,12 @@ async function cargarEmpresas() {
         </td>
 
         <td>
-          <div class="progress-bar">
-            <div class="progress-fill" style="width:${cumplimiento}%"></div>
-          </div>
-          <small>${cumplimiento}%</small>
+          ${cumplimiento === null
+            ? '<small>—</small>'
+            : `<div class="progress-bar">
+                <div class="progress-fill" style="width:${cumplimiento}%"></div>
+              </div>
+              <small>${cumplimiento}%</small>`}
         </td>
 
         <td>
@@ -184,9 +188,9 @@ async function cargarEmpresas() {
 
     document.getElementById('kpiPendientes').textContent = totalPendientesGlobal;
 
-    // 🔥 CUMPLIMIENTO GLOBAL
-    const promedioCumplimiento = totalEmpresas
-      ? Math.round(sumaCumplimiento / totalEmpresas)
+    // 🔥 CUMPLIMIENTO GLOBAL (solo empresas con documentos asignados)
+    const promedioCumplimiento = totalDocsGlobal
+      ? Math.round((totalEnviadosGlobal / totalDocsGlobal) * 100)
       : 0;
 
     document.getElementById('kpiCumplimiento').textContent = `${promedioCumplimiento}%`;
@@ -563,9 +567,6 @@ async function cargarDocumentos() {
           <button class="btn btn-sm btn-secondary" onclick="descargarDocumento('${doc.id}', '${doc.nombre_archivo}')" style="margin-right:5px;">
             Descargar
           </button>
-          <button class="btn btn-sm btn-primary" onclick="abrirPreviewAuditor('${doc.id}', '${String(doc.nombre_archivo || 'documento').replace(/'/g, "\\'")}')" style="margin-right:5px;">
-            Ver
-          </button>
           <button class="btn btn-success btn-sm" onclick="validarDocumento('${doc.id}', 'aprobar')" style="margin-right:5px;">
             Aprobar
           </button>
@@ -656,9 +657,6 @@ function renderHistorialAuditor() {
       <td>${fecha ? new Date(fecha).toLocaleDateString() : '—'}</td>
       <td><span class="badge ${badge.clase}">${badge.texto}</span></td>
       <td>
-        <button class="btn btn-sm btn-primary" onclick="abrirPreviewAuditor('${doc.id}', '${String(doc.nombre_archivo || 'documento').replace(/'/g, "\\'")}')" style="margin-right:5px;">
-          Ver
-        </button>
         <button class="btn btn-sm btn-secondary" onclick="descargarDocumento('${doc.id}', '${String(doc.nombre_archivo || 'documento').replace(/'/g, "\\'")}')">
           Descargar
         </button>

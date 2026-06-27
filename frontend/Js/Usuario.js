@@ -20,8 +20,21 @@ function obtenerNombreValidador(documento) {
   return 'No disponible';
 }
 
+function obtenerEstadoAsignado(documento) {
+  return String(documento.estado_documento || documento.estado || documento.status || 'pendiente').toLowerCase();
+}
+
+function esDocumentoAprobado(documento) {
+  return ['validado', 'revisado', 'aprobado'].includes(obtenerEstadoAsignado(documento));
+}
+
+function esDocumentoPendienteAccion(documento) {
+  const estado = obtenerEstadoAsignado(documento);
+  return estado === 'pendiente' || estado === 'rechazado';
+}
+
 function obtenerEstadoDocumentoVisual(documento) {
-  const estado = String(documento.estado_documento || documento.estado || documento.status || 'pendiente').toLowerCase();
+  const estado = obtenerEstadoAsignado(documento);
   if (['validado', 'revisado', 'aprobado'].includes(estado)) {
     return { clase: 'badge-success', texto: 'Validado' };
   }
@@ -74,58 +87,16 @@ function showStatus(text) {
 }
 
 function uploadDocument(docType) {
-  if (!authUser) return;
+  if (!user) return;
   const tipoId = prompt('Ingresa el ID del tipo de documento:');
   if (!tipoId) return;
-  uploadDocumentGeneric(tipoId, `Carga desde UI: ${docType || 'manual'}`, null);
-}
-
-function uploadDocumentGeneric(tipoDocumentoId, comentarios, reemplazaId = null) {
-  if (!authUser) return;
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.pdf,.doc,.docx,.jpg,.png,.xls,.xlsx';
-
-  input.onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    try {
-      const formData = new FormData();
-      formData.append('archivo', file);
-      formData.append('tipo_documento_id', tipoDocumentoId);
-      formData.append('comentarios', comentarios || 'Subido desde UI');
-      if (reemplazaId) formData.append('reemplaza_id', reemplazaId);
-
-      const response = await fetch('http://localhost:3000/api/documentos', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        alert(data.message || 'Error al subir documento');
-        return;
-      }
-
-      alert(`Documento "${file.name}" subido exitosamente. Queda en revisión.`);
-      loadDocumentos();
-    } catch (error) {
-      console.error('Error al subir documento:', error);
-      alert('Error al subir documento');
-    }
-  };
-
-  input.click();
+  uploadDocumentForPending(tipoId, docType || 'manual');
 }
 
 function reuploadRejectedDocument(tipoDocumentoId, nombre, docId = null) {
   const confirmar = confirm('Este documento fue rechazado. ¿Deseas volver a subirlo ahora?');
   if (!confirmar) return;
-  uploadDocumentGeneric(tipoDocumentoId, `Re-subido tras rechazo: ${nombre}`, docId);
+  uploadDocumentForPending(tipoDocumentoId, nombre, docId);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -181,8 +152,10 @@ async function loadDocumentos() {
     // Start with assigned pendientes (include rejected)
     const pendientesMap = new Map();
     asignados.forEach(doc => {
-      if (doc.estado === 'pendiente' || doc.estado === 'rechazado') {
-        pendientesMap.set(doc.tipo_documento_id || doc.id, Object.assign({}, doc));
+      if (esDocumentoPendienteAccion(doc)) {
+        pendientesMap.set(doc.tipo_documento_id || doc.id, Object.assign({}, doc, {
+          id: doc.documento_subido_id || doc.id
+        }));
       }
     });
 
@@ -218,16 +191,51 @@ async function loadDocumentos() {
     });
 
     const pendientes = Array.from(pendientesMap.values());
-    const completados = asignados.filter(doc => doc.estado === 'subido');
+    const completados = asignados.filter(esDocumentoAprobado);
+    const enRevision = asignados.filter(doc => obtenerEstadoAsignado(doc) === 'subido');
     const total = asignados.length;
-    const progreso = total > 0 ? (completados.length / total) * 100 : 0;
+    const progreso = total > 0 ? Math.round((completados.length / total) * 100) : 0;
 
     document.getElementById('kpiPendientes').textContent = pendientes.length;
     document.getElementById('kpiCompletados').textContent = completados.length;
-    document.getElementById('kpiProgreso').textContent = Math.round(progreso) + '%';
+    document.getElementById('kpiProgreso').textContent = progreso + '%';
     document.getElementById('progressFill').style.width = progreso + '%';
-    document.getElementById('progressDetalle').textContent = `${completados.length} de ${total} documentos completados`;
+
+    let detalleProgreso = total > 0
+      ? `${completados.length} de ${total} documentos aprobados`
+      : 'Sin documentos asignados';
+    if (enRevision.length > 0) {
+      detalleProgreso += ` (${enRevision.length} en revisión)`;
+    }
+    document.getElementById('progressDetalle').textContent = detalleProgreso;
+
+    const kpiProgresoDetalle = document.getElementById('kpiProgresoDetalle');
+    if (kpiProgresoDetalle) {
+      kpiProgresoDetalle.textContent = progreso >= 100
+        ? 'Cumplimiento completo'
+        : progreso >= 80
+        ? 'Buen avance'
+        : progreso > 0
+        ? 'En progreso'
+        : 'Sin avance';
+    }
+
+    const kpiPendientesDetalle = document.getElementById('kpiPendientesDetalle');
+    if (kpiPendientesDetalle) {
+      kpiPendientesDetalle.textContent = pendientes.length === 0
+        ? 'Al día'
+        : `${pendientes.length} por gestionar`;
+    }
+
     document.getElementById('badgePendientes').textContent = pendientes.length;
+
+    const alertPendientes = document.getElementById('alertPendientes');
+    if (alertPendientes) {
+      alertPendientes.style.display = pendientes.length > 0 ? '' : 'none';
+      if (pendientes.length > 0) {
+        alertPendientes.innerHTML = `<strong>Atención:</strong> Tienes ${pendientes.length} documento(s) pendiente(s) por gestionar.`;
+      }
+    }
 
     const tablaPendientes = document.getElementById('tablaPendientes');
     tablaPendientes.innerHTML = '';
@@ -240,10 +248,14 @@ async function loadDocumentos() {
         const safeName = (doc.nombre || '').replace(/'/g, "\\'");
         const prioridadBadge = `<span class="badge badge-${doc.prioridad === 'alta' ? 'danger' : doc.prioridad === 'media' ? 'warning' : 'info'}">${doc.prioridad}</span>`;
         const fechaLimite = new Date(doc.fecha_limite).toLocaleDateString();
-        const estadoInfo = obtenerEstadoDocumentoVisual(doc);
+        const estadoRaw = String(doc.estado_documento || doc.estado || 'pendiente').toLowerCase();
+        const estadoInfo = estadoRaw === 'rechazado'
+          ? { clase: 'badge-danger', texto: 'Rechazado' }
+          : obtenerEstadoDocumentoVisual(doc);
         const estadoBadge = `<span class="badge ${estadoInfo.clase}">${estadoInfo.texto}</span>`;
+        const docSubidoId = doc.documento_subido_id || doc.id || null;
         const actionButton = estadoInfo.texto === 'Rechazado'
-          ? `<button class="btn btn-sm btn-secondary" onclick="reuploadRejectedDocument(${doc.tipo_documento_id}, '${safeName}', ${doc.id || null})">Volver a subir</button>`
+          ? `<button class="btn btn-sm btn-secondary" onclick="reuploadRejectedDocument(${doc.tipo_documento_id}, '${safeName}', ${docSubidoId || 'null'})">Volver a subir</button>`
           : `<button class="btn btn-sm btn-primary" onclick="uploadDocumentForPending(${doc.tipo_documento_id}, '${safeName}')">Subir</button>`;
 
         row.innerHTML = `
@@ -338,7 +350,9 @@ window.cambiarPaginaHistorial = function (direccion) {
   renderHistorial(historialGlobal, auditorMapHistorial);
 };
 
-function uploadDocumentForPending(tipoDocumentoId, nombre) {
+function uploadDocumentForPending(tipoDocumentoId, nombre, reemplazaId = null) {
+  if (!user) return;
+
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.pdf,.doc,.docx,.jpg,.png,.xls,.xlsx';
@@ -351,7 +365,10 @@ function uploadDocumentForPending(tipoDocumentoId, nombre) {
       const formData = new FormData();
       formData.append('archivo', file);
       formData.append('tipo_documento_id', tipoDocumentoId);
-      formData.append('comentarios', `Subido desde dashboard usuario`);
+      formData.append(
+        'comentarios',
+        reemplazaId ? `Re-subido tras rechazo: ${nombre}` : 'Subido desde dashboard usuario'
+      );
 
       const response = await fetch('http://localhost:3000/api/documentos', {
         method: 'POST',
@@ -396,6 +413,9 @@ function initActividadUsuario() {
   });
   actividadWidget.init();
 }
+
+window.reuploadRejectedDocument = reuploadRejectedDocument;
+window.uploadDocumentForPending = uploadDocumentForPending;
 
 window.abrirPreviewUsuario = function (id, nombre) {
   previewDocumento(id, nombre, {

@@ -4,17 +4,13 @@
       'dashboard': { type: 'scroll', selector: '#sectionDashboard' },
       'cola de revision': { type: 'scroll', selector: '#sectionColaRevision' },
       'empresas': { type: 'tab', selector: '#tab-empresas' },
-      'reportes': { type: 'tab', selector: '#tab-historial' },
-      'guias y politicas': { type: 'scroll', selector: '#sectionGuiasPoliticas' }
+      'reportes': { type: 'tab', selector: '#tab-historial' }
     },
     'superadmin-dashboard.html': {
       'dashboard': { type: 'scroll', selector: '#sectionDashboard' },
-      'empresas': { type: 'scroll', selector: '#sectionEmpresas' },
       'usuarios': { type: 'tab', selector: '#tab-usuarios' },
       'documentos': { type: 'tab', selector: '#tab-documentos' },
-      'auditoria': { type: 'scroll', selector: '#sectionAuditoria' },
-      'politicas y roles': { type: 'scroll', selector: '#sectionPoliticasRoles' },
-      'integraciones': { type: 'scroll', selector: '#sectionIntegraciones' }
+      'auditoria': { type: 'scroll', selector: '#sectionAuditoria' }
     },
     'usuario-dashboard.html': {
       'inicio': { type: 'scroll', selector: '#sectionInicio' },

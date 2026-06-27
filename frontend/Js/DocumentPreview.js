@@ -7,9 +7,15 @@
     return window.Auth ? window.Auth.parseApiError(data) : (data?.message || 'Error desconocido');
   }
 
-  function puedeEliminarDocumento() {
+function puedeEliminarDocumento(doc) {
     const user = window.Auth ? window.Auth.getUser() : null;
-    return user && ['super_admin', 'auditor', 'usuario'].includes(user.rol);
+    if (!user) return false;
+    if (['super_admin', 'auditor'].includes(user.rol)) return true;
+    if (user.rol === 'usuario') {
+      const estado = String(doc?.estado || '').toLowerCase();
+      return !['validado', 'revisado', 'aprobado'].includes(estado);
+    }
+    return false;
   }
 
   function cerrarModal(modal, previewUrl) {
@@ -149,7 +155,7 @@
 
       acciones.appendChild(btnDescargar);
 
-      if (puedeEliminarDocumento()) {
+      if (puedeEliminarDocumento(doc)) {
         const btnEliminar = document.createElement('button');
         btnEliminar.className = 'btn btn-danger';
         btnEliminar.textContent = 'Eliminar';

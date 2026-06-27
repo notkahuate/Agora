@@ -20,7 +20,8 @@ const saludState = {
   documentos: [],
   resultado: null,
   vista: 'categorias',
-  categoriaId: null
+  categoriaId: null,
+  lastRenderKey: null
 };
 
 console.log("USER:", user);
@@ -312,6 +313,12 @@ window.switchTab = function (tabName, evt) {
   }
 };
 
+function actualizarVistaCola(cantidad) {
+  const grid = document.getElementById('gridSaludRow');
+  if (!grid) return;
+  grid.classList.toggle('is-cola-vacia', cantidad === 0);
+}
+
 async function cargarColaRevision() {
   try {
     const headers = {
@@ -328,8 +335,7 @@ async function cargarColaRevision() {
 
     tabla.innerHTML = '';
     badge.textContent = unassigned.length;
-
-    console.log("COLA PENDIENTES SIN ASIGNAR:", unassigned);
+    actualizarVistaCola(unassigned.length);
 
     unassigned.forEach(doc => {
       const sla = formatearSLA(doc.fecha_limite);
@@ -387,7 +393,23 @@ function aplicarSaludDesdeCache() {
     ? `${porcentajeEmpresa}%`
     : '0%';
 
-  renderSaludSistema();
+  renderSaludSistema({ animate: false });
+}
+
+function getSaludRenderKey(contenido) {
+  const { documentos, resultado, vista, categoriaId } = saludState;
+  return JSON.stringify({
+    vista,
+    categoriaId,
+    docCount: documentos.length,
+    contenido,
+    resultado: resultado ? {
+      porcentajeEmpresa: resultado.porcentajeEmpresa,
+      esAsignacionTotalCompleta: resultado.esAsignacionTotalCompleta,
+      porSeccion: resultado.porSeccion,
+      porSubseccion: resultado.porSubseccion
+    } : null
+  });
 }
 
 function estadoCumplimiento(porcentaje) {
@@ -518,14 +540,19 @@ function renderSaludSubcategorias(porSubseccion, categoriaId) {
   }).join('');
 }
 
-function renderSaludSistema() {
+function renderSaludSistema({ animate = false, force = false } = {}) {
   const container = document.getElementById('listaSaludSistema');
   const badgeGlobal = document.getElementById('badgeSaludGlobal');
   if (!container || !window.SgsstStructure) return;
 
   const { documentos, resultado } = saludState;
   if (!resultado) {
-    container.innerHTML = '<p class="salud-empty">No hay datos de cumplimiento.</p>';
+    const emptyMsg = '<p class="salud-empty">No hay datos de cumplimiento.</p>';
+    const emptyKey = getSaludRenderKey(emptyMsg);
+    if (!force && saludState.lastRenderKey === emptyKey) return;
+    saludState.lastRenderKey = emptyKey;
+    container.classList.remove('is-entering');
+    container.innerHTML = emptyMsg;
     renderSaludNav();
     return;
   }
@@ -550,9 +577,15 @@ function renderSaludSistema() {
     ? renderSaludSubcategorias(porSubseccion, saludState.categoriaId)
     : renderSaludCategorias(porSeccion);
 
+  const renderKey = getSaludRenderKey(contenido);
+  if (!force && saludState.lastRenderKey === renderKey) return;
+  saludState.lastRenderKey = renderKey;
+
   container.classList.remove('is-entering');
-  void container.offsetWidth;
-  container.classList.add('is-entering');
+  if (animate) {
+    void container.offsetWidth;
+    container.classList.add('is-entering');
+  }
   container.innerHTML = contenido;
 }
 
@@ -560,13 +593,15 @@ function saludIrAtras() {
   if (saludState.vista === 'categorias') return;
   saludState.vista = 'categorias';
   saludState.categoriaId = null;
-  renderSaludSistema();
+  saludState.lastRenderKey = null;
+  renderSaludSistema({ animate: true });
 }
 
 function saludAbrirCategoria(categoriaId) {
   saludState.vista = 'subcategorias';
   saludState.categoriaId = categoriaId;
-  renderSaludSistema();
+  saludState.lastRenderKey = null;
+  renderSaludSistema({ animate: true });
 }
 
 function initSaludNavegacion() {
@@ -607,6 +642,7 @@ async function cargarDocumentos() {
     );
 
     const documentos = await res.json();
+    if (JSON.stringify(documentosGlobal) === JSON.stringify(documentos)) return;
 
     documentosGlobal = documentos;
     paginaDocumentos = 1;
@@ -616,6 +652,7 @@ async function cargarDocumentos() {
     renderDocumentos();
     renderUsuarios();
     actualizarBarrasProgreso();
+    saludState.lastRenderKey = null;
     aplicarSaludDesdeCache();
 
   } catch (error) {

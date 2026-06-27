@@ -7,7 +7,12 @@
 
 /* ── Salud del sistema: layout responsive ── */
 .grid-salud-row {
+  grid-template-columns: 1fr;
   align-items: start;
+}
+
+.grid-salud-row.is-cola-vacia #sectionAuditoria {
+  display: none;
 }
 
 #cardSaludSistema {
@@ -78,10 +83,9 @@
   }
 }
 
-/* Portátil: salud a ancho completo para que las cards respiren */
-@media (max-width: 1280px) {
-  .grid-salud-row {
-    grid-template-columns: 1fr;
+@container salud-card (min-width: 821px) {
+  .salud-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
   }
 }
 

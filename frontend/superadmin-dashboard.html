@@ -25,13 +25,9 @@
       <div class="nav">
         <div class="nav-section">Panel</div>
         <div class="nav-item is-active">Dashboard</div>
-        <div class="nav-item">Empresas</div>
         <div class="nav-item">Usuarios</div>
         <div class="nav-item">Documentos</div>
         <div class="nav-item">Auditoría</div>
-        <div class="nav-section">Configuración</div>
-        <div class="nav-item">Políticas y roles</div>
-        <div class="nav-item">Integraciones</div>
       </div>
     </aside>
 
@@ -164,20 +160,7 @@
           </div>
         </div>
 
-        <div class="card" id="sectionEmpresas" style="margin-top:18px;">
-          <div class="card-header">
-            <div>
-              <div class="card-title">Empresas</div>
-              <div class="card-subtitle">Gestión de las empresas registradas.</div>
-            </div>
-          </div>
-          <div class="card-body">
-            <p>Esta sección muestra las empresas registradas en el sistema y su estado general.</p>
-            <p>Pronto estará disponible la lista completa de empresas con detalles de auditoría.</p>
-          </div>
-        </div>
-
-        <div class="grid-2 grid-salud-row" style="margin-top:18px;">
+        <div class="grid-2 grid-salud-row is-cola-vacia" id="gridSaludRow" style="margin-top:18px;">
           <div class="card card-salud" id="cardSaludSistema">
             <div class="card-header">
               <div>
@@ -202,7 +185,7 @@
               </div>
               <span class="badge badge-warning" id="badgeColaRevision">-</span>
             </div>
-            <div class="table-container">
+            <div class="table-container" id="colaTableWrap">
               <table>
                 <thead>
                   <tr>
@@ -225,7 +208,6 @@
             <div class="pill-tabs">
               <button class="pill is-active" onclick="switchTab('usuarios', event)">Usuarios</button>
               <button class="pill" onclick="switchTab('documentos', event)">Documentos</button>
-              <button class="pill" onclick="switchTab('historial', event)">Historial</button>
             </div>
           </div>
 
@@ -264,49 +246,6 @@
               </table>
               <div id="paginacionDocumentos" class="paginacion"></div>
             </div>
-          </div>
-
-          <div id="tab-historial" class="tab-content">
-            <div class="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Documento</th>
-                    <th>Usuario</th>
-                    <th>Fecha</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody id="tablaHistorial"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <div class="card" id="sectionPoliticasRoles" style="margin-top:18px;">
-          <div class="card-header">
-            <div>
-              <div class="card-title">Políticas y roles</div>
-              <div class="card-subtitle">Define permisos y políticas internas.</div>
-            </div>
-          </div>
-          <div class="card-body">
-            <p>Administra los roles de usuario y políticas del sistema desde aquí.</p>
-            <p>Las políticas se pueden revisar y ajustar dentro de la siguiente versión.</p>
-          </div>
-        </div>
-
-        <div class="card" id="sectionIntegraciones" style="margin-top:18px;">
-          <div class="card-header">
-            <div>
-              <div class="card-title">Integraciones</div>
-              <div class="card-subtitle">Conecta sistemas externos y servicios.</div>
-            </div>
-          </div>
-          <div class="card-body">
-            <p>Esta sección muestra el estado de las integraciones y conectores externos.</p>
           </div>
         </div>
 

@@ -175,6 +175,13 @@ exports.eliminarDocumento = async (req, res) => {
     const isAuditor = requester && requester.rol === 'auditor';
     const isOwner = requester && String(doc.usuario_id) === String(requester.id);
 
+    if (isOwner && requester.rol === 'usuario') {
+      const estado = String(doc.estado || '').toLowerCase();
+      if (['validado', 'revisado', 'aprobado'].includes(estado)) {
+        return res.status(403).json({ message: 'No se puede eliminar un documento validado' });
+      }
+    }
+
     if (!isAdmin && !isAuditor && !isOwner) {
       return res.status(403).json({ message: 'No autorizado para eliminar este documento' });
     }

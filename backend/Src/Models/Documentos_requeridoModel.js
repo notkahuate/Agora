@@ -147,14 +147,21 @@ const obtenerAsignadosPorUsuario = async (usuario_id) => {
       td.porcentaje AS porcentaje,
       COALESCE(u.nombre, 'Sin asignar') as responsable_nombre,
       COALESCE(u.email, '') as responsable_email,
-      CASE WHEN ds.id IS NOT NULL THEN 'subido' ELSE 'pendiente' END as estado
+      ds.id AS documento_subido_id,
+      COALESCE(ds.estado, 'pendiente') AS estado
     FROM documentos_requeridos dr
     JOIN tipos_documentos td ON td.id = dr.tipo_documento_id
-    LEFT JOIN documentos_subidos ds 
-      ON ds.tipo_documento_id = dr.tipo_documento_id
-      AND ds.empresa_id = dr.empresa_id
     JOIN documento_responsables dr_resp ON dr.id = dr_resp.documento_requerido_id
     JOIN usuarios u ON dr_resp.usuario_id = u.id
+    LEFT JOIN LATERAL (
+      SELECT ds2.id, ds2.estado
+      FROM documentos_subidos ds2
+      WHERE ds2.tipo_documento_id = dr.tipo_documento_id
+        AND ds2.empresa_id = dr.empresa_id
+        AND ds2.usuario_id = dr_resp.usuario_id
+      ORDER BY ds2.fecha_subida DESC NULLS LAST, ds2.id DESC
+      LIMIT 1
+    ) ds ON true
     WHERE dr_resp.usuario_id = $1
     ORDER BY dr.fecha_limite ASC
     `,
