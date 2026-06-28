@@ -4,13 +4,19 @@ const auditoria = require('../Helpers/auditoriaHelper');
 
 const crearEmpresa = async (req, res) => {
   try {
-    const { nombre, rut, sector, ubicacion, email, telefono, activa } = req.body;
+    const { nombre, nit, rut, sector, ubicacion, email, telefono, activa } = req.body;
+    const nitValue = nit || rut;
 
-    if (!nombre || !rut) {
-      return res.status(400).json({ message: 'nombre y rut son obligatorios' });
+    if (!nombre || !nitValue) {
+      return res.status(400).json({ message: 'nombre y nit son obligatorios' });
     }
 
-    const nueva = await Empresa.createEmpresa({ nombre, rut, sector, ubicacion, email, telefono, activa });
+    const nitRegex = /^\d{6,10}-\d$/;
+    if (!nitRegex.test(nitValue)) {
+      return res.status(400).json({ message: 'El nit debe tener formato 123456789-0' });
+    }
+
+    const nueva = await Empresa.createEmpresa({ nombre, rut: nitValue, sector, ubicacion, email, telefono, activa });
     // registrar en auditoria
     try {
       await auditoria.registrar({
@@ -29,7 +35,7 @@ const crearEmpresa = async (req, res) => {
   } catch (err) {
     // Manejo de errores comunes: unique constraint
     if (err.code === '23505') { // unique_violation
-      return res.status(409).json({ message: 'Ya existe una empresa con el mismo nombre o rut', detail: err.detail });
+      return res.status(409).json({ message: 'Ya existe una empresa con el mismo nombre o nit', detail: err.detail });
     }
     console.error(err);
     return res.status(500).json({ message: 'Error interno del servidor', error: err.message });

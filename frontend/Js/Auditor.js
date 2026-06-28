@@ -318,24 +318,52 @@ function cerrarModal(modalId) {
 function abrirModalCrearEmpresa() {
   selectedEmpresaId = null;
   document.getElementById('empresaNombre').value = '';
-  document.getElementById('empresaRut').value = '';
+  document.getElementById('empresaNit').value = '';
   document.getElementById('empresaSector').value = '';
   document.getElementById('empresaUbicacion').value = '';
   document.getElementById('empresaEmail').value = '';
   document.getElementById('empresaTelefono').value = '';
   document.getElementById('modalCrearEmpresa').style.display = 'flex';
+  setTimeout(() => {
+    const nitInput = document.getElementById('empresaNit');
+    if (nitInput) {
+      nitInput.addEventListener('input', formatearNitInput);
+      nitInput.addEventListener('blur', formatearNitInput);
+    }
+  }, 0);
+}
+
+function formatearNitInput(event) {
+  const input = event.target;
+  let value = input.value.replace(/[^0-9]/g, '');
+
+  if (value.length > 10) {
+    value = value.slice(0, 10);
+  }
+
+  if (value.length <= 9) {
+    input.value = value;
+    return;
+  }
+
+  input.value = `${value.slice(0, 9)}-${value.slice(9, 10)}`;
 }
 
 async function crearEmpresa() {
   const nombre = document.getElementById('empresaNombre').value.trim();
-  const rut = document.getElementById('empresaRut').value.trim();
+  const nit = document.getElementById('empresaNit').value.trim();
   const sector = document.getElementById('empresaSector').value.trim();
   const ubicacion = document.getElementById('empresaUbicacion').value.trim();
   const email = document.getElementById('empresaEmail').value.trim();
   const telefono = document.getElementById('empresaTelefono').value.trim();
 
-  if (!nombre || !rut) {
-    return alert('Nombre y RUT son obligatorios.');
+  if (!nombre || !nit) {
+    return alert('Nombre y NIT son obligatorios.');
+  }
+
+  const nitRegex = /^\d{6,10}-\d$/;
+  if (!nitRegex.test(nit)) {
+    return alert('El NIT debe tener entre 6 y 10 dígitos, un guion y un dígito verificador.');
   }
 
   try {
@@ -345,7 +373,7 @@ async function crearEmpresa() {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ nombre, rut, sector, ubicacion, email, telefono })
+      body: JSON.stringify({ nombre, nit, sector, ubicacion, email, telefono })
     });
 
     if (!res.ok) {
