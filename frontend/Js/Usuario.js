@@ -63,6 +63,44 @@ function renderComentarioRechazo(doc) {
   return `<div style="margin-top:6px;font-size:12px;color:#b91c1c;"><strong>Observación:</strong> ${texto}</div>`;
 }
 
+function crearModalObservacionRechazo() {
+  if (document.getElementById('modalObservacionRechazo')) return;
+
+  const modal = document.createElement('div');
+  modal.id = 'modalObservacionRechazo';
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width:420px;">
+      <span id="cerrarModalObservacion" style="float:right;cursor:pointer;font-size:20px;">&times;</span>
+      <h3 style="margin-top:6px;">Observación de rechazo</h3>
+      <p id="modalObservacionRechazoTexto" style="margin-top:12px;line-height:1.5;color:#334155;"></p>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  const cerrar = document.getElementById('cerrarModalObservacion');
+  cerrar.addEventListener('click', cerrarModalObservacionRechazo);
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) {
+      cerrarModalObservacionRechazo();
+    }
+  });
+}
+
+function abrirModalObservacionRechazo(texto) {
+  crearModalObservacionRechazo();
+  const modal = document.getElementById('modalObservacionRechazo');
+  const contenido = document.getElementById('modalObservacionRechazoTexto');
+  if (!modal || !contenido) return;
+  contenido.innerHTML = escaparTexto(texto || 'No se registró una observación.');
+  modal.style.display = 'block';
+}
+
+function cerrarModalObservacionRechazo() {
+  const modal = document.getElementById('modalObservacionRechazo');
+  if (modal) modal.style.display = 'none';
+}
+
 function obtenerNombreValidadorDesdeMapa(doc, auditorMap) {
   if (!doc) return 'No disponible';
   if (doc.validado_por_nombre) return doc.validado_por_nombre;
@@ -268,8 +306,12 @@ async function loadDocumentos() {
           ? { clase: 'badge-danger', texto: 'Rechazado' }
           : obtenerEstadoDocumentoVisual(doc);
         const estadoBadge = `<span class="badge ${estadoInfo.clase}">${estadoInfo.texto}</span>`;
-        const comentarioHtml = renderComentarioRechazo(doc);
+        const comentarioHtml = '';
         const docSubidoId = doc.documento_subido_id || doc.id || null;
+        const observacionTexto = String(doc.comentarios || doc.comentario || 'No se registró una observación.').replace(/'/g, "\\'").replace(/\n/g, ' ');
+        const observacionButton = estadoInfo.texto === 'Rechazado'
+          ? `<button class="btn btn-sm btn-secondary" onclick="abrirModalObservacionRechazo('${observacionTexto}')">Ver observación</button>`
+          : '';
         const actionButton = estadoInfo.texto === 'Rechazado'
           ? `<button class="btn btn-sm btn-secondary" onclick="reuploadRejectedDocument(${doc.tipo_documento_id}, '${safeName}', ${docSubidoId || 'null'})">Volver a subir</button>`
           : `<button class="btn btn-sm btn-primary" onclick="uploadDocumentForPending(${doc.tipo_documento_id}, '${safeName}')">Subir</button>`;
@@ -280,7 +322,7 @@ async function loadDocumentos() {
           <td>${fechaLimite}</td>
           <td>${estadoBadge}${comentarioHtml}</td>
           <td>${prioridadBadge}</td>
-          <td>${actionButton}</td>
+          <td>${observacionButton ? `${observacionButton} ` : ''}${actionButton}</td>
         `;
         tablaPendientes.appendChild(row);
       });
