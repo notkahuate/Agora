@@ -139,12 +139,13 @@
           <div class="card-header">
             <div>
               <div class="card-title">Documentos y usuarios</div>
-              <div class="card-subtitle">Subidos, pendientes y responsables.</div>
+              <div class="card-subtitle">Subidos, pendientes, asignados y responsables.</div>
             </div>
             <div class="pill-tabs">
               <button class="pill is-active" data-tab="documentos-subidos" onclick="switchTab('documentos-subidos', event)">Subidos</button>
               <button class="pill" data-tab="documentos-aprobados" onclick="switchTab('documentos-aprobados', event)">Aprobados</button>
               <button class="pill" data-tab="documentos-pendientes" onclick="switchTab('documentos-pendientes', event)">Pendientes</button>
+              <button class="pill" data-tab="documentos-asignados" onclick="switchTab('documentos-asignados', event)">Asignados</button>
               <button class="pill" data-tab="usuarios-empresa" onclick="switchTab('usuarios-empresa', event)">Usuarios</button>
             </div>
           </div>
@@ -179,6 +180,29 @@
             </div>
           </div>
 
+          <div id="tab-documentos-asignados" class="tab-content">
+            <div class="asignados-panel">
+              <div class="asignados-kpis" id="kpisDocumentosAsignados"></div>
+              <div class="asignados-toolbar">
+                <div class="asignados-search-wrap">
+                  <i data-lucide="search" class="asignados-search-icon"></i>
+                  <input
+                    type="search"
+                    id="buscarDocumentosAsignados"
+                    class="asignados-search"
+                    placeholder="Buscar por documento o responsable..."
+                    autocomplete="off"
+                  />
+                </div>
+                <div class="asignados-toolbar-actions">
+                  <button type="button" class="btn btn-secondary btn-sm" id="btnExpandirAsignados">Expandir todo</button>
+                  <button type="button" class="btn btn-secondary btn-sm" id="btnColapsarAsignados">Colapsar todo</button>
+                </div>
+              </div>
+              <div id="listaDocumentosAsignados" class="asignados-sgsst-grid"></div>
+            </div>
+          </div>
+
           <div id="tab-usuarios-empresa" class="tab-content">
             <div class="table-container">
               <table>
@@ -207,6 +231,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script>lucide.createIcons();</script>
   <script src="Js/Auth.js"></script>
+  <script src="Js/SgsstStructure.js"></script>
   <script src="Js/DocumentPreview.js"></script>
   <script src="Js/ActividadReciente.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>

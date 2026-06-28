@@ -178,9 +178,11 @@ async function cargarDocumentosRequeridosEmpresa() {
     } else {
       documentosRequeridosGlobal = [];
     }
+    renderDocumentosAsignados();
   } catch (err) {
     console.error('Error cargando documentos requeridos:', err);
     documentosRequeridosGlobal = [];
+    renderDocumentosAsignados();
   }
 }
 
@@ -534,6 +536,11 @@ async function switchTab(tabName, evt) {
     renderUsuarios();
     actualizarBarrasProgresoEmpresa();
   }
+
+  if (tabName === 'documentos-asignados') {
+    await cargarDocumentosRequeridosEmpresa();
+    renderDocumentosAsignados();
+  }
 }
 
 // ==============================
@@ -617,6 +624,342 @@ window.cambiarPaginaPendientes = function (direccion) {
   paginaPendientes = Math.min(totalPaginas, Math.max(1, paginaPendientes + direccion));
   renderPendientes();
 };
+
+// ==============================
+// DOCUMENTOS ASIGNADOS (árbol SG-SST)
+// ==============================
+const COLORES_CATEGORIA_SGSST = {
+  '1': { color: '#2563eb', bg: '#eff6ff' },
+  '2': { color: '#4f46e5', bg: '#eef2ff' },
+  '3': { color: '#059669', bg: '#ecfdf5' },
+  '4': { color: '#d97706', bg: '#fffbeb' },
+  '5': { color: '#dc2626', bg: '#fef2f2' },
+  '6': { color: '#7c3aed', bg: '#f5f3ff' },
+  '7': { color: '#0891b2', bg: '#ecfeff' },
+  otros: { color: '#64748b', bg: '#f8fafc' }
+};
+
+function obtenerCodigoDocumento(nombre) {
+  const match = String(nombre || '').trim().match(/^(\d+(?:\.\d+)+)/);
+  return match ? match[1] : null;
+}
+
+function obtenerTituloDocumento(nombre) {
+  const text = String(nombre || '').trim();
+  return text.replace(/^\d+(?:\.\d+)+\s*/, '') || text;
+}
+
+function calcularStatsGrupo(documentos) {
+  const docs = Array.isArray(documentos) ? documentos : [];
+  const completados = docs.filter(esDocumentoCompletoEmpresa).length;
+  const total = docs.length;
+  const porcentaje = total ? Math.round((completados / total) * 100) : 0;
+  return { total, completados, pendientes: total - completados, porcentaje };
+}
+
+function claseEstadoDocumentoAsignado(estadoRaw) {
+  const e = String(estadoRaw || 'pendiente').toLowerCase();
+  if (['validado', 'revisado', 'aprobado'].includes(e)) return 'aprobado';
+  if (e === 'subido') return 'subido';
+  if (e === 'rechazado') return 'rechazado';
+  return 'pendiente';
+}
+
+function agruparAsignadosPorSgsst(documentos) {
+  if (!window.SgsstStructure) {
+    return { categorias: [], sinCategoria: documentos || [] };
+  }
+
+  const { SG_SST_CATEGORIAS, obtenerSubseccionSgsst } = window.SgsstStructure;
+  const docs = Array.isArray(documentos) ? documentos : [];
+  const docsUsados = new Set();
+  const categorias = [];
+
+  SG_SST_CATEGORIAS.forEach(cat => {
+    const subcategorias = [];
+
+    cat.subcategorias.forEach(sub => {
+      const docsSub = docs.filter(doc => {
+        const nombre = doc.tipo_documento || doc.nombre || '';
+        return obtenerSubseccionSgsst(nombre) === sub.id;
+      });
+
+      docsSub.forEach(d => docsUsados.add(String(d.id || d.tipo_documento_id)));
+
+      if (docsSub.length) {
+        subcategorias.push({ ...sub, documentos: docsSub, stats: calcularStatsGrupo(docsSub) });
+      }
+    });
+
+    if (subcategorias.length) {
+      const todosDocs = subcategorias.flatMap(s => s.documentos);
+      categorias.push({ ...cat, subcategorias, stats: calcularStatsGrupo(todosDocs) });
+    }
+  });
+
+  const sinCategoria = docs.filter(doc => !docsUsados.has(String(doc.id || doc.tipo_documento_id)));
+
+  return { categorias, sinCategoria };
+}
+
+function filaDocumentoAsignado(doc) {
+  const nombreCompleto = doc.tipo_documento || doc.nombre || 'Documento';
+  const codigo = obtenerCodigoDocumento(nombreCompleto);
+  const titulo = obtenerTituloDocumento(nombreCompleto);
+  const estado = estadoDocumentoBadge(doc.estado_documento || doc.estado);
+  const estadoClase = claseEstadoDocumentoAsignado(doc.estado_documento || doc.estado);
+  const prioridad = String(doc.prioridad || 'media').toLowerCase();
+  const prioridadClase = prioridad === 'alta' ? 'danger' : prioridad === 'media' ? 'warning' : 'info';
+  const fechaLimite = doc.fecha_limite
+    ? new Date(doc.fecha_limite).toLocaleDateString()
+    : '-';
+  const porcentaje = doc.porcentaje ? `${doc.porcentaje}%` : '-';
+  const docSubidoId = doc.documento_subido_id;
+  const safeName = String(nombreCompleto).replace(/'/g, "\\'");
+  const searchText = `${nombreCompleto} ${doc.responsable_nombre || ''} ${doc.responsable_email || ''}`.toLowerCase().replace(/"/g, '');
+
+  const acciones = docSubidoId
+    ? `
+      <button type="button" class="btn btn-sm btn-primary" onclick="abrirPreviewEmpresa('${docSubidoId}', '${safeName}')">Ver</button>
+      <button type="button" class="btn btn-sm btn-secondary btn-descargar-doc" data-descargar-id="${docSubidoId}" data-descargar-nombre="${encodeURIComponent(nombreCompleto)}">Descargar</button>
+    `
+    : `<span class="doc-asignado-sin-subir"><i data-lucide="clock"></i> Pendiente de subir</span>`;
+
+  return `
+    <article class="doc-asignado-card doc-asignado-card--${estadoClase}" data-search="${searchText}">
+      <div class="doc-asignado-status-bar"></div>
+      <div class="doc-asignado-content">
+        <div class="doc-asignado-header">
+          <span class="doc-asignado-icon"><i data-lucide="file-text"></i></span>
+          <div class="doc-asignado-header-main">
+            ${codigo ? `<div class="doc-asignado-codigo">${codigo}</div>` : ''}
+            <h4 class="doc-asignado-titulo">${titulo}</h4>
+          </div>
+          <span class="badge ${estado.clase}">${estado.texto}</span>
+        </div>
+        <div class="doc-asignado-detalles">
+          <span class="doc-asignado-detalle"><i data-lucide="user"></i> ${doc.responsable_nombre || 'Sin asignar'}</span>
+          <span class="doc-asignado-detalle"><i data-lucide="calendar"></i> Límite: ${fechaLimite}</span>
+          <span class="doc-asignado-detalle"><i data-lucide="percent"></i> Peso: ${porcentaje}</span>
+          <span class="doc-asignado-detalle"><i data-lucide="flag"></i> <span class="badge badge-${prioridadClase}">${doc.prioridad || 'media'}</span></span>
+        </div>
+      </div>
+      <div class="doc-asignado-acciones">${acciones}</div>
+    </article>`;
+}
+
+function renderKpisAsignados(docs) {
+  const kpis = document.getElementById('kpisDocumentosAsignados');
+  if (!kpis) return;
+
+  if (!docs.length) {
+    kpis.innerHTML = '';
+    return;
+  }
+
+  const stats = calcularStatsGrupo(docs);
+  let cumplimientoSgsst = stats.porcentaje;
+
+  if (window.SgsstStructure) {
+    const resultado = window.SgsstStructure.calcularCumplimientoSgsst(docs);
+    cumplimientoSgsst = resultado?.porcentajeEmpresa ?? stats.porcentaje;
+  }
+
+  kpis.innerHTML = `
+    <div class="asignados-kpi">
+      <div class="asignados-kpi-label">Total asignados</div>
+      <div class="asignados-kpi-value is-primary">${stats.total}</div>
+    </div>
+    <div class="asignados-kpi">
+      <div class="asignados-kpi-label">Completados</div>
+      <div class="asignados-kpi-value is-success">${stats.completados}</div>
+    </div>
+    <div class="asignados-kpi">
+      <div class="asignados-kpi-label">Pendientes</div>
+      <div class="asignados-kpi-value is-warning">${stats.pendientes}</div>
+    </div>
+    <div class="asignados-kpi">
+      <div class="asignados-kpi-label">Avance SG-SST</div>
+      <div class="asignados-kpi-value">${cumplimientoSgsst}%</div>
+    </div>`;
+}
+
+function renderResumenCategoria(stats) {
+  return `
+    <div class="asignados-mini-stats">
+      <span>${stats.completados}/${stats.total} docs</span>
+      <div class="asignados-mini-bar" title="${stats.porcentaje}% completado">
+        <div class="asignados-mini-bar-fill" style="width:${stats.porcentaje}%"></div>
+      </div>
+    </div>
+    <span class="badge badge-info">${stats.total}</span>
+    <span class="asignados-chevron"><i data-lucide="chevron-down"></i></span>`;
+}
+
+function renderBloqueSinCategoria(documentos) {
+  if (!documentos.length) return '';
+
+  const stats = calcularStatsGrupo(documentos);
+  const tema = COLORES_CATEGORIA_SGSST.otros;
+  const items = documentos.map(filaDocumentoAsignado).join('');
+
+  return `
+    <details class="asignados-categoria" style="--cat-color:${tema.color};--cat-bg:${tema.bg}">
+      <summary class="asignados-summary">
+        <span class="asignados-summary-left">
+          <span class="asignados-cat-num">+</span>
+          <span class="asignados-summary-text">
+            <strong>Otros documentos</strong>
+            <small>Sin categoría SG-SST</small>
+          </span>
+        </span>
+        <span class="asignados-summary-right">
+          ${renderResumenCategoria(stats)}
+        </span>
+      </summary>
+      <div class="asignados-categoria-body">${items}</div>
+    </details>`;
+}
+
+function renderDocumentosAsignados() {
+  const container = document.getElementById('listaDocumentosAsignados');
+  if (!container) return;
+
+  const docs = documentosRequeridosGlobal || [];
+  renderKpisAsignados(docs);
+
+  const toolbar = document.querySelector('.asignados-toolbar');
+  if (toolbar) toolbar.style.display = docs.length ? '' : 'none';
+
+  if (!docs.length) {
+    container.innerHTML = `
+      <div class="asignados-empty">
+        <div class="asignados-empty-icon"><i data-lucide="folder-open"></i></div>
+        <strong>Sin documentos asignados</strong>
+        <p>Esta empresa aún no tiene requisitos SG-SST asignados desde el panel de auditoría.</p>
+      </div>`;
+    refrescarIconosAsignados();
+    return;
+  }
+
+  const { categorias, sinCategoria } = agruparAsignadosPorSgsst(docs);
+
+  if (!categorias.length && !sinCategoria.length) {
+    container.innerHTML = `
+      <div class="asignados-empty">
+        <div class="asignados-empty-icon"><i data-lucide="search-x"></i></div>
+        <strong>No se encontraron documentos</strong>
+        <p>Hubo un problema al agrupar los documentos asignados.</p>
+      </div>`;
+    refrescarIconosAsignados();
+    return;
+  }
+
+  const htmlCategorias = categorias.map((cat, index) => {
+    const tema = COLORES_CATEGORIA_SGSST[cat.id] || COLORES_CATEGORIA_SGSST.otros;
+    const subsHtml = cat.subcategorias.map(sub => {
+      const items = sub.documentos.map(filaDocumentoAsignado).join('');
+      return `
+        <details class="asignados-subcategoria">
+          <summary class="asignados-sub-summary">
+            <span class="asignados-sub-left">
+              <span class="asignados-sub-id">${sub.id}</span>
+              <span class="asignados-sub-text">
+                <strong>${sub.nombre}</strong>
+                <small>Peso ${sub.peso}% · ${sub.stats.completados}/${sub.stats.total} completados</small>
+              </span>
+            </span>
+            <span class="asignados-summary-right">
+              ${renderResumenCategoria(sub.stats)}
+            </span>
+          </summary>
+          <div class="asignados-subcategoria-body">${items}</div>
+        </details>`;
+    }).join('');
+
+    return `
+      <details class="asignados-categoria" ${index === 0 ? 'open' : ''} style="--cat-color:${tema.color};--cat-bg:${tema.bg}">
+        <summary class="asignados-summary">
+          <span class="asignados-summary-left">
+            <span class="asignados-cat-num">${cat.id}</span>
+            <span class="asignados-summary-text">
+              <strong>${cat.nombre}</strong>
+              <small>Peso regulación ${cat.peso}% · ${cat.stats.completados}/${cat.stats.total} completados</small>
+            </span>
+          </span>
+          <span class="asignados-summary-right">
+            ${renderResumenCategoria(cat.stats)}
+          </span>
+        </summary>
+        <div class="asignados-categoria-body">${subsHtml}</div>
+      </details>`;
+  }).join('');
+
+  container.innerHTML = htmlCategorias + renderBloqueSinCategoria(sinCategoria);
+  refrescarIconosAsignados();
+  filtrarDocumentosAsignados(document.getElementById('buscarDocumentosAsignados')?.value || '');
+}
+
+function refrescarIconosAsignados() {
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
+}
+
+function filtrarDocumentosAsignados(termino) {
+  const container = document.getElementById('listaDocumentosAsignados');
+  if (!container) return;
+
+  const query = String(termino || '').trim().toLowerCase();
+  const cards = container.querySelectorAll('.doc-asignado-card');
+  let visibles = 0;
+
+  cards.forEach(card => {
+    const match = !query || (card.dataset.search || '').includes(query);
+    card.classList.toggle('is-hidden', !match);
+    if (match) visibles += 1;
+  });
+
+  container.querySelectorAll('.asignados-subcategoria').forEach(sub => {
+    const tieneVisibles = Array.from(sub.querySelectorAll('.doc-asignado-card')).some(c => !c.classList.contains('is-hidden'));
+    sub.classList.toggle('is-filtered-hidden', query.length > 0 && !tieneVisibles);
+  });
+
+  container.querySelectorAll('.asignados-categoria').forEach(cat => {
+    const tieneVisibles = Array.from(cat.querySelectorAll('.doc-asignado-card')).some(c => !c.classList.contains('is-hidden'));
+    cat.classList.toggle('is-filtered-hidden', query.length > 0 && !tieneVisibles);
+  });
+
+  let msg = container.querySelector('.asignados-no-resultados');
+  if (query && visibles === 0) {
+    if (!msg) {
+      msg = document.createElement('p');
+      msg.className = 'asignados-no-resultados';
+      container.appendChild(msg);
+    }
+    msg.textContent = `No se encontraron documentos para "${termino.trim()}".`;
+    msg.style.display = '';
+  } else if (msg) {
+    msg.style.display = 'none';
+  }
+}
+
+function initControlesAsignados() {
+  const input = document.getElementById('buscarDocumentosAsignados');
+  const btnExpandir = document.getElementById('btnExpandirAsignados');
+  const btnColapsar = document.getElementById('btnColapsarAsignados');
+  const container = document.getElementById('listaDocumentosAsignados');
+
+  input?.addEventListener('input', (e) => filtrarDocumentosAsignados(e.target.value));
+
+  btnExpandir?.addEventListener('click', () => {
+    container?.querySelectorAll('details').forEach(d => { d.open = true; });
+  });
+
+  btnColapsar?.addEventListener('click', () => {
+    container?.querySelectorAll('details').forEach(d => { d.open = false; });
+  });
+}
 
 function formatDate(value) {
   if (!value) return '-';
@@ -838,6 +1181,7 @@ window.abrirPreviewEmpresa = function (id, nombre) {
       await cargarDocumentosRequeridosEmpresa();
       loadDocumentosEmpresa();
       actualizarBarrasProgresoEmpresa();
+      renderDocumentosAsignados();
       invalidarCacheActividadEmpresa();
       if (typeof cargarPendientesEmpresa === 'function') cargarPendientesEmpresa(empresaId);
     }
@@ -911,5 +1255,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   await cargarEmpresaDetalle();
   await cargarPendientesEmpresa(empresaId);
   initActividadEmpresa();
+  initControlesAsignados();
 });
 
