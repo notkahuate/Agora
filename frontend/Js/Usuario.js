@@ -24,6 +24,15 @@ function obtenerEstadoAsignado(documento) {
   return String(documento.estado_documento || documento.estado || documento.status || 'pendiente').toLowerCase();
 }
 
+function escaparTexto(texto) {
+  return String(texto ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function esDocumentoAprobado(documento) {
   return ['validado', 'revisado', 'aprobado'].includes(obtenerEstadoAsignado(documento));
 }
@@ -45,6 +54,13 @@ function obtenerEstadoDocumentoVisual(documento) {
     return { clase: 'badge-info', texto: 'Subido' };
   }
   return { clase: 'badge-warning', texto: 'Pendiente' };
+}
+
+function renderComentarioRechazo(doc) {
+  const comentario = doc?.comentarios || doc?.comentario || '';
+  if (!comentario) return '';
+  const texto = escaparTexto(String(comentario).trim());
+  return `<div style="margin-top:6px;font-size:12px;color:#b91c1c;"><strong>Observación:</strong> ${texto}</div>`;
 }
 
 function obtenerNombreValidadorDesdeMapa(doc, auditorMap) {
@@ -177,17 +193,16 @@ async function loadDocumentos() {
 
     rejectedUploads.forEach(d => {
       const key = d.tipo_documento_id || d.id;
-      if (!pendientesMap.has(key)) {
-        pendientesMap.set(key, {
-          nombre: d.nombre_archivo || d.nombre || 'Documento rechazado',
-          frecuencia: d.frecuencia || '-',
-          fecha_limite: d.fecha_limite || d.fecha_subida || new Date().toISOString(),
-          prioridad: d.prioridad || 'media',
-          estado: 'rechazado',
-          tipo_documento_id: d.tipo_documento_id,
-          id: d.id
-        });
-      }
+      pendientesMap.set(key, {
+        nombre: d.nombre_archivo || d.nombre || 'Documento rechazado',
+        frecuencia: d.frecuencia || '-',
+        fecha_limite: d.fecha_limite || d.fecha_subida || new Date().toISOString(),
+        prioridad: d.prioridad || 'media',
+        estado: 'rechazado',
+        tipo_documento_id: d.tipo_documento_id,
+        id: d.id,
+        comentarios: d.comentarios || null
+      });
     });
 
     const pendientes = Array.from(pendientesMap.values());
@@ -253,6 +268,7 @@ async function loadDocumentos() {
           ? { clase: 'badge-danger', texto: 'Rechazado' }
           : obtenerEstadoDocumentoVisual(doc);
         const estadoBadge = `<span class="badge ${estadoInfo.clase}">${estadoInfo.texto}</span>`;
+        const comentarioHtml = renderComentarioRechazo(doc);
         const docSubidoId = doc.documento_subido_id || doc.id || null;
         const actionButton = estadoInfo.texto === 'Rechazado'
           ? `<button class="btn btn-sm btn-secondary" onclick="reuploadRejectedDocument(${doc.tipo_documento_id}, '${safeName}', ${docSubidoId || 'null'})">Volver a subir</button>`
@@ -262,7 +278,7 @@ async function loadDocumentos() {
           <td>${doc.nombre}</td>
           <td>${doc.frecuencia || '-'}</td>
           <td>${fechaLimite}</td>
-          <td>${estadoBadge}</td>
+          <td>${estadoBadge}${comentarioHtml}</td>
           <td>${prioridadBadge}</td>
           <td>${actionButton}</td>
         `;
@@ -307,12 +323,13 @@ function renderHistorial(historial, auditorMap) {
       const row = document.createElement('tr');
       const estadoInfo = obtenerEstadoDocumentoVisual(doc);
       const estadoBadge = `<span class="badge ${estadoInfo.clase}">${estadoInfo.texto}</span>`;
+      const comentarioHtml = renderComentarioRechazo(doc);
       const validado = obtenerNombreValidadorDesdeMapa(doc, auditorMap) || '—';
 
       row.innerHTML = `
         <td>${doc.nombre_archivo || doc.nombre || 'Documento'}</td>
         <td>${doc.fecha_subida ? new Date(doc.fecha_subida).toLocaleDateString() : '-'}</td>
-        <td>${estadoBadge}</td>
+        <td>${estadoBadge}${comentarioHtml}</td>
         <td>${validado}</td>
         <td>
           <button class="btn btn-sm btn-primary" onclick="abrirPreviewUsuario('${doc.id}', '${String(doc.nombre_archivo || doc.nombre || 'Documento').replace(/'/g, "\\'")}')">Ver</button>

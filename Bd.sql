@@ -59,11 +59,11 @@ CREATE TABLE documentos_subidos (
     estado document_status DEFAULT 'subido',
     validado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
     comentarios TEXT,
+    observaciones TEXT, -- Observaciones del revisor al rechazar el documento
     fecha_subida TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     fecha_validacion TIMESTAMP,
     fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE TABLE documento_responsables (
     id SERIAL PRIMARY KEY,
     documento_requerido_id INTEGER NOT NULL UNIQUE REFERENCES documentos_requeridos(id) ON DELETE CASCADE,

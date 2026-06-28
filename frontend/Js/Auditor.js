@@ -800,11 +800,18 @@ window.validarDocumento = async function(id, action) {
     };
 
     const estado = action === 'aprobar' ? 'revisado' : 'rechazado';
+    let comentarios = null;
+
+    if (action === 'rechazar') {
+      const motivo = await mostrarModalObservacion('Escribe la observación del rechazo del documento');
+      if (motivo === null) return;
+      comentarios = motivo.trim() || null;
+    }
 
     const res = await fetch(`http://localhost:3000/api/documentos/${id}/validar`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ estado })
+      body: JSON.stringify({ estado, comentarios })
     });
 
     if (res.ok) {
@@ -826,6 +833,59 @@ window.validarDocumento = async function(id, action) {
     console.error('Error validando documento:', err);
   }
 };
+
+async function mostrarModalObservacion(titulo) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.background = 'rgba(15, 23, 42, 0.6)';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.zIndex = '9999';
+
+    const modal = document.createElement('div');
+    modal.style.width = 'min(92vw, 480px)';
+    modal.style.background = '#fff';
+    modal.style.borderRadius = '16px';
+    modal.style.boxShadow = '0 16px 40px rgba(0,0,0,0.22)';
+    modal.style.padding = '24px';
+    modal.style.border = '1px solid #e2e8f0';
+
+    modal.innerHTML = `
+      <h3 style="margin:0 0 8px; color:#0f172a; font-size:20px;">${titulo}</h3>
+      <p style="margin:0 0 14px; color:#64748b; font-size:14px;">Explica brevemente por qué se rechaza este documento.</p>
+      <textarea id="observacionRechazo" rows="6" style="width:100%; box-sizing:border-box; padding:12px; border:1px solid #cbd5e1; border-radius:10px; resize:vertical; font-size:14px; outline:none;"></textarea>
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px;">
+        <button id="cancelarObservacion" class="btn btn-secondary btn-sm">Cancelar</button>
+        <button id="guardarObservacion" class="btn btn-danger btn-sm">Guardar observación</button>
+      </div>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    const textarea = modal.querySelector('#observacionRechazo');
+    const cancelarBtn = modal.querySelector('#cancelarObservacion');
+    const guardarBtn = modal.querySelector('#guardarObservacion');
+
+    const cerrar = (valor) => {
+      overlay.remove();
+      resolve(valor);
+    };
+
+    cancelarBtn.onclick = () => cerrar(null);
+    guardarBtn.onclick = () => cerrar(textarea.value);
+    overlay.onclick = (e) => {
+      if (e.target === overlay) cerrar(null);
+    };
+    textarea.focus();
+  });
+}
 
 window.descargarDocumento = async function(id, nombreArchivo) {
   try {
