@@ -7,6 +7,49 @@ const limiteHistorial = 7;
 let historialGlobal = [];
 let auditorMapHistorial = new Map();
 let actividadWidget = null;
+let ultimoEstadoDocumentos = new Map();
+let intervaloActualizacionUsuario = null;
+
+function mostrarToastUsuario({ titulo, mensaje, tipo = 'success' }) {
+  let contenedor = document.getElementById('toastUsuario');
+  if (!contenedor) {
+    contenedor = document.createElement('div');
+    contenedor.id = 'toastUsuario';
+    contenedor.className = 'toast-stack toast-stack-user hidden';
+    document.body.appendChild(contenedor);
+  }
+
+  const icono = tipo === 'error' ? '!' : '✓';
+  const accentClass = tipo === 'error' ? 'is-error' : 'is-success';
+
+  const toast = document.createElement('div');
+  toast.className = `toast-card ${accentClass}`;
+  toast.innerHTML = `
+    <div class="toast-accent" aria-hidden="true"></div>
+    <div class="toast-icon-wrap" aria-hidden="true">
+      <span class="toast-icon">${icono}</span>
+    </div>
+    <div class="toast-content">
+      <div class="toast-title">${escaparTexto(titulo)}</div>
+      <div class="toast-message">${escaparTexto(mensaje)}</div>
+    </div>
+    <button type="button" class="toast-close" aria-label="Cerrar notificación">&times;</button>
+    <div class="toast-progress" aria-hidden="true"><span></span></div>
+  `;
+
+  toast.querySelector('.toast-close')?.addEventListener('click', () => {
+    toast.remove();
+  });
+
+  contenedor.appendChild(toast);
+  contenedor.classList.remove('hidden');
+  requestAnimationFrame(() => contenedor.classList.add('show'));
+
+  setTimeout(() => {
+    toast.classList.add('is-hiding');
+    setTimeout(() => toast.remove(), 260);
+  }, 3800);
+}
 
 function obtenerNombreValidador(documento) {
   if (!documento) return 'No disponible';
@@ -54,13 +97,6 @@ function obtenerEstadoDocumentoVisual(documento) {
     return { clase: 'badge-info', texto: 'Subido' };
   }
   return { clase: 'badge-warning', texto: 'Pendiente' };
-}
-
-function renderComentarioRechazo(doc) {
-  const comentario = doc?.comentarios || doc?.comentario || '';
-  if (!comentario) return '';
-  const texto = escaparTexto(String(comentario).trim());
-  return `<div style="margin-top:6px;font-size:12px;color:#b91c1c;"><strong>Observación:</strong> ${texto}</div>`;
 }
 
 function crearModalObservacionRechazo() {
@@ -156,10 +192,17 @@ function reuploadRejectedDocument(tipoDocumentoId, nombre, docId = null) {
 document.addEventListener('DOMContentLoaded', () => {
   loadDocumentos();
   initActividadUsuario();
+
+  if (intervaloActualizacionUsuario) {
+    clearInterval(intervaloActualizacionUsuario);
+  }
+  intervaloActualizacionUsuario = setInterval(() => loadDocumentos(true), 10000);
 });
 
-async function loadDocumentos() {
-  showStatus('Cargando documentos...');
+async function loadDocumentos(silent = false) {
+  if (!silent) {
+    showStatus('Cargando documentos...');
+  }
 
   try {
     // Fetch both assigned requirements and uploaded documents in parallel
@@ -179,6 +222,30 @@ async function loadDocumentos() {
 
     const asignados = await asignadosResponse.json();
     const subidos = await subidosResponse.json();
+
+    const cambiosEstado = [];
+    subidos.forEach(doc => {
+      const key = String(doc.id || doc.documento_subido_id || doc.tipo_documento_id || 'doc');
+      const estadoActual = String(doc.estado_documento || doc.estado || 'pendiente').toLowerCase();
+      const estadoAnterior = ultimoEstadoDocumentos.get(key);
+      if (estadoAnterior && estadoAnterior !== estadoActual && ['revisado', 'aprobado', 'validado', 'rechazado'].includes(estadoActual)) {
+        cambiosEstado.push({
+          id: key,
+          nombre: doc.nombre_archivo || doc.nombre || 'Documento',
+          estado: estadoActual
+        });
+      }
+      ultimoEstadoDocumentos.set(key, estadoActual);
+    });
+
+    if (cambiosEstado.length && !silent) {
+      const cambio = cambiosEstado[cambiosEstado.length - 1];
+      mostrarToastUsuario({
+        titulo: cambio.estado === 'rechazado' ? 'Documento rechazado' : 'Documento aprobado',
+        mensaje: `${cambio.nombre} ahora está ${cambio.estado === 'rechazado' ? 'rechazado' : 'aprobado'}.`,
+        tipo: cambio.estado === 'rechazado' ? 'error' : 'success'
+      });
+    }
 
     historialGlobal = subidos.filter(d => String(d.estado).toLowerCase() !== 'rechazado');
     paginaHistorial = 1;
@@ -338,10 +405,12 @@ async function loadDocumentos() {
       renderHistorial(historial, auditorMap);
     }
 
-    if (pendientes.length > 0) {
-      showStatus(`Tienes ${pendientes.length} documento(s) pendiente(s).`);
-    } else {
-      showStatus('No tienes documentos pendientes asignados.');
+    if (!silent) {
+      if (pendientes.length > 0) {
+        showStatus(`Tienes ${pendientes.length} documento(s) pendiente(s).`);
+      } else {
+        showStatus('No tienes documentos pendientes asignados.');
+      }
     }
 
     actividadWidget?.refrescarSilenciosa();
@@ -365,13 +434,12 @@ function renderHistorial(historial, auditorMap) {
       const row = document.createElement('tr');
       const estadoInfo = obtenerEstadoDocumentoVisual(doc);
       const estadoBadge = `<span class="badge ${estadoInfo.clase}">${estadoInfo.texto}</span>`;
-      const comentarioHtml = renderComentarioRechazo(doc);
       const validado = obtenerNombreValidadorDesdeMapa(doc, auditorMap) || '—';
 
       row.innerHTML = `
         <td>${doc.nombre_archivo || doc.nombre || 'Documento'}</td>
         <td>${doc.fecha_subida ? new Date(doc.fecha_subida).toLocaleDateString() : '-'}</td>
-        <td>${estadoBadge}${comentarioHtml}</td>
+        <td>${estadoBadge}</td>
         <td>${validado}</td>
         <td>
           <button class="btn btn-sm btn-primary" onclick="abrirPreviewUsuario('${doc.id}', '${String(doc.nombre_archivo || doc.nombre || 'Documento').replace(/'/g, "\\'")}')">Ver</button>
@@ -443,7 +511,11 @@ function uploadDocumentForPending(tipoDocumentoId, nombre, reemplazaId = null) {
         return;
       }
 
-      alert(`Documento "${file.name}" subido exitosamente. Queda en revisión.`);
+      mostrarToastUsuario({
+        titulo: 'Documento subido',
+        mensaje: `Tu documento "${file.name}" se subió correctamente y quedó en revisión.`,
+        tipo: 'success'
+      });
       loadDocumentos();
     } catch (error) {
       console.error('Error al subir documento:', error);

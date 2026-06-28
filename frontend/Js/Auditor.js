@@ -843,7 +843,16 @@ window.validarDocumento = async function(id, action) {
     });
 
     if (res.ok) {
-      alert(`Documento ${action === 'aprobar' ? 'aprobado' : 'rechazado'}`);
+      const mensaje = action === 'aprobar'
+        ? 'El documento fue aprobado correctamente.'
+        : 'El documento fue rechazado y la observación quedó registrada.';
+
+      mostrarToast({
+        titulo: action === 'aprobar' ? 'Documento aprobado' : 'Documento rechazado',
+        mensaje,
+        tipo: action === 'aprobar' ? 'success' : 'error'
+      });
+
       historialGlobal = [];
       invalidarCacheActividad();
       cargarDocumentos();
@@ -855,7 +864,11 @@ window.validarDocumento = async function(id, action) {
         actualizarKpiRevisados();
       }
     } else {
-      alert(`Error al ${action === 'aprobar' ? 'aprobar' : 'rechazar'} documento`);
+      mostrarToast({
+        titulo: 'No se pudo completar',
+        mensaje: `No se pudo ${action === 'aprobar' ? 'aprobar' : 'rechazar'} el documento. Intenta nuevamente.`,
+        tipo: 'error'
+      });
     }
   } catch (err) {
     console.error('Error validando documento:', err);
