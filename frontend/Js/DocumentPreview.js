@@ -30,7 +30,7 @@ function puedeEliminarDocumento(doc) {
     }
 
     try {
-      const res = await fetch(`http://localhost:3000/api/documentos/${id}`, {
+      const res = await fetch(`http://agorasst.com/api/documentos/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${getToken()}` }
       });
@@ -55,7 +55,7 @@ function puedeEliminarDocumento(doc) {
 
     try {
       const headers = { Authorization: `Bearer ${getToken()}` };
-      const docRes = await fetch(`http://localhost:3000/api/documentos/${id}`, { method: 'GET', headers });
+      const docRes = await fetch(`http://agorasst.com/api/documentos/${id}`, { method: 'GET', headers });
 
       if (!docRes.ok) {
         const errorData = await docRes.json().catch(() => ({}));
@@ -71,7 +71,7 @@ function puedeEliminarDocumento(doc) {
 
       let previewUrl = null;
       if (isImage || isPdf) {
-        const previewRes = await fetch(`http://localhost:3000/api/documentos/${id}/descargar`, {
+        const previewRes = await fetch(`http://agorasst.com/api/documentos/${id}/descargar`, {
           method: 'GET',
           headers
         });
@@ -130,7 +130,7 @@ function puedeEliminarDocumento(doc) {
           return;
         }
         try {
-          const res = await fetch(`http://localhost:3000/api/documentos/${id}/descargar`, {
+          const res = await fetch(`http://agorasst.com/api/documentos/${id}/descargar`, {
             method: 'GET',
             headers: { Authorization: `Bearer ${getToken()}` }
           });
