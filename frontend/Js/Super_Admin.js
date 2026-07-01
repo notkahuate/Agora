@@ -24,17 +24,16 @@ const saludState = {
   lastRenderKey: null
 };
 
-console.log("USER:", user);
-
 if (!token || !user) {
   window.location.replace('/');
+  throw new Error('AGORA: sin sesión');
 }
 
-if (user && user.rol !== 'super_admin') {
+if (user.rol !== 'super_admin') {
   alert('No autorizado');
   window.location.replace('/');
+  throw new Error('AGORA: rol no autorizado');
 }
-
 
 // Avatar
 const avatar = document.getElementById('userAvatar');
@@ -61,9 +60,15 @@ const btnAbrir = document.getElementById('btnAbrirModal');
 const cerrar = document.getElementById('cerrarModal');
 const cerrarResponsable = document.getElementById('cerrarModalResponsable');
 
-btnAbrir.onclick = () => { modal.style.display = 'block'; };
-cerrar.onclick = () => modal.style.display = 'none';
-modalResponsable && cerrarResponsable && (cerrarResponsable.onclick = () => modalResponsable.style.display = 'none');
+if (btnAbrir && modal) {
+  btnAbrir.onclick = () => { modal.style.display = 'block'; };
+}
+if (cerrar && modal) {
+  cerrar.onclick = () => modal.style.display = 'none';
+}
+if (modalResponsable && cerrarResponsable) {
+  cerrarResponsable.onclick = () => modalResponsable.style.display = 'none';
+}
 
 window.onclick = (e) => {
   if (e.target === modal) modal.style.display = 'none';
@@ -108,7 +113,7 @@ async function asignarResponsableDocumento() {
   }
 
   try {
-    const res = await fetch('http://localhost:3000/api/documento-responsables', {
+    const res = await fetch('/api/documento-responsables', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -158,7 +163,7 @@ document.getElementById('formCrearUsuario')
     };
 
     try {
-      const resp = await fetch('http://localhost:3000/api/usuarios', {
+      const resp = await fetch('/api/usuarios', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -189,11 +194,7 @@ document.getElementById('formCrearUsuario')
 
 async function cargarUsuariosEmpresa() {
   try {
-    const res = await fetch('/api/usuarios', {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
+    const res = await window.Auth.apiFetch('/api/usuarios');
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -222,6 +223,7 @@ async function cargarUsuariosEmpresa() {
 
 function renderUsuarios() {
   const tbody = document.getElementById('tablaUsuarios');
+  if (!tbody) return;
   tbody.innerHTML = '';
 
   const inicio = (paginaUsuarios - 1) * limiteUsuarios;
@@ -321,15 +323,30 @@ function actualizarVistaCola(cantidad) {
 
 async function cargarColaRevision() {
   try {
+    const tabla = document.getElementById('tablaColaRevision');
+    const badge = document.getElementById('badgeColaRevision');
+    if (!tabla || !badge) return;
+
+    if (!user?.empresa_id) {
+      tabla.innerHTML = '<tr><td colspan="4">No hay empresa asociada a tu cuenta.</td></tr>';
+      badge.textContent = '0';
+      actualizarVistaCola(0);
+      return;
+    }
+
     const headers = {
       'Authorization': `Bearer ${token}`
     };
 
-    const res = await fetch(`http://localhost:3000/api/documentos-requeridos/empresa/${user.empresa_id}/pendientes`, { headers });
-    const docs = await res.json();
+    const res = await window.Auth.apiFetch(`/api/documentos-requeridos/empresa/${user.empresa_id}/pendientes`);
+    if (!res.ok) {
+      throw new Error('Error al cargar cola de revisión');
+    }
 
-    const tabla = document.getElementById('tablaColaRevision');
-    const badge = document.getElementById('badgeColaRevision');
+    const docs = await res.json();
+    if (!Array.isArray(docs)) {
+      throw new Error('Respuesta inválida de cola de revisión');
+    }
 
     const unassigned = docs.filter(doc => !doc.responsable_id);
 
@@ -632,8 +649,16 @@ function initSaludNavegacion() {
 
 async function cargarDocumentos() {
   try {
+    if (!user?.empresa_id) {
+      documentosGlobal = [];
+      renderDocumentos();
+      renderUsuarios();
+      actualizarBarrasProgreso();
+      return;
+    }
+
     const res = await fetch(
-      `http://localhost:3000/api/documentos-requeridos/empresa/${user.empresa_id}`,
+      `/api/documentos-requeridos/empresa/${user.empresa_id}`,
       {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -662,6 +687,7 @@ async function cargarDocumentos() {
 
 function renderDocumentos() {
   const tbody = document.getElementById('tablaDocumentos');
+  if (!tbody) return;
   tbody.innerHTML = '';
 
   const inicio = (paginaDocumentos - 1) * limiteDocumentos;
@@ -760,7 +786,7 @@ async function validarDocumento(id) {
 
     const comentarios = motivo.trim() || null;
 
-    await fetch(`http://localhost:3000/api/documentos/${id}/validar`, {
+    await fetch(`/api/documentos/${id}/validar`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -832,10 +858,14 @@ async function mostrarModalObservacionSuperAdmin(titulo) {
 
 async function cargarKPIs() {
   try {
-    // ⚠️ CAMBIA el ID si luego lo haces dinámico
-    const empresaId = user.empresa_id;
+    const empresaId = user?.empresa_id;
+    if (!empresaId) {
+      const kpi = document.getElementById('kpiDocsPendientes');
+      if (kpi) kpi.textContent = '0';
+      return;
+    }
 
-    const res = await fetch(`http://localhost:3000/api/documentos-requeridos/empresa/${empresaId}/pendientes`, {
+    const res = await fetch(`/api/documentos-requeridos/empresa/${empresaId}/pendientes`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -943,9 +973,10 @@ function actualizarBarrasProgreso() {
 // ==============================
 async function cargarEmpresasMap() {
   try {
-    const res = await fetch('/api/empresas', { headers: { 'Authorization': `Bearer ${token}` } });
+    const res = await window.Auth.apiFetch('/api/empresas');
     if (!res.ok) return;
     const list = await res.json();
+    if (!Array.isArray(list)) return;
     empresasMap = {};
     list.forEach(e => { empresasMap[e.id] = e.nombre; });
   } catch (err) {
@@ -954,7 +985,7 @@ async function cargarEmpresasMap() {
 }
 
 function invalidarCacheActividad() {
-  actividadWidget?.invalidarYRecargar();
+  actividadWidget?.refrescarSilenciosa();
 }
 
 function initActividadSuperAdmin() {
@@ -963,7 +994,7 @@ function initActividadSuperAdmin() {
     timelineId: 'timelineSuperAdmin',
     paginacionId: 'paginacionActividadReciente',
     buildUrl: (limit) => {
-      let url = `http://localhost:3000/api/auditoria?limit=${limit}&offset=0`;
+      let url = `/api/auditoria?limit=${limit}&offset=0&skipCount=1`;
       if (user?.empresa_id) url += `&empresa_id=${user.empresa_id}`;
       return url;
     },

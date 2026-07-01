@@ -74,7 +74,7 @@
             <span class="badge badge-warning" id="badgePendientes">-</span>
           </div>
           <div class="table-container">
-            <table>
+            <table class="table-pendientes">
               <thead>
                 <tr>
                   <th>Documento</th>
@@ -88,21 +88,31 @@
               <tbody id="tablaPendientes"></tbody>
             </table>
           </div>
-          <div class="table-container" style="margin-top:18px;">
-            <table>
+        </div>
+
+        <div class="card usuario-subidos-card" id="sectionHistorial" style="margin-top:18px;">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Documentos subidos</div>
+              <div class="card-subtitle">Historial de archivos enviados y su estado de revisión.</div>
+            </div>
+            <span class="badge badge-info" id="badgeHistorial">0</span>
+          </div>
+          <div class="table-container table-container--historial">
+            <table class="table-historial">
               <thead>
                 <tr>
                   <th>Documento</th>
                   <th>Fecha de subida</th>
                   <th>Estado</th>
                   <th>Validado por</th>
-                  <th>Acciones</th>
+                  <th class="col-acciones">Acciones</th>
                 </tr>
               </thead>
               <tbody id="tablaHistorial"></tbody>
             </table>
-            <div id="paginacionHistorial" class="paginacion"></div>
           </div>
+          <div id="paginacionHistorial" class="paginacion"></div>
         </div>
 
         <div class="card" id="sectionActividadReciente" style="margin-top:18px;">
@@ -132,6 +142,8 @@
       </div>
     </div>
   </div>
+
+  <div id="toastUsuario" class="toast-stack toast-stack-user hidden" aria-live="polite" aria-atomic="true"></div>
 
   <script src="https://unpkg.com/lucide@latest"></script>
   <script>lucide.createIcons();</script>

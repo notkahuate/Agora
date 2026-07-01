@@ -10,45 +10,89 @@ let actividadWidget = null;
 let ultimoEstadoDocumentos = new Map();
 let intervaloActualizacionUsuario = null;
 
-function mostrarToastUsuario({ titulo, mensaje, tipo = 'success' }) {
+function mostrarToastUsuario({ titulo, mensaje, tipo = 'success', variante = null }) {
   let contenedor = document.getElementById('toastUsuario');
   if (!contenedor) {
     contenedor = document.createElement('div');
     contenedor.id = 'toastUsuario';
     contenedor.className = 'toast-stack toast-stack-user hidden';
+    contenedor.setAttribute('aria-live', 'polite');
     document.body.appendChild(contenedor);
   }
 
-  const icono = tipo === 'error' ? '!' : '✓';
-  const accentClass = tipo === 'error' ? 'is-error' : 'is-success';
+  const presets = {
+    upload: {
+      accent: 'is-upload',
+      icon: 'upload-cloud',
+      badge: 'En revisión'
+    },
+    success: {
+      accent: 'is-success',
+      icon: 'check-circle-2',
+      badge: null
+    },
+    error: {
+      accent: 'is-error',
+      icon: 'alert-circle',
+      badge: null
+    },
+    info: {
+      accent: 'is-info',
+      icon: 'info',
+      badge: null
+    }
+  };
+
+  const preset = presets[variante || tipo] || presets.success;
+  const badgeHtml = preset.badge
+    ? `<span class="toast-badge">${escaparTexto(preset.badge)}</span>`
+    : '';
 
   const toast = document.createElement('div');
-  toast.className = `toast-card ${accentClass}`;
+  toast.className = `toast-card ${preset.accent}`;
   toast.innerHTML = `
     <div class="toast-accent" aria-hidden="true"></div>
     <div class="toast-icon-wrap" aria-hidden="true">
-      <span class="toast-icon">${icono}</span>
+      <i data-lucide="${preset.icon}" class="toast-lucide-icon"></i>
     </div>
     <div class="toast-content">
-      <div class="toast-title">${escaparTexto(titulo)}</div>
+      <div class="toast-title-row">
+        <div class="toast-title">${escaparTexto(titulo)}</div>
+        ${badgeHtml}
+      </div>
       <div class="toast-message">${escaparTexto(mensaje)}</div>
     </div>
     <button type="button" class="toast-close" aria-label="Cerrar notificación">&times;</button>
     <div class="toast-progress" aria-hidden="true"><span></span></div>
   `;
 
-  toast.querySelector('.toast-close')?.addEventListener('click', () => {
-    toast.remove();
-  });
+  const cerrarToast = () => {
+    toast.classList.add('is-hiding');
+    setTimeout(() => {
+      toast.remove();
+      if (!contenedor.querySelector('.toast-card')) {
+        contenedor.classList.remove('show');
+        contenedor.classList.add('hidden');
+      }
+    }, 280);
+  };
+
+  toast.querySelector('.toast-close')?.addEventListener('click', cerrarToast);
 
   contenedor.appendChild(toast);
   contenedor.classList.remove('hidden');
-  requestAnimationFrame(() => contenedor.classList.add('show'));
+  requestAnimationFrame(() => {
+    contenedor.classList.add('show');
+    toast.querySelector('.toast-progress span')?.classList.add('is-running');
+  });
 
-  setTimeout(() => {
-    toast.classList.add('is-hiding');
-    setTimeout(() => toast.remove(), 260);
-  }, 3800);
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons({ nodes: [toast] });
+  }
+
+  const duracion = tipo === 'error' ? 5200 : 4500;
+  const timer = setTimeout(cerrarToast, duracion);
+  toast.addEventListener('mouseenter', () => clearTimeout(timer), { once: true });
 }
 
 function obtenerNombreValidador(documento) {
@@ -77,12 +121,22 @@ function escaparTexto(texto) {
 }
 
 function esDocumentoAprobado(documento) {
+  if (documento.cumple_periodo_actual === true || documento.cumple_periodo_actual === 't') {
+    return true;
+  }
   return ['validado', 'revisado', 'aprobado'].includes(obtenerEstadoAsignado(documento));
 }
 
 function esDocumentoPendienteAccion(documento) {
   const estado = obtenerEstadoAsignado(documento);
-  return estado === 'pendiente' || estado === 'rechazado';
+  if (documento.cumple_periodo_actual === true || documento.cumple_periodo_actual === 't') return false;
+  if (['validado', 'revisado', 'aprobado'].includes(estado)) return false;
+  return estado === 'pendiente' || estado === 'rechazado' || estado === 'subido' || !documento.cumple_periodo_actual;
+}
+
+function puedeAgregarMasArchivos(documento) {
+  const estado = obtenerEstadoAsignado(documento);
+  return estado === 'subido' && !esDocumentoAprobado(documento);
 }
 
 function obtenerEstadoDocumentoVisual(documento) {
@@ -150,11 +204,13 @@ const user = window.Auth ? window.Auth.getUser() : null;
 
 if (!token || !user) {
   window.location.replace('/');
+  throw new Error('AGORA: sin sesión');
 }
 
 if (!['usuario'].includes(user.rol)) {
   alert('No autorizado');
   window.location.replace('/');
+  throw new Error('AGORA: rol no autorizado');
 }
 
 if (user && document.getElementById('userAvatar')) {
@@ -196,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (intervaloActualizacionUsuario) {
     clearInterval(intervaloActualizacionUsuario);
   }
-  intervaloActualizacionUsuario = setInterval(() => loadDocumentos(true), 10000);
+  intervaloActualizacionUsuario = setInterval(() => loadDocumentos(true), 15000);
 });
 
 async function loadDocumentos(silent = false) {
@@ -212,12 +268,12 @@ async function loadDocumentos(silent = false) {
     ]);
 
     if (!asignadosResponse.ok) {
-      const error = await asignadosResponse.json();
-      throw new Error(error.message || 'Error al cargar documentos asignados');
+      const error = await asignadosResponse.json().catch(() => ({}));
+      throw new Error(error.message || error.error || 'Error al cargar documentos asignados');
     }
     if (!subidosResponse.ok) {
-      const error = await subidosResponse.json();
-      throw new Error(error.message || 'Error al cargar historial de documentos');
+      const error = await subidosResponse.json().catch(() => ({}));
+      throw new Error(error.message || error.error || 'Error al cargar historial de documentos');
     }
 
     const asignados = await asignadosResponse.json();
@@ -247,28 +303,13 @@ async function loadDocumentos(silent = false) {
       });
     }
 
-    historialGlobal = subidos.filter(d => String(d.estado).toLowerCase() !== 'rechazado');
+    historialGlobal = subidos.slice().sort((a, b) => {
+      const ta = a.fecha_subida ? new Date(a.fecha_subida).getTime() : 0;
+      const tb = b.fecha_subida ? new Date(b.fecha_subida).getTime() : 0;
+      return tb - ta || (b.id - a.id);
+    });
     paginaHistorial = 1;
     auditorMapHistorial = new Map();
-
-    // Resolve auditor names for any validado_por ids
-    const auditorIds = Array.from(new Set(subidos.map(s => s.validado_por).filter(Boolean)));
-    const auditorMap = auditorMapHistorial;
-    if (auditorIds.length > 0) {
-      await Promise.all(auditorIds.map(async id => {
-        try {
-          const res = await window.Auth.apiFetch(`/api/usuarios/${id}`);
-          if (res.ok) {
-            const userData = await res.json();
-            auditorMap.set(id, userData.nombre || userData.email || `#${id}`);
-          } else {
-            auditorMap.set(id, `#${id}`);
-          }
-        } catch (e) {
-          auditorMap.set(id, `#${id}`);
-        }
-      }));
-    }
 
     // Start with assigned pendientes (include rejected)
     const pendientesMap = new Map();
@@ -369,40 +410,61 @@ async function loadDocumentos(silent = false) {
         const prioridadBadge = `<span class="badge badge-${doc.prioridad === 'alta' ? 'danger' : doc.prioridad === 'media' ? 'warning' : 'info'}">${doc.prioridad}</span>`;
         const fechaLimite = new Date(doc.fecha_limite).toLocaleDateString();
         const estadoRaw = String(doc.estado_documento || doc.estado || 'pendiente').toLowerCase();
+        const archivosPeriodo = parseInt(doc.archivos_periodo, 10) || 0;
         const estadoInfo = estadoRaw === 'rechazado'
           ? { clase: 'badge-danger', texto: 'Rechazado' }
           : obtenerEstadoDocumentoVisual(doc);
         const estadoBadge = `<span class="badge ${estadoInfo.clase}">${estadoInfo.texto}</span>`;
+        const archivosInfo = archivosPeriodo > 0
+          ? `<span class="doc-cell-meta">${archivosPeriodo} archivo(s) en este periodo</span>`
+          : '';
         const comentarioHtml = '';
         const docSubidoId = doc.documento_subido_id || doc.id || null;
         const observacionTexto = String(doc.comentarios || doc.comentario || 'No se registró una observación.').replace(/'/g, "\\'").replace(/\n/g, ' ');
         const observacionButton = estadoInfo.texto === 'Rechazado'
           ? `<button class="btn btn-sm btn-secondary" onclick="abrirModalObservacionRechazo('${observacionTexto}')">Ver observación</button>`
           : '';
-        const actionButton = estadoInfo.texto === 'Rechazado'
-          ? `<button class="btn btn-sm btn-secondary" onclick="reuploadRejectedDocument(${doc.tipo_documento_id}, '${safeName}', ${docSubidoId || 'null'})">Volver a subir</button>`
-          : `<button class="btn btn-sm btn-primary" onclick="uploadDocumentForPending(${doc.tipo_documento_id}, '${safeName}')">Subir</button>`;
+        let actionButton;
+        if (estadoInfo.texto === 'Rechazado') {
+          actionButton = `<button class="btn btn-sm btn-secondary" onclick="reuploadRejectedDocument(${doc.tipo_documento_id}, '${safeName}', ${docSubidoId || 'null'})">Volver a subir</button>`;
+        } else if (puedeAgregarMasArchivos(doc)) {
+          actionButton = `<button class="btn btn-sm btn-primary" onclick="uploadDocumentForPending(${doc.tipo_documento_id}, '${safeName}')">Agregar archivos</button>`;
+        } else {
+          actionButton = `<button class="btn btn-sm btn-primary" onclick="uploadDocumentForPending(${doc.tipo_documento_id}, '${safeName}')">Subir archivos</button>`;
+        }
 
         row.innerHTML = `
-          <td>${doc.nombre}</td>
-          <td>${doc.frecuencia || '-'}</td>
+          <td>
+            <div class="doc-cell-info">
+              <span class="doc-cell-title">${escaparTexto(doc.nombre)}</span>
+              ${archivosInfo}
+            </div>
+          </td>
+          <td>${escaparTexto(doc.frecuencia || '-')}</td>
           <td>${fechaLimite}</td>
           <td>${estadoBadge}${comentarioHtml}</td>
           <td>${prioridadBadge}</td>
-          <td>${observacionButton ? `${observacionButton} ` : ''}${actionButton}</td>
+          <td class="table-actions-cell">
+            <div class="table-actions">
+              ${observacionButton ? `${observacionButton} ` : ''}${actionButton}
+            </div>
+          </td>
         `;
         tablaPendientes.appendChild(row);
       });
     }
 
-    // Render historial excluding rejected uploads so they don't clutter historial
+    // Render historial con todas las versiones (incluye rechazados y periodos anteriores)
     const tablaHistorial = document.getElementById('tablaHistorial');
     const historial = historialGlobal;
+    const badgeHistorial = document.getElementById('badgeHistorial');
+    if (badgeHistorial) badgeHistorial.textContent = historial.length;
+
     if (historial.length === 0) {
-      tablaHistorial.innerHTML = '<tr><td colspan="4">No hay documentos subidos aún.</td></tr>';
+      tablaHistorial.innerHTML = '<tr class="table-empty-row"><td colspan="5">No hay documentos subidos aún.</td></tr>';
       document.getElementById('paginacionHistorial').innerHTML = '';
     } else {
-      renderHistorial(historial, auditorMap);
+      renderHistorial(historial, auditorMapHistorial);
     }
 
     if (!silent) {
@@ -412,8 +474,6 @@ async function loadDocumentos(silent = false) {
         showStatus('No tienes documentos pendientes asignados.');
       }
     }
-
-    actividadWidget?.refrescarSilenciosa();
   } catch (error) {
     console.error('Error cargando documentos:', error);
     showStatus('No se pudo cargar los documentos. Revisa la consola.');
@@ -428,21 +488,35 @@ function renderHistorial(historial, auditorMap) {
   tablaHistorial.innerHTML = '';
 
   if (pagina.length === 0) {
-    tablaHistorial.innerHTML = '<tr><td colspan="5">No hay documentos subidos aún.</td></tr>';
+    tablaHistorial.innerHTML = '<tr class="table-empty-row"><td colspan="5">No hay documentos subidos aún.</td></tr>';
   } else {
     pagina.forEach(doc => {
       const row = document.createElement('tr');
       const estadoInfo = obtenerEstadoDocumentoVisual(doc);
       const estadoBadge = `<span class="badge ${estadoInfo.clase}">${estadoInfo.texto}</span>`;
-      const validado = obtenerNombreValidadorDesdeMapa(doc, auditorMap) || '—';
+      const validado = escaparTexto(obtenerNombreValidadorDesdeMapa(doc, auditorMap) || '—');
+      const nombreDoc = escaparTexto(doc.tipo_documento_nombre || doc.nombre_archivo || doc.nombre || 'Documento');
+      const archivo = escaparTexto(doc.nombre_archivo || doc.nombre || 'Documento');
+      const safeName = String(doc.nombre_archivo || doc.nombre || 'Documento').replace(/'/g, "\\'");
+      const fechaSubida = doc.fecha_subida
+        ? new Date(doc.fecha_subida).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+        : '—';
 
       row.innerHTML = `
-        <td>${doc.nombre_archivo || doc.nombre || 'Documento'}</td>
-        <td>${doc.fecha_subida ? new Date(doc.fecha_subida).toLocaleDateString() : '-'}</td>
+        <td>
+          <div class="doc-cell-info">
+            <span class="doc-cell-title">${nombreDoc}</span>
+            <span class="doc-cell-meta">${archivo}</span>
+          </div>
+        </td>
+        <td>${fechaSubida}</td>
         <td>${estadoBadge}</td>
         <td>${validado}</td>
-        <td>
-          <button class="btn btn-sm btn-primary" onclick="abrirPreviewUsuario('${doc.id}', '${String(doc.nombre_archivo || doc.nombre || 'Documento').replace(/'/g, "\\'")}')">Ver</button>
+        <td class="table-actions-cell">
+          <div class="table-actions">
+            <button type="button" class="btn btn-sm btn-primary" onclick="abrirPreviewUsuario('${doc.id}', '${safeName}')">Ver</button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="descargarDocumentoUsuario('${doc.id}', '${safeName}')">Descargar</button>
+          </div>
         </td>
       `;
       tablaHistorial.appendChild(row);
@@ -482,44 +556,89 @@ function uploadDocumentForPending(tipoDocumentoId, nombre, reemplazaId = null) {
 
   const input = document.createElement('input');
   input.type = 'file';
+  input.multiple = true;
   input.accept = '.pdf,.doc,.docx,.jpg,.png,.xls,.xlsx';
 
   input.onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const prevStatus = statusMessage.textContent || '';
+    showStatus(files.length > 1
+      ? `Subiendo ${files.length} archivos...`
+      : 'Subiendo documento...');
 
     try {
-      const formData = new FormData();
-      formData.append('archivo', file);
-      formData.append('tipo_documento_id', tipoDocumentoId);
-      formData.append(
-        'comentarios',
-        reemplazaId ? `Re-subido tras rechazo: ${nombre}` : 'Subido desde dashboard usuario'
-      );
+      let response;
+      let data;
 
-      const response = await fetch('http://localhost:3000/api/documentos', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
+      if (files.length === 1) {
+        const formData = new FormData();
+        formData.append('archivo', files[0]);
+        formData.append('tipo_documento_id', tipoDocumentoId);
+        formData.append(
+          'comentarios',
+          reemplazaId ? `Re-subido tras rechazo: ${nombre}` : 'Subido desde dashboard usuario'
+        );
 
-      const data = await response.json();
+        response = await fetch('/api/documentos', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData
+        });
+        data = await response.json();
+      } else {
+        const formData = new FormData();
+        files.forEach(file => formData.append('archivos', file));
+        formData.append('tipo_documento_id', tipoDocumentoId);
+        formData.append(
+          'comentarios',
+          reemplazaId
+            ? `Re-subidos ${files.length} archivos tras rechazo: ${nombre}`
+            : `Subidos ${files.length} archivos desde dashboard usuario`
+        );
+
+        response = await fetch('/api/documentos/lote', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData
+        });
+        data = await response.json();
+      }
+
       if (!response.ok) {
-        alert(data.message || 'Error al subir documento');
+        mostrarToastUsuario({
+          titulo: 'No se pudo subir',
+          mensaje: data.message || data.error || 'Ocurrió un error al subir el documento. Intenta nuevamente.',
+          tipo: 'error'
+        });
+        if (prevStatus) showStatus(prevStatus);
         return;
       }
 
+      const totalSubidos = data.total || 1;
+      const nombres = files.length === 1
+        ? files[0].name
+        : files.map(f => f.name).slice(0, 3).join(', ') + (files.length > 3 ? ` (+${files.length - 3} más)` : '');
+
       mostrarToastUsuario({
-        titulo: 'Documento subido',
-        mensaje: `Tu documento "${file.name}" se subió correctamente y quedó en revisión.`,
-        tipo: 'success'
+        titulo: totalSubidos > 1 ? '¡Archivos subidos!' : '¡Documento subido!',
+        mensaje: totalSubidos > 1
+          ? `Se cargaron ${totalSubidos} archivos para "${nombre}". El equipo de auditoría los revisará pronto.`
+          : `"${nombres}" se cargó correctamente. El equipo de auditoría lo revisará pronto.`,
+        tipo: 'success',
+        variante: 'upload'
       });
-      loadDocumentos();
+      loadDocumentos(true);
+      actividadWidget?.refrescarSilenciosa();
     } catch (error) {
       console.error('Error al subir documento:', error);
-      alert('Error al subir documento');
+      mostrarToastUsuario({
+        titulo: 'Error de conexión',
+        mensaje: 'No se pudo subir el documento. Revisa tu conexión e intenta de nuevo.',
+        tipo: 'error'
+      });
+      if (prevStatus) showStatus(prevStatus);
     }
   };
 
@@ -527,7 +646,7 @@ function uploadDocumentForPending(tipoDocumentoId, nombre, reemplazaId = null) {
 }
 
 function invalidarCacheActividad() {
-  actividadWidget?.invalidarYRecargar();
+  actividadWidget?.refrescarSilenciosa();
 }
 
 function initActividadUsuario() {
@@ -536,7 +655,7 @@ function initActividadUsuario() {
     timelineId: 'timelineUsuario',
     paginacionId: 'paginacionActividadReciente',
     buildUrl: (limit) => {
-      let url = `http://localhost:3000/api/auditoria?limit=${limit}&offset=0`;
+      let url = `/api/auditoria?limit=${limit}&offset=0&skipCount=1`;
       if (user?.empresa_id) url += `&empresa_id=${user.empresa_id}`;
       return url;
     },
@@ -555,5 +674,30 @@ window.abrirPreviewUsuario = function (id, nombre) {
       loadDocumentos();
     }
   });
+};
+
+window.descargarDocumentoUsuario = async function (id, nombreArchivo) {
+  if (!id) return alert('No se encontró el documento para descargar.');
+
+  try {
+    const res = await window.Auth.apiFetch(`/api/documentos/${id}/descargar`);
+    if (!res.ok) {
+      const error = await res.json().catch(() => null);
+      return alert(error?.message || 'No se pudo descargar el documento.');
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombreArchivo || `documento-${id}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Error descargando documento:', err);
+    alert('Error al descargar el documento.');
+  }
 };
 

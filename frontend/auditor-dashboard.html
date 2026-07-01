@@ -66,30 +66,22 @@
             <div class="card-header">
               <div>
                 <div class="card-title">Empresas en riesgo</div>
-                <div class="card-subtitle">Priorizar las que bajaron cumplimiento.</div>
+                <div class="card-subtitle">Empresas con documentos pendientes de subir.</div>
               </div>
               <span class="badge badge-danger" id="badgeEmpresasRiesgo">-</span>
             </div>
             <div class="list" id="listaEmpresasRiesgo"></div>
-
-
-</div>
-          
+          </div>
 
           <div class="card" id="sectionColaRevision">
             <div class="card-header">
               <div>
                 <div class="card-title">Cola prioritaria</div>
-                <div class="card-subtitle">Documentos de alta prioridad.</div>
+                <div class="card-subtitle">Pendientes sin subir, ordenados por peso SG-SST.</div>
               </div>
               <span class="badge badge-warning" id="badgeCola">-</span>
             </div>
-            <div class="table-container">
-              <table>
-                <thead><tr><th>Documento</th><th>Empresa</th><th>Prioridad</th><th>Fecha</th><th>Acción</th></tr></thead>
-                <tbody id="tablaColaPrioritaria"></tbody>
-              </table>
-            </div>
+            <div class="cola-list" id="listaColaPrioritaria"></div>
           </div>
         </div>
 
@@ -100,9 +92,9 @@
               <div class="card-subtitle">Empresas, documentos y historial.</div>
             </div>
             <div class="pill-tabs">
-              <button class="pill is-active" onclick="switchTab('empresas', event)">Empresas</button>
-              <button class="pill" onclick="switchTab('documentos', event)">Documentos</button>
-              <button class="pill" onclick="switchTab('historial', event)">Historial</button>
+              <button class="pill is-active" data-tab="empresas" onclick="switchTab('empresas', event)">Empresas</button>
+              <button class="pill" data-tab="documentos" onclick="switchTab('documentos', event)">Documentos</button>
+              <button class="pill" data-tab="historial" onclick="switchTab('historial', event)">Historial</button>
             </div>
           </div>
 

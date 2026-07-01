@@ -3,64 +3,93 @@ const Documento = require('../Models/DocumentModel');
 const { pool } = require('../configures/db');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const auditoria = require('../Helpers/auditoriaHelper');
+
+function resolverContextoSubida(req) {
+  const body = req.body || {};
+  const requester = req.user;
+  const isAdmin = requester && requester.rol === 'super_admin';
+  const isUsuario = requester && requester.rol === 'usuario';
+
+  if (!isAdmin && !isUsuario) {
+    return { error: { status: 403, message: 'No autorizado para subir documentos' } };
+  }
+
+  const resolvedUsuarioId = isUsuario ? requester.id : body.usuario_id;
+  const resolvedEmpresaId = isUsuario ? requester.empresa_id : body.empresa_id;
+  const tipo_documento_id = body.tipo_documento_id;
+
+  if (!resolvedUsuarioId || !tipo_documento_id || !resolvedEmpresaId) {
+    return { error: { status: 400, message: 'usuario_id, tipo_documento_id y empresa_id son obligatorios' } };
+  }
+
+  return {
+    resolvedUsuarioId,
+    resolvedEmpresaId,
+    tipo_documento_id,
+    comentarios: body.comentarios || null
+  };
+}
+
+async function registrarAuditoriaSubida({ creados, resolvedUsuarioId, resolvedEmpresaId, tipo_documento_id, loteSubida }) {
+  try {
+    const infoResult = await pool.query(
+      `SELECT e.nombre AS empresa_nombre, td.nombre AS tipo_nombre
+       FROM empresas e, tipos_documentos td
+       WHERE e.id = $1 AND td.id = $2`,
+      [resolvedEmpresaId, tipo_documento_id]
+    );
+    const info = infoResult.rows[0] || {};
+    const nombres = creados.map(d => d.nombre_archivo).join(', ');
+    await auditoria.registrar({
+      entidad: 'documentos_subidos',
+      entidad_id: creados[0]?.id || null,
+      accion: 'subir',
+      usuario_id: resolvedUsuarioId,
+      descripcion: creados.length > 1
+        ? `${creados.length} archivos subidos para '${info.tipo_nombre || tipo_documento_id}' (${nombres})`
+        : `Documento '${info.tipo_nombre || creados[0]?.nombre_archivo}' subido para empresa '${info.empresa_nombre || resolvedEmpresaId}'`,
+      datos_nuevos: { lote_subida: loteSubida, archivos: creados.map(d => ({ id: d.id, nombre: d.nombre_archivo })) },
+      empresa_id: resolvedEmpresaId
+    });
+  } catch (e) {
+    console.error('auditoria crearDocumento error:', e.message);
+  }
+}
 
 exports.crearDocumento = async (req, res) => {
   try {
-    const body = req.body || {};
-    const { usuario_id, tipo_documento_id, empresa_id, comentarios } = body;
-    const requester = req.user;
-    const isAdmin = requester && requester.rol === 'super_admin';
-    const isUsuario = requester && requester.rol === 'usuario';
-
-    if (!isAdmin && !isUsuario) {
-      return res.status(403).json({ message: 'No autorizado para subir documentos' });
+    const ctx = resolverContextoSubida(req);
+    if (ctx.error) {
+      return res.status(ctx.error.status).json({ message: ctx.error.message });
     }
 
-    const resolvedUsuarioId = isUsuario ? requester.id : usuario_id;
-    const resolvedEmpresaId = isUsuario ? requester.empresa_id : empresa_id;
-
-    if (!resolvedUsuarioId || !tipo_documento_id || !resolvedEmpresaId || !req.file) {
-      return res.status(400).json({ message: 'usuario_id, tipo_documento_id, empresa_id y archivo son obligatorios' });
+    if (!req.file) {
+      return res.status(400).json({ message: 'El archivo es obligatorio' });
     }
 
-    // Obtener nombre del archivo subido
-    const nombre_archivo = req.file.originalname;
-    const archivo = req.file.buffer;
-    const mime_type = req.file.mimetype;
+    const loteSubida = crypto.randomUUID();
 
     const creado = await Documento.crearDocumento({
-      usuario_id: resolvedUsuarioId,
-      tipo_documento_id,
-      empresa_id: resolvedEmpresaId,
-      nombre_archivo,
+      usuario_id: ctx.resolvedUsuarioId,
+      tipo_documento_id: ctx.tipo_documento_id,
+      empresa_id: ctx.resolvedEmpresaId,
+      nombre_archivo: req.file.originalname,
       ruta_archivo: null,
-      archivo,
-      mime_type,
-      comentarios
+      archivo: req.file.buffer,
+      mime_type: req.file.mimetype,
+      comentarios: ctx.comentarios,
+      lote_subida: loteSubida
     });
 
-    // Registrar auditoría: documento subido
-    try {
-      const infoResult = await pool.query(
-        `SELECT e.nombre AS empresa_nombre, td.nombre AS tipo_nombre
-         FROM empresas e, tipos_documentos td
-         WHERE e.id = $1 AND td.id = $2`,
-        [resolvedEmpresaId, tipo_documento_id]
-      );
-      const info = infoResult.rows[0] || {};
-      await auditoria.registrar({
-        entidad: 'documentos_subidos',
-        entidad_id: creado.id,
-        accion: 'subir',
-        usuario_id: resolvedUsuarioId,
-        descripcion: `Documento '${info.tipo_nombre || creado.nombre_archivo}' subido para empresa '${info.empresa_nombre || resolvedEmpresaId}'`,
-        datos_nuevos: creado,
-        empresa_id: resolvedEmpresaId
-      });
-    } catch (e) {
-      console.error('auditoria crearDocumento error:', e.message);
-    }
+    await registrarAuditoriaSubida({
+      creados: [creado],
+      resolvedUsuarioId: ctx.resolvedUsuarioId,
+      resolvedEmpresaId: ctx.resolvedEmpresaId,
+      tipo_documento_id: ctx.tipo_documento_id,
+      loteSubida
+    });
 
     return res.status(201).json({
       ...creado,
@@ -68,10 +97,65 @@ exports.crearDocumento = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    if (err.code === '23503') { // foreign key violation
+    if (err.code === '23503') {
       return res.status(400).json({ message: 'Referencia inválida (usuario, tipo o empresa no existe)', detail: err.detail });
     }
     return res.status(500).json({ message: 'Error al crear documento', error: err.message });
+  }
+};
+
+exports.crearDocumentosLote = async (req, res) => {
+  try {
+    const ctx = resolverContextoSubida(req);
+    if (ctx.error) {
+      return res.status(ctx.error.status).json({ message: ctx.error.message });
+    }
+
+    const files = Array.isArray(req.files) ? req.files : [];
+    if (!files.length) {
+      return res.status(400).json({ message: 'Debes seleccionar al menos un archivo' });
+    }
+
+    const loteSubida = crypto.randomUUID();
+    const creados = [];
+
+    for (const file of files) {
+      const creado = await Documento.crearDocumento({
+        usuario_id: ctx.resolvedUsuarioId,
+        tipo_documento_id: ctx.tipo_documento_id,
+        empresa_id: ctx.resolvedEmpresaId,
+        nombre_archivo: file.originalname,
+        ruta_archivo: null,
+        archivo: file.buffer,
+        mime_type: file.mimetype,
+        comentarios: ctx.comentarios || `Lote de ${files.length} archivo(s)`,
+        lote_subida: loteSubida
+      });
+      creados.push({
+        ...creado,
+        ruta_archivo: `/api/documentos/${creado.id}/descargar`
+      });
+    }
+
+    await registrarAuditoriaSubida({
+      creados,
+      resolvedUsuarioId: ctx.resolvedUsuarioId,
+      resolvedEmpresaId: ctx.resolvedEmpresaId,
+      tipo_documento_id: ctx.tipo_documento_id,
+      loteSubida
+    });
+
+    return res.status(201).json({
+      lote_subida: loteSubida,
+      total: creados.length,
+      documentos: creados
+    });
+  } catch (err) {
+    console.error(err);
+    if (err.code === '23503') {
+      return res.status(400).json({ message: 'Referencia inválida (usuario, tipo o empresa no existe)', detail: err.detail });
+    }
+    return res.status(500).json({ message: 'Error al subir archivos', error: err.message });
   }
 };
 
@@ -296,14 +380,57 @@ exports.contarRevisadosMes = async (req, res) => {
       SELECT COUNT(*) as count
       FROM documentos_subidos
       WHERE estado = 'revisado'
-      AND EXTRACT(MONTH FROM fecha_validacion) = EXTRACT(MONTH FROM CURRENT_DATE)
-      AND EXTRACT(YEAR FROM fecha_validacion) = EXTRACT(YEAR FROM CURRENT_DATE)
+      AND MONTH(fecha_validacion) = MONTH(CURRENT_DATE)
+      AND YEAR(fecha_validacion) = YEAR(CURRENT_DATE)
     `);
 
     return res.json({ count: parseInt(rows[0].count) });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Error al contar documentos revisados del mes' });
+  }
+};
+
+exports.listarColaPrioritaria = async (req, res) => {
+  try {
+    const requester = req.user;
+    if (!['auditor', 'super_admin'].includes(requester.rol)) {
+      return res.status(403).json({ message: 'No autorizado' });
+    }
+
+    const limite = Math.min(parseInt(req.query.limit, 10) || 8, 20);
+    const cola = await Documento.listarColaPrioritariaAuditor(limite);
+    return res.json(cola);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Error al listar cola prioritaria' });
+  }
+};
+
+exports.listarHistorialPorTipo = async (req, res) => {
+  try {
+    const { empresa_id, tipo_documento_id } = req.query;
+    const requester = req.user;
+
+    if (!empresa_id || !tipo_documento_id) {
+      return res.status(400).json({ message: 'empresa_id y tipo_documento_id son obligatorios' });
+    }
+
+    const empresaId = Number(empresa_id);
+    const tipoId = Number(tipo_documento_id);
+    const isAdmin = requester.rol === 'super_admin';
+    const isAuditor = requester.rol === 'auditor';
+    const isSameEmpresa = String(requester.empresa_id) === String(empresaId);
+
+    if (!isAdmin && !isAuditor && !isSameEmpresa) {
+      return res.status(403).json({ message: 'No autorizado para ver este historial' });
+    }
+
+    const historial = await Documento.listarHistorialPorTipo(empresaId, tipoId);
+    return res.json(historial);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Error al listar historial del documento' });
   }
 };
 
@@ -320,9 +447,10 @@ exports.descargarDocumento = async (req, res) => {
     const isAdmin = requester.rol === 'super_admin';
     const isOwner = String(doc.usuario_id) === String(requester.id);
     const isAuditor = requester.rol === 'auditor';
+    const isSameEmpresa = String(doc.empresa_id) === String(requester.empresa_id);
 
-    // Verificar permisos: owner, admin, o auditor
-    if (!isAdmin && !isOwner && !isAuditor) {
+    // Verificar permisos: owner, admin, auditor o mismo empresa (super_admin/auditor/usuario de la empresa)
+    if (!isAdmin && !isOwner && !isAuditor && !isSameEmpresa) {
       return res.status(403).json({ message: 'No autorizado para descargar este documento' });
     }
 

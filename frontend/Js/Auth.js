@@ -71,6 +71,11 @@
     return user;
   }
 
+  function apiUrl(path) {
+    if (!path) return '/';
+    return path.startsWith('/') ? path : `/${path}`;
+  }
+
   async function apiFetch(url, options = {}) {
     const token = getToken();
     const headers = { ...options.headers };
@@ -79,11 +84,11 @@
       headers.Authorization = `Bearer ${token}`;
     }
 
-    if (options.body && !headers['Content-Type']) {
+    if (options.body && !headers['Content-Type'] && !(options.body instanceof FormData)) {
       headers['Content-Type'] = 'application/json';
     }
 
-    const res = await fetch(url, { ...options, headers });
+    const res = await fetch(apiUrl(url), { ...options, headers });
 
     if (res.status === 401) {
       clearSession();
@@ -147,6 +152,7 @@
     parseApiError,
     validateSession,
     requireAuth,
+    apiUrl,
     apiFetch,
     logout
   };

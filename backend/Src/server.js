@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require("express");
 const path = require("path");
 const { testConnection } = require('./configures/db');
+const { runMigrations } = require('./configures/migrate');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -33,7 +34,11 @@ app.use('/api/auditoria', auditoriaRoutes);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use(express.static(path.join(__dirname, "../../frontend")));
-testConnection();
+
+(async () => {
+  await testConnection();
+  await runMigrations();
+})();
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "../../frontend/index.html"));

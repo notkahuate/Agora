@@ -77,11 +77,13 @@ function mostrarToast(input, tipo = 'success') {
 
 if (!token || !user) {
   window.location.replace('/');
+  throw new Error('AGORA: sin sesión');
 }
 
 if (!['auditor', 'super_admin'].includes(user.rol)) {
   alert('No autorizado');
   window.location.replace('/');
+  throw new Error('AGORA: rol no autorizado');
 }
 
 // ==============================
@@ -101,18 +103,226 @@ window.switchTab = function (tabName, evt) {
   document.querySelectorAll('.pill').forEach(p => p.classList.remove('is-active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-  if (evt?.currentTarget) evt.currentTarget.classList.add('is-active');
+  const selectedPill = evt?.currentTarget
+    || document.querySelector(`.pill[data-tab="${tabName}"]`)
+    || Array.from(document.querySelectorAll('.pill')).find(p => (p.getAttribute('onclick') || '').includes(`'${tabName}'`));
+
+  if (selectedPill) selectedPill.classList.add('is-active');
 
   const panel = document.getElementById(`tab-${tabName}`);
   if (panel) panel.classList.add('active');
 
-  // Cargar datos según el tab
   if (tabName === 'documentos') {
     cargarDocumentos();
   } else if (tabName === 'historial') {
     cargarHistorial();
   }
 };
+
+window.pendientesAuditorGlobal = [];
+
+function agruparPendientesPorEmpresa(pendientes) {
+  const map = new Map();
+  (pendientes || []).forEach(p => {
+    const key = String(p.empresa_id);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(p);
+  });
+  return map;
+}
+
+function renderEmpresasEnRiesgo() {
+  const listaRiesgo = document.getElementById('listaEmpresasRiesgo');
+  const badgeRiesgo = document.getElementById('badgeEmpresasRiesgo');
+  if (!listaRiesgo || !badgeRiesgo) return;
+
+  const porEmpresa = agruparPendientesPorEmpresa(window.pendientesAuditorGlobal);
+  const empresasMap = new Map((window.empresasData || []).map(e => [String(e.id), e]));
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const empresasRiesgo = [];
+
+  porEmpresa.forEach((docs, empresaId) => {
+    if (!docs.length) return;
+
+    const empresa = empresasMap.get(empresaId);
+    const nombre = empresa?.nombre || docs[0]?.empresa_nombre || docs[0]?.empresa || 'Empresa';
+    const vencidos = docs.filter(d => {
+      if (!d.fecha_limite) return false;
+      const fecha = new Date(d.fecha_limite);
+      return !Number.isNaN(fecha.getTime()) && fecha < hoy;
+    }).length;
+
+    empresasRiesgo.push({
+      id: empresaId,
+      nombre,
+      pendientes: docs.length,
+      vencidos
+    });
+  });
+
+  empresasRiesgo.sort((a, b) => {
+    if (b.vencidos !== a.vencidos) return b.vencidos - a.vencidos;
+    return b.pendientes - a.pendientes;
+  });
+
+  badgeRiesgo.textContent = empresasRiesgo.length;
+
+  listaRiesgo.innerHTML = empresasRiesgo.length
+    ? empresasRiesgo.slice(0, 6).map(e => `
+        <div class="list-item list-item-riesgo" role="button" tabindex="0"
+          onclick="verEmpresa('${e.id}')"
+          onkeydown="if(event.key==='Enter')verEmpresa('${e.id}')">
+          <div class="list-item-riesgo-info">
+            <strong>${e.nombre}</strong>
+            <small>${e.pendientes} documento(s) pendiente(s) de subir</small>
+          </div>
+          <div class="list-item-riesgo-badges">
+            ${e.vencidos > 0 ? `<span class="badge badge-danger">${e.vencidos} vencido(s)</span>` : ''}
+            <span class="badge badge-warning">${e.pendientes} pend.</span>
+          </div>
+        </div>
+      `).join('')
+    : `<div class="list-empty"><i data-lucide="shield-check"></i><span>Ninguna empresa con documentos pendientes</span></div>`;
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function esPendienteSinSubir(doc) {
+  if (doc.sin_subir === true || doc.sin_subir === 'true') return true;
+  return String(doc.estado_documento || 'pendiente').toLowerCase() === 'pendiente';
+}
+
+function renderColaPrioritaria() {
+  const lista = document.getElementById('listaColaPrioritaria');
+  const badge = document.getElementById('badgeCola');
+  const sectionCola = document.getElementById('sectionColaRevision');
+  if (!lista || !badge) return;
+
+  const items = [...(window.pendientesAuditorGlobal || [])]
+    .filter(esPendienteSinSubir)
+    .sort((a, b) => {
+      const pctA = parseFloat(a.porcentaje) || 0;
+      const pctB = parseFloat(b.porcentaje) || 0;
+      if (pctB !== pctA) return pctB - pctA;
+      return new Date(a.fecha_limite || 0) - new Date(b.fecha_limite || 0);
+    })
+    .slice(0, 6);
+
+  if (sectionCola) sectionCola.style.display = '';
+  badge.textContent = items.length;
+
+  if (!items.length) {
+    lista.innerHTML = `
+      <div class="list-empty">
+        <i data-lucide="inbox"></i>
+        <span>No hay documentos pendientes sin subir</span>
+      </div>`;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  lista.innerHTML = items.map(doc => {
+    const nombreDoc = doc.nombre || doc.tipo_documento || 'Documento';
+    const empresa = doc.empresa_nombre || doc.empresa || '—';
+    const porcentaje = parseFloat(doc.porcentaje) || 0;
+    const fecha = doc.fecha_limite
+      ? new Date(doc.fecha_limite).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
+      : '—';
+    const nombreEsc = nombreDoc.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const empresaEsc = empresa.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+    return `
+      <div class="cola-item">
+        <div class="cola-item-doc">
+          <strong title="${nombreEsc}">${nombreDoc}</strong>
+          <small>${empresa} · ${doc.responsable_nombre || 'Sin responsable'}</small>
+        </div>
+        <div class="cola-item-meta">
+          <span class="badge badge-info">${porcentaje}%</span>
+          <small class="cola-item-fecha">${fecha}</small>
+        </div>
+        <button type="button" class="btn btn-sm btn-warning cola-btn-alerta"
+          onclick="generarAlertaCola(${doc.id}, '${nombreEsc}', '${empresaEsc}', this)">
+          Generar alerta
+        </button>
+      </div>`;
+  }).join('');
+
+  if (window.lucide) lucide.createIcons();
+}
+
+window.generarAlertaCola = async function (documentoId, nombreDoc, empresaNombre, btn) {
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Enviando…';
+  }
+
+  try {
+    const res = await fetch(
+      `/api/documentos-requeridos/auditor/alerta/${documentoId}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data.error || data.message || 'No se pudo generar la alerta');
+    }
+
+    mostrarToast({
+      titulo: 'Alerta generada',
+      mensaje: `Se registró alerta por "${nombreDoc}" en ${empresaNombre}`,
+      tipo: 'success'
+    });
+    invalidarCacheActividad();
+  } catch (error) {
+    console.error('Error generando alerta:', error);
+    mostrarToast({
+      titulo: 'Error',
+      mensaje: error.message || 'No se pudo generar la alerta',
+      tipo: 'error'
+    });
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Generar alerta';
+    }
+  }
+};
+
+async function cargarPendientesAuditor() {
+  try {
+    const headers = { 'Authorization': `Bearer ${token}` };
+    const res = await window.Auth.apiFetch('/api/documentos-requeridos/auditor/pendientes');
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || 'Error al cargar pendientes');
+    }
+
+    const data = await res.json();
+    window.pendientesAuditorGlobal = Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('Error cargando pendientes auditor:', error);
+    window.pendientesAuditorGlobal = [];
+  }
+
+  renderEmpresasEnRiesgo();
+  renderColaPrioritaria();
+
+  const kpiPendientes = document.getElementById('kpiPendientes');
+  if (kpiPendientes) {
+    kpiPendientes.textContent = window.pendientesAuditorGlobal.length;
+  }
+}
 
 // ==============================
 // CARGAR EMPRESAS (TU ENDPOINT)
@@ -124,55 +334,74 @@ async function cargarEmpresas() {
   const badgeRiesgo = document.getElementById('badgeEmpresasRiesgo');
   const tablaEmpresas = document.getElementById('tablaEmpresas');
 
+  if (tablaEmpresas) {
+    tablaEmpresas.innerHTML = '<tr><td colspan="7">Cargando empresas...</td></tr>';
+  }
+
   try {
     const headers = {
       'Authorization': `Bearer ${token}`
     };
 
     const [empresasRes, usuariosRes] = await Promise.all([
-      fetch('http://localhost:3000/api/empresas', { headers }),
-      fetch('http://localhost:3000/api/usuarios', { headers })
+      window.Auth.apiFetch('/api/empresas'),
+      window.Auth.apiFetch('/api/usuarios')
     ]);
+
+    if (!empresasRes.ok) {
+      const err = await empresasRes.json().catch(() => ({}));
+      throw new Error(window.Auth.parseApiError(err) || 'Error al cargar empresas');
+    }
+    if (!usuariosRes.ok) {
+      const err = await usuariosRes.json().catch(() => ({}));
+      throw new Error(window.Auth.parseApiError(err) || 'Error al cargar usuarios');
+    }
 
     const empresas = await empresasRes.json();
     const usuarios = await usuariosRes.json();
-    window.allUsuarios = usuarios;
+
+    if (!Array.isArray(empresas)) {
+      throw new Error('Respuesta inválida de empresas');
+    }
+
+    window.allUsuarios = Array.isArray(usuarios) ? usuarios : [];
     window.empresasData = empresas;
 
     let totalPendientesGlobal = 0;
     let totalDocsGlobal = 0;
     let totalEnviadosGlobal = 0;
 
-    tablaEmpresas.innerHTML = '';
-    const empresasRiesgo = [];
+    if (tablaEmpresas) {
+      tablaEmpresas.innerHTML = '';
+    }
 
-    // 🔥 recorrer empresas
+    const pendientesPorEmpresa = agruparPendientesPorEmpresa(window.pendientesAuditorGlobal);
+
+    const resumenesMap = new Map();
+    await Promise.all(empresas.map(async (e) => {
+      try {
+        const resResumen = await fetch(
+          `/api/documentos-requeridos/empresa/${e.id}/resumen`,
+          { headers }
+        );
+        const resumen = resResumen.ok ? await resResumen.json() : { total: 0, enviados: 0 };
+        resumenesMap.set(String(e.id), resumen);
+      } catch {
+        resumenesMap.set(String(e.id), { total: 0, enviados: 0 });
+      }
+    }));
+
     for (const e of empresas) {
-
-      const resPend = await fetch(
-        `http://localhost:3000/api/documentos-requeridos/empresa/${e.id}/pendientes`,
-        { headers }
-      );
-
-      const pendientesEmpresa = await resPend.json();
+      const pendientesEmpresa = pendientesPorEmpresa.get(String(e.id)) || [];
       const totalPendientes = pendientesEmpresa.length;
 
       totalPendientesGlobal += totalPendientes;
 
-      // 👤 usuarios
-      const usuariosEmpresa = usuarios.filter(u =>
+      const usuariosEmpresa = window.allUsuarios.filter(u =>
         String(u.empresa_id) === String(e.id)
       );
 
-      // ==============================
-      // 🔥 CUMPLIMIENTO
-      // ==============================
-      const resResumen = await fetch(
-        `http://localhost:3000/api/documentos-requeridos/empresa/${e.id}/resumen`,
-        { headers }
-      );
-
-      const resumen = await resResumen.json();
+      const resumen = resumenesMap.get(String(e.id)) || { total: 0, enviados: 0 };
 
       const totalDocs = parseInt(resumen.total) || 0;
       const enviados = parseInt(resumen.enviados) || 0;
@@ -186,17 +415,7 @@ async function cargarEmpresas() {
         totalEnviadosGlobal += enviados;
       }
 
-      // ==============================
-      // 🚨 RIESGO (solo si hay pendientes reales)
-      // ==============================
-      const enRiesgo = totalDocs > 0 && totalPendientes > 0 && cumplimiento < 70;
-
-      if (enRiesgo) {
-        empresasRiesgo.push({
-          nombre: e.nombre,
-          pendientes: totalPendientes
-        });
-      }
+      const enRiesgo = totalPendientes > 0;
 
       const tr = document.createElement('tr');
 
@@ -241,19 +460,20 @@ async function cargarEmpresas() {
         </td>
       `;
 
-      tablaEmpresas.appendChild(tr);
+      if (tablaEmpresas) {
+        tablaEmpresas.appendChild(tr);
+      }
     }
 
    
     // ==============================
     // 🔥 KPI GLOBAL
     // ==============================
-    kpiEmpresas.textContent = empresas.length;
-    kpiEmpresasDetalle.textContent = `${empresas.length} registradas`;
+    if (kpiEmpresas) kpiEmpresas.textContent = empresas.length;
+    if (kpiEmpresasDetalle) kpiEmpresasDetalle.textContent = `${empresas.length} registradas`;
 
-    document.getElementById('kpiPendientes').textContent = totalPendientesGlobal;
-
-    // 🔥 CUMPLIMIENTO GLOBAL (solo empresas con documentos asignados)
+    const kpiPendientesEl = document.getElementById('kpiPendientes');
+    if (kpiPendientesEl) kpiPendientesEl.textContent = totalPendientesGlobal;
     const promedioCumplimiento = totalDocsGlobal
       ? Math.round((totalEnviadosGlobal / totalDocsGlobal) * 100)
       : 0;
@@ -271,7 +491,7 @@ async function cargarEmpresas() {
     // 🔥 REVISADOS DEL MES
     // ==============================
     try {
-      const resRevisados = await fetch('http://localhost:3000/api/documentos/revisados-mes', { headers });
+      const resRevisados = await fetch('/api/documentos/revisados-mes', { headers });
       const dataRevisados = await resRevisados.json();
       document.getElementById('kpiRevisados').textContent = dataRevisados.count;
     } catch (err) {
@@ -280,26 +500,21 @@ async function cargarEmpresas() {
     }
 
     // ==============================
-    // 🚨 EMPRESAS EN RIESGO
+    // 🚨 EMPRESAS EN RIESGO (desde pendientes globales)
     // ==============================
-    badgeRiesgo.textContent = empresasRiesgo.length;
-
-    listaRiesgo.innerHTML = empresasRiesgo.length
-      ? empresasRiesgo
-          .sort((a, b) => b.pendientes - a.pendientes)
-          .slice(0, 5)
-          .map(e => `
-            <div class="list-item">
-              <span>${e.nombre}</span>
-              <span class="badge badge-danger">
-                ${e.pendientes} pendientes
-              </span>
-            </div>
-          `).join('')
-      : `<div class="list-item"><span>Sin riesgo</span></div>`;
+    renderEmpresasEnRiesgo();
 
   } catch (err) {
     console.error('Error cargando dashboard:', err);
+    if (kpiEmpresas) kpiEmpresas.textContent = '0';
+    if (kpiEmpresasDetalle) kpiEmpresasDetalle.textContent = 'Error al cargar';
+    if (listaRiesgo) {
+      listaRiesgo.innerHTML = `<div class="list-empty is-error">No se pudo cargar el listado de riesgo</div>`;
+    }
+    if (badgeRiesgo) badgeRiesgo.textContent = '!';
+    if (tablaEmpresas) {
+      tablaEmpresas.innerHTML = '<tr><td colspan="7">No se pudieron cargar las empresas.</td></tr>';
+    }
   }
 }
 
@@ -367,7 +582,7 @@ async function crearEmpresa() {
   }
 
   try {
-    const res = await fetch('http://localhost:3000/api/empresas', {
+    const res = await fetch('/api/empresas', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -424,7 +639,7 @@ async function crearUsuario() {
   }
 
   try {
-    const res = await fetch('http://localhost:3000/api/usuarios', {
+    const res = await fetch('/api/usuarios', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -479,8 +694,8 @@ async function abrirModalAsignarDocumentos(empresaId, empresaNombre) {
   try {
     const headers = { 'Authorization': `Bearer ${token}` };
     const [tiposRes, docsEmpresaRes] = await Promise.all([
-      fetch('http://localhost:3000/api/tipos-documentos', { headers }),
-      fetch(`http://localhost:3000/api/documentos-requeridos/empresa/${empresaId}`, { headers })
+      fetch('/api/tipos-documentos', { headers }),
+      fetch(`/api/documentos-requeridos/empresa/${empresaId}`, { headers })
     ]);
 
     if (!tiposRes.ok) {
@@ -572,7 +787,7 @@ async function asignarDocumentosEmpresa() {
     };
 
     const results = await Promise.all(tipoIds.map(tipo_documento_id =>
-      fetch('http://localhost:3000/api/documentos-requeridos', {
+      fetch('/api/documentos-requeridos', {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -636,7 +851,7 @@ async function actualizarKpiRevisados() {
       'Authorization': `Bearer ${token}`
     };
 
-    const res = await fetch('http://localhost:3000/api/documentos/revisados-mes', { headers });
+    const res = await fetch('/api/documentos/revisados-mes', { headers });
     const data = await res.json();
     document.getElementById('kpiRevisados').textContent = data.count;
   } catch (err) {
@@ -652,7 +867,7 @@ async function cargarDocumentos() {
       'Authorization': `Bearer ${token}`
     };
 
-    const res = await fetch('http://localhost:3000/api/documentos/pendientes-validacion', { headers });
+    const res = await fetch('/api/documentos/pendientes-validacion', { headers });
     const documentos = await res.json();
 
     console.log('📋 DOCUMENTOS RECIBIDOS:', documentos); // 🔍 DEBUG
@@ -717,7 +932,7 @@ async function cargarHistorial(forceReload = false) {
     if (forceReload || historialGlobal.length === 0) {
       tbody.innerHTML = '<tr><td colspan="7">Cargando historial...</td></tr>';
 
-      const res = await fetch('http://localhost:3000/api/documentos', {
+      const res = await fetch('/api/documentos', {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -821,6 +1036,13 @@ window.abrirPreviewAuditor = function (id, nombre) {
 };
 
 window.validarDocumento = async function(id, action) {
+  const btn = event?.target?.closest?.('button');
+  const prevText = btn?.textContent;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = action === 'aprobar' ? 'Aprobando…' : 'Rechazando…';
+  }
+
   try {
     const headers = {
       'Authorization': `Bearer ${token}`,
@@ -836,7 +1058,7 @@ window.validarDocumento = async function(id, action) {
       comentarios = motivo.trim() || null;
     }
 
-    const res = await fetch(`http://localhost:3000/api/documentos/${id}/validar`, {
+    const res = await fetch(`/api/documentos/${id}/validar`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ estado, comentarios })
@@ -854,11 +1076,11 @@ window.validarDocumento = async function(id, action) {
       });
 
       historialGlobal = [];
-      invalidarCacheActividad();
-      cargarDocumentos();
-      cargarColaPrioritaria();
-      invalidarCacheActividad();
-      cargarEmpresas();
+      actividadWidget?.refrescarSilenciosa();
+      Promise.all([
+        cargarDocumentos(),
+        cargarPendientesAuditor()
+      ]).then(() => cargarEmpresas());
 
       if (action === 'aprobar') {
         actualizarKpiRevisados();
@@ -872,6 +1094,11 @@ window.validarDocumento = async function(id, action) {
     }
   } catch (err) {
     console.error('Error validando documento:', err);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      if (prevText) btn.textContent = prevText;
+    }
   }
 };
 
@@ -934,7 +1161,7 @@ window.descargarDocumento = async function(id, nombreArchivo) {
       'Authorization': `Bearer ${token}`
     };
 
-    const res = await fetch(`http://localhost:3000/api/documentos/${id}/descargar`, {
+    const res = await fetch(`/api/documentos/${id}/descargar`, {
       method: 'GET',
       headers
     });
@@ -963,95 +1190,17 @@ window.descargarDocumento = async function(id, nombreArchivo) {
 };
 
 async function cargarColaPrioritaria() {
-  try {
-    const headers = {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
-    };
-
-    const resEmpresas = await fetch('http://localhost:3000/api/empresas', { headers });
-    const empresas = await resEmpresas.json();
-
-    const pendientesPorEmpresa = await Promise.all(
-      empresas.map(e =>
-        fetch(`http://localhost:3000/api/documentos-requeridos/empresa/${e.id}/pendientes`, { headers })
-          .then(res => res.json())
-          .then(docs => docs.map(doc => ({
-            ...doc,
-            empresa: e.nombre
-          })))
-      )
-    );
-
-    const todos = pendientesPorEmpresa.flat();
-
-    console.log("PENDIENTES REALES:", todos);
-
-    // 🔥 ORDENAR
-    const ordenados = todos.sort((a, b) => {
-      const porcentajeA = parseFloat(a.porcentaje) || 0;
-      const porcentajeB = parseFloat(b.porcentaje) || 0;
-
-      if (porcentajeB !== porcentajeA) {
-        return porcentajeB - porcentajeA;
-      }
-
-      return new Date(a.fecha_limite) - new Date(b.fecha_limite);
-    });
-
-    const top5 = ordenados.slice(0, 5);
-
-    const sectionCola = document.getElementById('sectionColaRevision');
-    const tbody = document.getElementById('tablaColaPrioritaria');
-    const badge = document.getElementById('badgeCola');
-
-    if (top5.length === 0) {
-      if (sectionCola) sectionCola.style.display = 'none';
-      if (badge) badge.textContent = '0';
-      return;
-    }
-
-    if (sectionCola) sectionCola.style.display = '';
-
-    tbody.innerHTML = '';
-    badge.textContent = top5.length;
-
-    top5.forEach(doc => {
-      const tr = document.createElement('tr');
-
-      tr.innerHTML = `
-        <td>${doc.tipo_documento || doc.nombre} (${doc.porcentaje || 0}%)</td>
-        <td>${doc.empresa}</td>
-        <td>
-          <span class="badge ${
-            doc.prioridad === 'alta'
-              ? 'badge-danger'
-              : doc.prioridad === 'media'
-              ? 'badge-warning'
-              : 'badge-success'
-          }">
-            ${doc.prioridad}
-          </span>
-        </td>
-        <td>${doc.fecha_limite ? new Date(doc.fecha_limite).toLocaleDateString() : '—'}</td>
-        <td>
-          <button class="btn btn-primary">
-            Revisar
-          </button>
-        </td>
-      `;
-
-      tbody.appendChild(tr);
-    });
-
-  } catch (error) {
-    console.error('Error cola prioritaria:', error);
-  }
+  await cargarPendientesAuditor();
 }
+
+window.revisarDocumentoCola = function (id, nombre) {
+  verEmpresa(id);
+};
 
 
 
 function invalidarCacheActividad() {
-  actividadWidget?.invalidarYRecargar();
+  actividadWidget?.refrescarSilenciosa();
 }
 
 function initActividadAuditor() {
@@ -1059,7 +1208,7 @@ function initActividadAuditor() {
   actividadWidget = ActividadReciente.crearWidget({
     timelineId: 'timelineAuditor',
     paginacionId: 'paginacionActividadReciente',
-    buildUrl: (limit) => `http://localhost:3000/api/auditoria?limit=${limit}&offset=0`,
+    buildUrl: (limit) => `/api/auditoria?limit=${limit}&offset=0&skipCount=1`,
     mensajeVacio: 'Sin eventos registrados'
   });
   actividadWidget.init();
@@ -1068,11 +1217,11 @@ function initActividadAuditor() {
 // ==============================
 // INIT
 // ==============================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await cargarPendientesAuditor();
   cargarEmpresas();
-  cargarColaPrioritaria();
   initActividadAuditor();
-  window.colaPrioritariaInterval = setInterval(cargarColaPrioritaria, 15000);
+  window.colaPrioritariaInterval = setInterval(cargarPendientesAuditor, 15000);
 
   document.querySelectorAll('.modal').forEach((modal) => {
     modal.addEventListener('click', (event) => {

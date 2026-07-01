@@ -274,6 +274,22 @@ img {
   color: var(--text);
 }
 
+.btn-warning {
+  background: #f59e0b;
+  color: #fff;
+  border-color: #f59e0b;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: #d97706;
+  border-color: #d97706;
+}
+
+.btn-warning:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .btn-ghost {
   background: transparent;
   color: var(--muted);
@@ -507,6 +523,170 @@ tbody tr:hover {
   border-radius: 12px;
   background: var(--surface-muted);
   border: 1px solid var(--border);
+}
+
+.list-item-riesgo {
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+  gap: 12px;
+}
+
+.list-item-riesgo:hover {
+  border-color: rgba(239, 68, 68, 0.35);
+  box-shadow: 0 8px 20px -16px rgba(239, 68, 68, 0.45);
+  transform: translateY(-1px);
+}
+
+.list-item-riesgo-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.list-item-riesgo-info strong {
+  font-size: 14px;
+  color: var(--text-strong);
+}
+
+.list-item-riesgo-info small {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.list-item-riesgo-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Cola prioritaria — lista compacta dentro de la tarjeta */
+.grid-2 > .card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+#sectionColaRevision,
+.grid-2 > .card:has(#listaEmpresasRiesgo) {
+  min-height: 0;
+}
+
+#listaEmpresasRiesgo,
+.cola-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+}
+
+.cola-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+}
+
+.cola-item-doc {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.cola-item-doc strong {
+  display: block;
+  font-size: 13px;
+  color: var(--text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cola-item-doc small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.cola-item-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.cola-item-fecha {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.cola-btn-alerta {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+@media (max-width: 900px) {
+  .cola-item {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .cola-item-meta {
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+
+  .cola-btn-alerta {
+    width: 100%;
+  }
+}
+
+.list-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  border-radius: 12px;
+  background: var(--surface-muted);
+  border: 1px dashed var(--border-strong);
+}
+
+.list-empty .icon {
+  width: 28px;
+  height: 28px;
+  color: var(--accent);
+  opacity: 0.85;
+}
+
+.list-empty.is-error {
+  color: #b45309;
+  border-color: rgba(245, 158, 11, 0.35);
+  background: #fffbeb;
+}
+
+.list-empty-inline {
+  padding: 16px;
+  margin: 4px 0;
 }
 
 .chip {
@@ -925,6 +1105,73 @@ tbody tr:hover {
 .modal-content.wide-modal {
   width: min(980px, calc(100% - 40px));
   max-width: 980px;
+}
+
+/* Documentos cargados por usuario — celda compacta + modal */
+.usuario-docs-col {
+  width: auto;
+  min-width: 140px;
+  white-space: nowrap;
+}
+
+.usuario-docs-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.usuario-docs-resumen {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.usuario-docs-count {
+  flex-shrink: 0;
+}
+
+.usuario-docs-btn-ver {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.usuario-docs-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.usuario-docs-vacio {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.modal-docs-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.modal-docs-close {
+  font-size: 28px;
+  line-height: 1;
+  padding: 4px 10px;
+}
+
+.modal-docs-table-wrap {
+  max-height: 52vh;
+  overflow-y: auto;
+}
+
+.usuario-docs-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .seccion-grid {
@@ -1542,4 +1789,96 @@ tbody tr:hover {
   .doc-asignado-detalles {
     grid-template-columns: 1fr;
   }
+
+  .doc-historial-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* Historial de versiones por documento */
+.doc-historial-panel {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-muted);
+  overflow: hidden;
+}
+
+.doc-historial-panel summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  list-style: none;
+}
+
+.doc-historial-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.doc-historial-panel summary::before {
+  content: '▸ ';
+}
+
+.doc-historial-panel[open] summary::before {
+  content: '▾ ';
+}
+
+.doc-historial-list {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+
+.doc-historial-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.doc-historial-item.is-actual {
+  border-color: rgba(37, 99, 235, 0.35);
+  background: #f8fbff;
+}
+
+.doc-historial-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.doc-historial-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.doc-historial-info strong {
+  font-size: 13px;
+  color: var(--text-strong);
+}
+
+.doc-historial-meta {
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.doc-historial-acciones {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
 }

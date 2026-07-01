@@ -228,6 +228,33 @@
     </div>
   </div>
 
+  <div id="modalDocsUsuario" class="modal" onclick="if(event.target===this)cerrarModalDocsUsuario()">
+    <div class="modal-content wide-modal">
+      <div class="modal-docs-header">
+        <div>
+          <h2 id="modalDocsUsuarioTitulo" style="margin:0 0 4px;">Documentos cargados</h2>
+          <p id="modalDocsUsuarioSubtitulo" class="card-subtitle" style="margin:0;"></p>
+        </div>
+        <button type="button" class="btn btn-ghost modal-docs-close" onclick="cerrarModalDocsUsuario()" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="table-container modal-docs-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Documento</th>
+              <th>Tipo</th>
+              <th>Fecha</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="modalDocsUsuarioBody"></tbody>
+        </table>
+      </div>
+      <div id="paginacionModalDocsUsuario" class="paginacion"></div>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/lucide@latest"></script>
   <script>lucide.createIcons();</script>
   <script src="Js/Auth.js"></script>

@@ -18,6 +18,10 @@ let aprobadosGlobal = [];
 let paginaAprobados = 1;
 
 const LIMITE_PAGINA = 7;
+const LIMITE_MODAL_DOCS = 6;
+
+let modalDocsUsuarioId = null;
+let modalDocsUsuarioPagina = 1;
 
 let actividadWidget = null;
 
@@ -161,8 +165,11 @@ let documentosRequeridosGlobal = [];
 let empresaData = null;
 
 function esDocumentoCompletoEmpresa(doc) {
+  if (doc.cumple_periodo_actual === true || doc.cumple_periodo_actual === 't') {
+    return true;
+  }
   const estado = String(doc.estado_documento || doc.estado || 'pendiente').toLowerCase();
-  return ['validado', 'revisado', 'aprobado', 'subido'].includes(estado);
+  return ['validado', 'revisado', 'aprobado'].includes(estado);
 }
 
 async function cargarDocumentosRequeridosEmpresa() {
@@ -363,6 +370,115 @@ function actualizarBarrasProgresoEmpresa() {
   document.getElementById('usuariosProgresoEmpresa').textContent = usuariosEnProgresoCount;
 }
 
+function obtenerDocsDelUsuario(usuarioId) {
+  return (documentosGlobal || []).filter(d =>
+    String(d.usuario_id) === String(usuarioId)
+  );
+}
+
+function renderCellDocumentosUsuario(usuario) {
+  const docs = obtenerDocsDelUsuario(usuario.id);
+  const count = docs.length;
+
+  if (!count) {
+    return '<span class="usuario-docs-vacio">Sin documentos</span>';
+  }
+
+  const ultima = docs.reduce((max, d) => {
+    const t = d.fecha_subida ? new Date(d.fecha_subida).getTime() : 0;
+    return t > max ? t : max;
+  }, 0);
+  const ultimaStr = ultima
+    ? new Date(ultima).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
+    : '—';
+
+  return `
+    <div class="usuario-docs-cell">
+      <div class="usuario-docs-resumen">
+        <span class="badge badge-info usuario-docs-count">${count} doc${count !== 1 ? 's' : ''}</span>
+        <button type="button" class="btn btn-sm btn-secondary usuario-docs-btn-ver" onclick="abrirModalDocsUsuario(${usuario.id})">
+          Ver
+        </button>
+      </div>
+      <small class="usuario-docs-meta">Última subida: ${ultimaStr}</small>
+    </div>`;
+}
+
+function renderModalDocsUsuario() {
+  const tbody = document.getElementById('modalDocsUsuarioBody');
+  if (!tbody || !modalDocsUsuarioId) return;
+
+  const docs = obtenerDocsDelUsuario(modalDocsUsuarioId)
+    .slice()
+    .sort((a, b) => new Date(b.fecha_subida || 0) - new Date(a.fecha_subida || 0));
+
+  const inicio = (modalDocsUsuarioPagina - 1) * LIMITE_MODAL_DOCS;
+  const pagina = docs.slice(inicio, inicio + LIMITE_MODAL_DOCS);
+
+  tbody.innerHTML = pagina.length
+    ? pagina.map(d => {
+        const estado = estadoDocumentoBadge(d.estado);
+        const nombreArchivo = d.nombre_archivo || d.nombre || 'Documento';
+        const safeName = String(nombreArchivo).replace(/'/g, "\\'");
+        return `
+          <tr>
+            <td>${nombreArchivo}</td>
+            <td>${d.tipo_documento_nombre || d.tipo_documento_id || '—'}</td>
+            <td>${d.fecha_subida ? new Date(d.fecha_subida).toLocaleDateString() : '—'}</td>
+            <td><span class="badge ${estado.clase}">${estado.texto}</span></td>
+            <td class="usuario-docs-acciones">
+              <button type="button" class="btn btn-sm btn-primary" onclick="abrirPreviewEmpresa('${d.id}', '${safeName}')">Ver</button>
+              <button type="button" class="btn btn-sm btn-secondary btn-descargar-doc" data-descargar-id="${d.id}" data-descargar-nombre="${encodeURIComponent(nombreArchivo)}">Descargar</button>
+            </td>
+          </tr>`;
+      }).join('')
+    : '<tr><td colspan="5">Sin documentos</td></tr>';
+
+  renderPaginacionEmpresa(
+    'paginacionModalDocsUsuario',
+    modalDocsUsuarioPagina,
+    docs.length,
+    'cambiarPaginaModalDocsUsuario',
+    LIMITE_MODAL_DOCS
+  );
+}
+
+window.abrirModalDocsUsuario = function (usuarioId) {
+  modalDocsUsuarioId = usuarioId;
+  modalDocsUsuarioPagina = 1;
+
+  const usuario = usuariosGlobal.find(u => String(u.id) === String(usuarioId));
+  const modal = document.getElementById('modalDocsUsuario');
+  if (!modal) return;
+
+  const docs = obtenerDocsDelUsuario(usuarioId);
+  const titulo = document.getElementById('modalDocsUsuarioTitulo');
+  const subtitulo = document.getElementById('modalDocsUsuarioSubtitulo');
+
+  if (titulo) {
+    titulo.textContent = `Documentos de ${usuario?.nombre || usuario?.email || 'usuario'}`;
+  }
+  if (subtitulo) {
+    subtitulo.textContent = `${docs.length} documento(s) cargado(s)`;
+  }
+
+  renderModalDocsUsuario();
+  modal.style.display = 'flex';
+};
+
+window.cerrarModalDocsUsuario = function () {
+  const modal = document.getElementById('modalDocsUsuario');
+  if (modal) modal.style.display = 'none';
+  modalDocsUsuarioId = null;
+};
+
+window.cambiarPaginaModalDocsUsuario = function (direccion) {
+  const docs = obtenerDocsDelUsuario(modalDocsUsuarioId);
+  const totalPaginas = Math.max(1, Math.ceil(docs.length / LIMITE_MODAL_DOCS));
+  modalDocsUsuarioPagina = Math.min(totalPaginas, Math.max(1, modalDocsUsuarioPagina + direccion));
+  renderModalDocsUsuario();
+};
+
 function renderUsuarios() {
   const tablaUsuarios = document.getElementById('tablaUsuariosEmpresa');
 
@@ -373,26 +489,7 @@ function renderUsuarios() {
 
   tablaUsuarios.innerHTML = pagina.length
     ? pagina.map(u => {
-        const docsDelUsuario = documentosGlobal.filter(d =>
-          String(d.usuario_id) === String(u.id)
-        );
-
-        const contadorDocumentos = docsDelUsuario.length;
-
-        const listaDocumentos = docsDelUsuario.length > 0
-          ? docsDelUsuario.map(d => {
-              const safeName = String(d.nombre_archivo || d.nombre || 'Documento').replace(/'/g, "\\'");
-              return `
-              <div style="font-size:12px; padding:6px; background:#f8fafc; border-radius:6px; margin:4px 0; display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                <span>${d.nombre_archivo || d.nombre || 'Documento'}</span>
-                <span style="display:flex; gap:6px; flex-shrink:0;">
-                  <button type="button" class="btn btn-sm btn-primary" onclick="abrirPreviewEmpresa('${d.id}', '${safeName}')">Ver</button>
-                  <button type="button" class="btn btn-sm btn-secondary btn-descargar-doc" data-descargar-id="${d.id}" data-descargar-nombre="${encodeURIComponent(d.nombre_archivo || d.nombre || 'Documento')}">Descargar</button>
-                </span>
-              </div>
-            `;
-            }).join('')
-          : '<div style="font-size:12px; color:#64748b;">Sin documentos</div>';
+        const docsDelUsuario = obtenerDocsDelUsuario(u.id);
 
         const ultimaActividad = docsDelUsuario.length > 0
           ? new Date(Math.max(...docsDelUsuario.map(d => new Date(d.fecha_subida).getTime()))).toLocaleDateString()
@@ -408,10 +505,7 @@ function renderUsuarios() {
             <td>${u.email || '-'}</td>
             <td>${u.rol || '-'}</td>
             <td><span class="badge ${estadoUsuario === 'Activo' ? 'badge-success' : 'badge-danger'}">${estadoUsuario}</span></td>
-            <td style="min-width:280px;">
-              <div style="font-size:12px; color:#64748b; margin-bottom:4px;">${contadorDocumentos} documento(s)</div>
-              ${listaDocumentos}
-            </td>
+            <td class="usuario-docs-col">${renderCellDocumentosUsuario(u)}</td>
             <td>${ultimaActividad}</td>
           </tr>
         `;
@@ -539,6 +633,7 @@ async function switchTab(tabName, evt) {
 
   if (tabName === 'documentos-asignados') {
     await cargarDocumentosRequeridosEmpresa();
+    await cargarTodosLosDocumentos();
     renderDocumentosAsignados();
   }
 }
@@ -702,6 +797,49 @@ function agruparAsignadosPorSgsst(documentos) {
   return { categorias, sinCategoria };
 }
 
+function obtenerHistorialPorTipo(tipoDocumentoId) {
+  return (documentosGlobal || [])
+    .filter(d => String(d.tipo_documento_id) === String(tipoDocumentoId))
+    .sort((a, b) => {
+      const ta = a.fecha_subida ? new Date(a.fecha_subida).getTime() : 0;
+      const tb = b.fecha_subida ? new Date(b.fecha_subida).getTime() : 0;
+      return tb - ta || (Number(b.id) - Number(a.id));
+    });
+}
+
+function renderHistorialVersiones(doc, historial) {
+  if (!historial.length) return '';
+
+  const items = historial.map((version, index) => {
+    const estado = estadoDocumentoBadge(version.estado);
+    const fecha = version.fecha_subida
+      ? new Date(version.fecha_subida).toLocaleDateString()
+      : '-';
+    const nombreArchivo = version.nombre_archivo || version.nombre || 'Documento';
+    const safeName = String(nombreArchivo).replace(/'/g, "\\'");
+    const esActual = String(version.id) === String(doc.documento_subido_id);
+
+    return `
+      <div class="doc-historial-item ${esActual ? 'is-actual' : ''}">
+        <div class="doc-historial-info">
+          <span class="doc-historial-label">${esActual ? 'Versión actual' : `Versión ${historial.length - index}`}</span>
+          <strong>${nombreArchivo}</strong>
+          <span class="doc-historial-meta">${fecha} · <span class="badge ${estado.clase}">${estado.texto}</span></span>
+        </div>
+        <div class="doc-historial-acciones">
+          <button type="button" class="btn btn-sm btn-primary" onclick="abrirPreviewEmpresa('${version.id}', '${safeName}')">Ver</button>
+          <button type="button" class="btn btn-sm btn-secondary btn-descargar-doc" data-descargar-id="${version.id}" data-descargar-nombre="${encodeURIComponent(nombreArchivo)}">Descargar</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <details class="doc-historial-panel">
+      <summary>Historial de versiones (${historial.length})</summary>
+      <div class="doc-historial-list">${items}</div>
+    </details>`;
+}
+
 function filaDocumentoAsignado(doc) {
   const nombreCompleto = doc.tipo_documento || doc.nombre || 'Documento';
   const codigo = obtenerCodigoDocumento(nombreCompleto);
@@ -717,6 +855,12 @@ function filaDocumentoAsignado(doc) {
   const docSubidoId = doc.documento_subido_id;
   const safeName = String(nombreCompleto).replace(/'/g, "\\'");
   const searchText = `${nombreCompleto} ${doc.responsable_nombre || ''} ${doc.responsable_email || ''}`.toLowerCase().replace(/"/g, '');
+  const frecuencia = doc.frecuencia ? String(doc.frecuencia) : '-';
+  const historial = obtenerHistorialPorTipo(doc.tipo_documento_id);
+  const periodoOk = doc.cumple_periodo_actual === true || doc.cumple_periodo_actual === 't';
+  const periodoBadge = periodoOk
+    ? '<span class="badge badge-success">Periodo al día</span>'
+    : '<span class="badge badge-warning">Requiere entrega</span>';
 
   const acciones = docSubidoId
     ? `
@@ -740,9 +884,12 @@ function filaDocumentoAsignado(doc) {
         <div class="doc-asignado-detalles">
           <span class="doc-asignado-detalle"><i data-lucide="user"></i> ${doc.responsable_nombre || 'Sin asignar'}</span>
           <span class="doc-asignado-detalle"><i data-lucide="calendar"></i> Límite: ${fechaLimite}</span>
+          <span class="doc-asignado-detalle"><i data-lucide="repeat"></i> Frecuencia: ${frecuencia}</span>
           <span class="doc-asignado-detalle"><i data-lucide="percent"></i> Peso: ${porcentaje}</span>
           <span class="doc-asignado-detalle"><i data-lucide="flag"></i> <span class="badge badge-${prioridadClase}">${doc.prioridad || 'media'}</span></span>
+          <span class="doc-asignado-detalle">${periodoBadge}</span>
         </div>
+        ${renderHistorialVersiones(doc, historial)}
       </div>
       <div class="doc-asignado-acciones">${acciones}</div>
     </article>`;
@@ -1225,7 +1372,7 @@ window.descargarDocumento = async function (id, nombreArchivo) {
 // ACTIVIDAD RECIENTE (EMPRESA)
 // ==============================
 function invalidarCacheActividadEmpresa() {
-  actividadWidget?.invalidarYRecargar();
+  actividadWidget?.refrescarSilenciosa();
 }
 
 function initActividadEmpresa() {
@@ -1234,7 +1381,7 @@ function initActividadEmpresa() {
     timelineId: 'timelineEmpresa',
     paginacionId: 'paginacionActividadEmpresa',
     limite: 7,
-    buildUrl: (limit) => `http://localhost:3000/api/auditoria?limit=${limit}&offset=0&empresa_id=${empresaId}`,
+    buildUrl: (limit) => `http://localhost:3000/api/auditoria?limit=${limit}&offset=0&skipCount=1&empresa_id=${empresaId}`,
     mensajeVacio: 'Sin actividad registrada para esta empresa'
   });
   actividadWidget.init();
@@ -1254,7 +1401,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await cargarEmpresaDetalle();
   await cargarPendientesEmpresa(empresaId);
-  initActividadEmpresa();
   initControlesAsignados();
+  initActividadEmpresa();
 });
 

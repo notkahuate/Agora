@@ -2,6 +2,10 @@
 const { pool } = require('../configures/db');
 
 async function enriquecerEvento(evento) {
+  if (evento.descripcion && String(evento.descripcion).trim().length > 0) {
+    return evento;
+  }
+
   const datosNuevos = evento.datos_nuevos || {};
   const datosAnteriores = evento.datos_anteriores || {};
   const entidad = evento.entidad;
@@ -89,7 +93,7 @@ async function enriquecerEvento(evento) {
  */
 const obtenerEventos = async (req, res) => {
   try {
-    const { limit = 20, offset = 0, empresa_id } = req.query;
+    const { limit = 20, offset = 0, empresa_id, skipCount } = req.query;
     const limitNum = Math.min(parseInt(limit) || 20, 100); // Max 100
     const offsetNum = Math.max(parseInt(offset) || 0, 0);
     const requestedEmpresaId = empresa_id ? parseInt(empresa_id) : null;
@@ -140,17 +144,21 @@ const obtenerEventos = async (req, res) => {
     const { rows } = await pool.query(query, params);
     const eventos = await Promise.all(rows.map(enriquecerEvento));
 
-    // Contar total de eventos
-    const countParams = empresaIdNum ? [empresaIdNum] : [];
-    const countResult = await pool.query(countQuery, countParams);
-    const total = parseInt(countResult.rows[0].total);
+    let total = eventos.length;
+    if (skipCount !== '1' && skipCount !== 'true') {
+      const countParams = empresaIdNum ? [empresaIdNum] : [];
+      const countResult = await pool.query(countQuery, countParams);
+      total = parseInt(countResult.rows[0].total);
+    }
 
     return res.json({
       eventos,
       total,
       limit: limitNum,
       offset: offsetNum,
-      hasMore: offsetNum + limitNum < total
+      hasMore: skipCount === '1' || skipCount === 'true'
+        ? eventos.length >= limitNum
+        : offsetNum + limitNum < total
     });
   } catch (err) {
     console.error('Error obteniendo eventos de auditoría:', err);
@@ -216,10 +224,21 @@ const obtenerEventosPorEntidad = async (req, res) => {
  */
 const obtenerEventosRecientes = async (req, res) => {
   try {
-    const { limit = 10 } = req.query;
+    const { limit = 10, empresa_id } = req.query;
     const limitNum = Math.min(parseInt(limit) || 10, 50);
 
-    const query = `
+    let empresaIdNum = null;
+    if (req.user && req.user.rol === 'usuario') {
+      empresaIdNum = req.user.empresa_id || null;
+      if (!empresaIdNum) {
+        return res.json({ eventos: [], limit: limitNum });
+      }
+    } else if (empresa_id) {
+      empresaIdNum = parseInt(empresa_id) || null;
+    }
+
+    const params = [limitNum];
+    let query = `
       SELECT 
         a.id,
         a.entidad,
@@ -234,11 +253,16 @@ const obtenerEventosRecientes = async (req, res) => {
         u.email as usuario_email
       FROM auditoria_sistema a
       LEFT JOIN usuarios u ON a.usuario_id = u.id
-      ORDER BY a.fecha_evento DESC
-      LIMIT $1
     `;
 
-    const { rows } = await pool.query(query, [limitNum]);
+    if (empresaIdNum) {
+      query += ` WHERE a.empresa_id = $2`;
+      params.push(empresaIdNum);
+    }
+
+    query += ` ORDER BY a.fecha_evento DESC LIMIT $1`;
+
+    const { rows } = await pool.query(query, params);
     const eventos = await Promise.all(rows.map(enriquecerEvento));
 
     return res.json({

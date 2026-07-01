@@ -1,11 +1,11 @@
 // src/models/documentoModel.js
 const { pool } = require('../configures/db');
 
-const crearDocumento = async ({ usuario_id, tipo_documento_id, empresa_id, nombre_archivo, ruta_archivo, archivo, mime_type, comentarios }) => {
+const crearDocumento = async ({ usuario_id, tipo_documento_id, empresa_id, nombre_archivo, ruta_archivo, archivo, mime_type, comentarios, lote_subida = null }) => {
   const texto = `
     INSERT INTO documentos_subidos
-      (usuario_id, tipo_documento_id, empresa_id, nombre_archivo, ruta_archivo, archivo, mime_type, comentarios)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      (usuario_id, tipo_documento_id, empresa_id, nombre_archivo, ruta_archivo, archivo, mime_type, comentarios, lote_subida)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
     RETURNING *;
   `;
   const valores = [
@@ -16,25 +16,26 @@ const crearDocumento = async ({ usuario_id, tipo_documento_id, empresa_id, nombr
     ruta_archivo || null,
     archivo || null,
     mime_type || null,
-    comentarios || null
+    comentarios || null,
+    lote_subida || null
   ];
   const { rows } = await pool.query(texto, valores);
   return rows[0];
 };
 
-const listarDocumentos = async () => {
-  const { rows } = await pool.query(`
+const LISTAR_DOCUMENTOS_SQL = (includeLote = true) => `
     SELECT 
       ds.id,
       ds.usuario_id,
       ds.tipo_documento_id,
       ds.empresa_id,
       ds.nombre_archivo,
-      COALESCE(ds.ruta_archivo, '/api/documentos/' || ds.id || '/descargar') AS ruta_archivo,
+      COALESCE(ds.ruta_archivo, CONCAT('/api/documentos/', ds.id, '/descargar')) AS ruta_archivo,
       ds.estado,
       ds.validado_por,
       vu.nombre AS validado_por_nombre,
       ds.comentarios,
+      ${includeLote ? 'ds.lote_subida,' : ''}
       ds.fecha_subida,
       ds.fecha_validacion,
       ds.fecha_actualizacion,
@@ -47,8 +48,19 @@ const listarDocumentos = async () => {
     LEFT JOIN usuarios vu ON ds.validado_por = vu.id
     JOIN tipos_documentos td ON ds.tipo_documento_id = td.id
     ORDER BY ds.fecha_subida DESC;
-  `);
-  return rows;
+  `;
+
+const listarDocumentos = async () => {
+  try {
+    const { rows } = await pool.query(LISTAR_DOCUMENTOS_SQL(true));
+    return rows;
+  } catch (error) {
+    if (String(error.message || '').includes('lote_subida')) {
+      const { rows } = await pool.query(LISTAR_DOCUMENTOS_SQL(false));
+      return rows;
+    }
+    throw error;
+  }
 };
 
 const listarDocumentosPorUsuario = async (usuario_id) => {
@@ -60,18 +72,21 @@ const listarDocumentosPorUsuario = async (usuario_id) => {
         ds.tipo_documento_id,
         ds.empresa_id,
         ds.nombre_archivo,
-        COALESCE(ds.ruta_archivo, '/api/documentos/' || ds.id || '/descargar') AS ruta_archivo,
+        COALESCE(ds.ruta_archivo, CONCAT('/api/documentos/', ds.id, '/descargar')) AS ruta_archivo,
         ds.estado,
         ds.validado_por,
         vu.nombre AS validado_por_nombre,
         ds.comentarios,
         ds.fecha_subida,
         ds.fecha_validacion,
-        ds.fecha_actualizacion
+        ds.fecha_actualizacion,
+        td.nombre AS tipo_documento_nombre,
+        td.frecuencia
       FROM documentos_subidos ds
       LEFT JOIN usuarios vu ON ds.validado_por = vu.id
+      LEFT JOIN tipos_documentos td ON td.id = ds.tipo_documento_id
       WHERE ds.usuario_id = $1
-      ORDER BY ds.fecha_subida DESC;
+      ORDER BY ds.fecha_subida IS NULL, ds.fecha_subida DESC, ds.id DESC;
     `,
     [usuario_id]
   );
@@ -87,7 +102,7 @@ const listarDocumentosPorEmpresa = async (empresa_id) => {
         ds.tipo_documento_id,
         ds.empresa_id,
         ds.nombre_archivo,
-        COALESCE(ds.ruta_archivo, '/api/documentos/' || ds.id || '/descargar') AS ruta_archivo,
+        COALESCE(ds.ruta_archivo, CONCAT('/api/documentos/', ds.id, '/descargar')) AS ruta_archivo,
         ds.estado,
         ds.validado_por,
         vu.nombre AS validado_por_nombre,
@@ -113,11 +128,12 @@ const obtenerDocumentoPorId = async (id) => {
       ds.tipo_documento_id,
       ds.empresa_id,
       ds.nombre_archivo,
-      COALESCE(ds.ruta_archivo, '/api/documentos/' || ds.id || '/descargar') AS ruta_archivo,
+      COALESCE(ds.ruta_archivo, CONCAT('/api/documentos/', ds.id, '/descargar')) AS ruta_archivo,
       ds.estado,
       ds.validado_por,
       vu.nombre AS validado_por_nombre,
       ds.comentarios,
+      ds.lote_subida,
       ds.fecha_subida,
       ds.fecha_validacion,
       ds.fecha_actualizacion
@@ -143,6 +159,7 @@ const obtenerDocumentoArchivoPorId = async (id) => {
       ds.validado_por,
       vu.nombre AS validado_por_nombre,
       ds.comentarios,
+      ds.lote_subida,
       ds.fecha_subida,
       ds.fecha_validacion,
       ds.fecha_actualizacion
@@ -211,7 +228,7 @@ const listarPendientesValidacionConJoin = async () => {
       ds.tipo_documento_id,
       ds.empresa_id,
       ds.nombre_archivo,
-      COALESCE(ds.ruta_archivo, '/api/documentos/' || ds.id || '/descargar') AS ruta_archivo,
+      COALESCE(ds.ruta_archivo, CONCAT('/api/documentos/', ds.id, '/descargar')) AS ruta_archivo,
       ds.comentarios,
       ds.estado,
       ds.fecha_subida,
@@ -220,7 +237,8 @@ const listarPendientesValidacionConJoin = async () => {
       vu.nombre AS validado_por_nombre,
       e.nombre AS empresa_nombre,
       u.nombre AS usuario_nombre,
-      td.nombre AS tipo_documento_nombre
+      td.nombre AS tipo_documento_nombre,
+      td.porcentaje
     FROM documentos_subidos ds
     LEFT JOIN empresas e ON ds.empresa_id = e.id
     LEFT JOIN usuarios u ON ds.usuario_id = u.id
@@ -229,6 +247,73 @@ const listarPendientesValidacionConJoin = async () => {
     WHERE ds.estado = 'subido'
     ORDER BY ds.fecha_subida DESC;
   `);
+  return rows;
+};
+
+/**
+ * Cola prioritaria del auditor: documentos subidos pendientes de revisión, ordenados por prioridad y peso SG-SST.
+ */
+const listarColaPrioritariaAuditor = async (limite = 8) => {
+  const { rows } = await pool.query(`
+    SELECT 
+      ds.id,
+      ds.nombre_archivo,
+      ds.fecha_subida,
+      td.nombre AS tipo_documento_nombre,
+      td.porcentaje,
+      e.nombre AS empresa_nombre,
+      e.id AS empresa_id,
+      u.nombre AS usuario_nombre,
+      COALESCE(dr.prioridad, 'media') AS prioridad,
+      dr.fecha_limite
+    FROM documentos_subidos ds
+    JOIN tipos_documentos td ON td.id = ds.tipo_documento_id
+    JOIN empresas e ON e.id = ds.empresa_id
+    JOIN usuarios u ON u.id = ds.usuario_id
+    LEFT JOIN documentos_requeridos dr
+      ON dr.empresa_id = ds.empresa_id
+      AND dr.tipo_documento_id = ds.tipo_documento_id
+    WHERE ds.estado = 'subido'
+    ORDER BY
+      CASE COALESCE(dr.prioridad, 'media')
+        WHEN 'alta' THEN 0
+        WHEN 'media' THEN 1
+        ELSE 2
+      END,
+      td.porcentaje IS NULL, td.porcentaje DESC,
+      ds.fecha_subida ASC
+    LIMIT $1
+  `, [limite]);
+  return rows;
+};
+
+const listarHistorialPorTipo = async (empresa_id, tipo_documento_id) => {
+  const { rows } = await pool.query(`
+    SELECT
+      ds.id,
+      ds.usuario_id,
+      ds.tipo_documento_id,
+      ds.empresa_id,
+      ds.nombre_archivo,
+      COALESCE(ds.ruta_archivo, CONCAT('/api/documentos/', ds.id, '/descargar')) AS ruta_archivo,
+      ds.estado,
+      ds.validado_por,
+      vu.nombre AS validado_por_nombre,
+      ds.comentarios,
+      ds.lote_subida,
+      ds.fecha_subida,
+      ds.fecha_validacion,
+      ds.fecha_actualizacion,
+      u.nombre AS usuario_nombre,
+      td.nombre AS tipo_documento_nombre,
+      td.frecuencia
+    FROM documentos_subidos ds
+    JOIN usuarios u ON u.id = ds.usuario_id
+    JOIN tipos_documentos td ON td.id = ds.tipo_documento_id
+    LEFT JOIN usuarios vu ON vu.id = ds.validado_por
+    WHERE ds.empresa_id = $1 AND ds.tipo_documento_id = $2
+    ORDER BY ds.fecha_subida IS NULL, ds.fecha_subida DESC, ds.id DESC
+  `, [empresa_id, tipo_documento_id]);
   return rows;
 };
 
@@ -243,4 +328,6 @@ module.exports = {
   eliminarDocumento,
   validarDocumento,
   listarPendientesValidacionConJoin,
+  listarColaPrioritariaAuditor,
+  listarHistorialPorTipo,
 };

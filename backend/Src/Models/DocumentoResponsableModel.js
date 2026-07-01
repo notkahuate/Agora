@@ -10,10 +10,13 @@ const asignarResponsable = async (documento_requerido_id, usuario_id) => {
   );
 
   if (existe.rows.length > 0) {
-    // Actualizar
-    const result = await pool.query(
-      'UPDATE documento_responsables SET usuario_id = $1, fecha_asignacion = CURRENT_TIMESTAMP WHERE documento_requerido_id = $2 RETURNING *',
+    await pool.query(
+      'UPDATE documento_responsables SET usuario_id = $1, fecha_asignacion = CURRENT_TIMESTAMP WHERE documento_requerido_id = $2',
       [usuario_id, documento_requerido_id]
+    );
+    const result = await pool.query(
+      'SELECT * FROM documento_responsables WHERE documento_requerido_id = $1',
+      [documento_requerido_id]
     );
     return result.rows[0];
   } else {

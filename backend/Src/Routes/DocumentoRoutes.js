@@ -5,14 +5,18 @@ const controller = require('../Controllers/DocumentoController');
 const { authenticate, authorize } = require('../milddlewares/authMiddleware');
 const upload = require('../milddlewares/uploadMiddleware');
 
-// POST con multer para subida de archivo
+// POST — uno o varios archivos para el mismo documento requerido
+router.post('/lote', authenticate, upload.uploadMultiple, controller.crearDocumentosLote);
 router.post('/', authenticate, upload.single('archivo'), controller.crearDocumento);
 
 // endpoint para listar documentos pendientes de validación (antes de :id para evitar conflicto)
 router.get('/pendientes-validacion', authenticate, authorize('auditor', 'super_admin'), controller.listarPendientesValidacion);
 
-// endpoint para contar documentos revisados en el mes
+router.get('/cola-prioritaria', authenticate, authorize('auditor', 'super_admin'), controller.listarColaPrioritaria);
+
 router.get('/revisados-mes', authenticate, authorize('auditor', 'super_admin'), controller.contarRevisadosMes);
+
+router.get('/historial/tipo', authenticate, controller.listarHistorialPorTipo);
 
 router.get('/', authenticate, controller.listarDocumentos);
 router.get('/:id/descargar', authenticate, controller.descargarDocumento);

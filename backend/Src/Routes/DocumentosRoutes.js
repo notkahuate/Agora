@@ -7,6 +7,10 @@ const { authenticate } = require('../milddlewares/authMiddleware');
 // 📌 Crear
 router.post('/', authenticate, controller.crear);
 
+// 📌 Pendientes globales auditor (antes de rutas con :empresaId)
+router.get('/auditor/pendientes', authenticate, controller.listarPendientesAuditor);
+router.post('/auditor/alerta/:id', authenticate, controller.generarAlerta);
+
 // 📌 Listar por empresa
 router.get('/empresa/:empresaId', authenticate, controller.listarPorEmpresa);
 

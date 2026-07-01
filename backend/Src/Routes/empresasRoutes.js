@@ -6,7 +6,7 @@ const { authenticate, authorize } = require('../milddlewares/authMiddleware');
 
 // CRUD básico
 router.post('/', authenticate, authorize('super_admin', 'auditor'), controller.crearEmpresa); // Crear empresa
-router.get('/', authenticate, authorize('auditor'), controller.listarEmpresas); // Obtener todas
+router.get('/', authenticate, authorize('auditor', 'super_admin'), controller.listarEmpresas); // Obtener todas
 router.get('/:id', authenticate, authorize('super_admin', 'auditor'), controller.obtenerEmpresa); // Obtener por id
 router.put('/:id', authenticate, authorize('super_admin'), controller.actualizarEmpresa); // Actualizar
 router.delete('/:id', authenticate, authorize('super_admin'), controller.eliminarEmpresa); // Eliminar

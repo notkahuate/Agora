@@ -1,10 +1,10 @@
 /**
- * Widget compartido de actividad reciente — mismo diseño y carga optimizada.
+ * Widget compartido de actividad reciente — carga ligera y no bloqueante.
  */
 const ActividadReciente = (function () {
   const LIMITE_PAGINA = 7;
-  const FETCH_LIMIT = 100;
-  const REFRESH_MS = 20000;
+  const FETCH_LIMIT = 21;
+  const REFRESH_MS = 30000;
   const registry = {};
 
   function obtenerToken() {
@@ -20,6 +20,7 @@ const ActividadReciente = (function () {
     if (evento.accion === 'descargar') return { color: '#0ea5e9', icono: '↓' };
     if (evento.accion === 'subir') return { color: '#f59e0b', icono: '↑' };
     if (evento.accion === 'asignar') return { color: '#f59e0b', icono: '→' };
+    if (evento.accion === 'alerta') return { color: '#ef4444', icono: '!' };
     if (entidadTexto.toLowerCase().includes('documento')) return { color: '#f97316', icono: '📄' };
     return { color: '#94a3b8', icono: '●' };
   }
@@ -52,6 +53,7 @@ const ActividadReciente = (function () {
       pagina: 1,
       eventos: [],
       cargando: false,
+      pendingRefresh: false,
       inicializada: false,
       abortController: null,
       lastHash: '',
@@ -140,20 +142,30 @@ const ActividadReciente = (function () {
 
     async function cargar(pagina = 1, forceFetch = false, silent = false) {
       if (!getTimeline()) return;
-      if (state.cargando) return;
 
       state.pagina = Math.max(1, parseInt(pagina) || 1);
+      const needsFetch = forceFetch || !state.eventos.length;
+
+      if (!needsFetch) {
+        const totalPaginas = Math.max(1, Math.ceil(state.eventos.length / state.limite));
+        state.pagina = Math.min(state.pagina, totalPaginas);
+        renderEventos(true);
+        return;
+      }
+
+      if (state.cargando) {
+        state.pendingRefresh = true;
+        return;
+      }
 
       try {
-        const needsFetch = forceFetch || !state.eventos.length;
-        if (needsFetch) {
-          state.cargando = true;
-          if (!silent && !state.inicializada) {
-            renderMensaje('Cargando actividad...');
-          }
-          state.eventos = await fetchEventos();
-          state.inicializada = true;
+        state.cargando = true;
+        if (!silent && !state.inicializada) {
+          renderMensaje('Cargando actividad...');
         }
+
+        state.eventos = await fetchEventos();
+        state.inicializada = true;
 
         const totalPaginas = Math.max(1, Math.ceil(state.eventos.length / state.limite));
         state.pagina = Math.min(state.pagina, totalPaginas);
@@ -167,18 +179,27 @@ const ActividadReciente = (function () {
         renderPaginacion();
       } finally {
         state.cargando = false;
+        if (state.pendingRefresh) {
+          state.pendingRefresh = false;
+          cargar(state.pagina, true, true);
+        }
       }
     }
 
     async function refrescarSilenciosa() {
-      if (state.cargando || document.hidden) return;
+      if (document.hidden) return;
+      if (state.cargando) {
+        state.pendingRefresh = true;
+        return;
+      }
 
       const prevHash = hashEventos(state.eventos);
       try {
         state.cargando = true;
         const nuevos = await fetchEventos();
-        if (hashEventos(nuevos) !== prevHash) {
+        if (hashEventos(nuevos) !== prevHash || !state.inicializada) {
           state.eventos = nuevos;
+          state.inicializada = true;
           const totalPaginas = Math.max(1, Math.ceil(state.eventos.length / state.limite));
           state.pagina = Math.min(state.pagina, totalPaginas);
           renderEventos(true);
@@ -189,6 +210,10 @@ const ActividadReciente = (function () {
         }
       } finally {
         state.cargando = false;
+        if (state.pendingRefresh) {
+          state.pendingRefresh = false;
+          refrescarSilenciosa();
+        }
       }
     }
 
@@ -199,8 +224,7 @@ const ActividadReciente = (function () {
     }
 
     function invalidarYRecargar() {
-      invalidar();
-      return cargar(1, true);
+      return refrescarSilenciosa();
     }
 
     function iniciarAutoRefresh() {
