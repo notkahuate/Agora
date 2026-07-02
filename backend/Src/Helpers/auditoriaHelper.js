@@ -12,6 +12,16 @@ const { pool } = require('../configures/db');
  *  - datos_nuevos: object | null
  */
 const registrar = async ({ entidad, entidad_id = null, accion, usuario_id = null, descripcion = null, datos_anteriores = null, datos_nuevos = null, empresa_id = null }) => {
+  const valoresBase = [
+    entidad,
+    entidad_id,
+    accion,
+    usuario_id,
+    descripcion,
+    datos_anteriores ? JSON.stringify(datos_anteriores) : null,
+    datos_nuevos ? JSON.stringify(datos_nuevos) : null,
+  ];
+
   try {
     const texto = `
       INSERT INTO auditoria_sistema
@@ -19,24 +29,26 @@ const registrar = async ({ entidad, entidad_id = null, accion, usuario_id = null
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
       RETURNING *;
     `;
-
-    const valores = [
-      entidad,
-      entidad_id,
-      accion,
-      usuario_id,
-      descripcion,
-      datos_anteriores ? JSON.stringify(datos_anteriores) : null,
-      datos_nuevos ? JSON.stringify(datos_nuevos) : null,
-      empresa_id,
-    ];
-
-    const { rows } = await pool.query(texto, valores);
+    const { rows } = await pool.query(texto, [...valoresBase, empresa_id]);
     return rows[0];
   } catch (err) {
-    // No bloquear la operación principal por fallos en auditoría
-    console.error('Error registrando auditoria:', err.message);
-    return null;
+    if (!String(err.message).includes('empresa_id')) {
+      console.error('Error registrando auditoria:', err.message);
+      return null;
+    }
+    try {
+      const texto = `
+        INSERT INTO auditoria_sistema
+          (entidad, entidad_id, accion, usuario_id, descripcion, datos_anteriores, datos_nuevos)
+        VALUES ($1,$2,$3,$4,$5,$6,$7)
+        RETURNING *;
+      `;
+      const { rows } = await pool.query(texto, valoresBase);
+      return rows[0];
+    } catch (err2) {
+      console.error('Error registrando auditoria:', err2.message);
+      return null;
+    }
   }
 };
 

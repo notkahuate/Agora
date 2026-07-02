@@ -44,34 +44,36 @@ async function runMigrations() {
     );
 
     if (auditoriaEmpresaCol.length === 0) {
-      await mysqlPool.execute(
-        'ALTER TABLE auditoria_sistema ADD COLUMN empresa_id INT NULL'
-      );
-      await mysqlPool.execute(
-        `ALTER TABLE auditoria_sistema
-         ADD CONSTRAINT fk_aud_empresa
-         FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE SET NULL`
-      ).catch(() => {
-        // Si ya existe la FK o falla en hosting, continuar
-      });
-      console.log('✅ Columna empresa_id agregada a auditoria_sistema');
+      try {
+        await mysqlPool.execute(
+          'ALTER TABLE auditoria_sistema ADD COLUMN empresa_id INT NULL'
+        );
+        console.log('✅ Columna empresa_id agregada a auditoria_sistema');
+      } catch (err) {
+        console.warn('⚠️ No se pudo agregar empresa_id:', err.message);
+      }
     }
 
-    // Rellenar empresa_id en eventos antiguos sin empresa
-    await mysqlPool.execute(
-      `UPDATE auditoria_sistema a
-       LEFT JOIN usuarios u ON a.usuario_id = u.id
-       SET a.empresa_id = u.empresa_id
-       WHERE a.empresa_id IS NULL AND u.empresa_id IS NOT NULL`
-    ).catch(() => {});
+    const [fechaIndex] = await mysqlPool.execute(
+      `SELECT INDEX_NAME
+       FROM INFORMATION_SCHEMA.STATISTICS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'auditoria_sistema'
+         AND INDEX_NAME = 'idx_aud_fecha_evento'`
+    );
 
-    await mysqlPool.execute(
-      `UPDATE auditoria_sistema
-       SET empresa_id = CAST(JSON_UNQUOTE(JSON_EXTRACT(datos_nuevos, '$.empresa_id')) AS UNSIGNED)
-       WHERE empresa_id IS NULL
-         AND JSON_EXTRACT(datos_nuevos, '$.empresa_id') IS NOT NULL
-         AND JSON_UNQUOTE(JSON_EXTRACT(datos_nuevos, '$.empresa_id')) REGEXP '^[0-9]+$'`
-    ).catch(() => {});
+    if (fechaIndex.length === 0) {
+      await mysqlPool.execute(
+        'CREATE INDEX idx_aud_fecha_evento ON auditoria_sistema (fecha_evento DESC)'
+      ).catch(async () => {
+        await mysqlPool.execute(
+          'CREATE INDEX idx_aud_fecha_evento ON auditoria_sistema (fecha_evento)'
+        ).catch((err) => {
+          console.warn('⚠️ No se pudo crear índice fecha_evento:', err.message);
+        });
+      });
+      console.log('✅ Índice idx_aud_fecha_evento en auditoria_sistema');
+    }
 
     console.log('✅ Migraciones aplicadas');
   } catch (error) {

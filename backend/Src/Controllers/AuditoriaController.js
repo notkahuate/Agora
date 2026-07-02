@@ -142,37 +142,83 @@ function construirFiltroAuditoria(alcance, paramIndex = 1) {
   switch (alcance.tipo) {
     case 'empresa':
       return {
-        whereSql: ` WHERE COALESCE(a.empresa_id, u.empresa_id) = $${paramIndex}`,
-        countWhereSql: ` WHERE COALESCE(a.empresa_id, u.empresa_id) = $${paramIndex}`,
+        tipo: 'empresa',
+        innerJoinSql: ' LEFT JOIN usuarios u2 ON a2.usuario_id = u2.id',
+        innerWhereSql: ` WHERE u2.empresa_id = $${paramIndex}`,
         countJoinSql: ' LEFT JOIN usuarios u ON a.usuario_id = u.id',
+        countWhereSql: ` WHERE u.empresa_id = $${paramIndex}`,
         params: [...alcance.params],
         nextIndex: paramIndex + 1
       };
     case 'usuario':
       return {
-        whereSql: ` WHERE a.usuario_id = $${paramIndex}`,
-        countWhereSql: ` WHERE a.usuario_id = $${paramIndex}`,
+        tipo: 'usuario',
+        innerJoinSql: '',
+        innerWhereSql: ` WHERE a2.usuario_id = $${paramIndex}`,
         countJoinSql: '',
+        countWhereSql: ` WHERE a.usuario_id = $${paramIndex}`,
         params: [...alcance.params],
         nextIndex: paramIndex + 1
       };
     case 'vacio':
       return {
-        whereSql: ' WHERE 1=0',
-        countWhereSql: ' WHERE 1=0',
+        tipo: 'vacio',
+        innerJoinSql: '',
+        innerWhereSql: ' WHERE 1=0',
         countJoinSql: '',
+        countWhereSql: ' WHERE 1=0',
         params: [],
         nextIndex: paramIndex
       };
     default:
       return {
-        whereSql: '',
-        countWhereSql: '',
+        tipo: 'todos',
+        innerJoinSql: '',
+        innerWhereSql: '',
         countJoinSql: '',
+        countWhereSql: '',
         params: [],
         nextIndex: paramIndex
       };
   }
+}
+
+function formatearEvento(row) {
+  return {
+    ...row,
+    descripcion: row.descripcion
+      || `${row.accion || 'Evento'} en ${String(row.entidad || 'sistema').replace(/_/g, ' ')}`
+  };
+}
+
+/**
+ * Lista ligera: primero pagina solo IDs (evita sort memory con JSON grandes),
+ * luego trae columnas necesarias para el timeline.
+ */
+function buildListadoEventosQuery(filtro, limitNum, offsetNum) {
+  return `
+    SELECT
+      a.id,
+      a.entidad,
+      a.entidad_id,
+      a.accion,
+      a.usuario_id,
+      a.descripcion,
+      a.fecha_evento,
+      u.nombre AS usuario_nombre,
+      u.email AS usuario_email
+    FROM (
+      SELECT a2.id
+      FROM auditoria_sistema a2
+      ${filtro.innerJoinSql || ''}
+      ${filtro.innerWhereSql || ''}
+      ORDER BY a2.fecha_evento DESC
+      LIMIT ${limitNum} OFFSET ${offsetNum}
+    ) pag
+    JOIN auditoria_sistema a ON a.id = pag.id
+    LEFT JOIN usuarios u ON a.usuario_id = u.id
+    ORDER BY a.fecha_evento DESC
+  `;
 }
 
 /**
@@ -188,35 +234,11 @@ const obtenerEventos = async (req, res) => {
     const alcance = resolverAlcanceAuditoria(req, empresa_id);
     const filtro = construirFiltroAuditoria(alcance, 1);
 
-    let query = `
-      SELECT 
-        a.id,
-        a.entidad,
-        a.entidad_id,
-        a.accion,
-        a.usuario_id,
-        a.empresa_id,
-        a.descripcion,
-        a.datos_anteriores,
-        a.datos_nuevos,
-        a.fecha_evento,
-        u.nombre as usuario_nombre,
-        u.email as usuario_email
-      FROM auditoria_sistema a
-      LEFT JOIN usuarios u ON a.usuario_id = u.id
-    `;
+    const query = buildListadoEventosQuery(filtro, limitNum, offsetNum);
+    const countQuery = `SELECT COUNT(*) AS total FROM auditoria_sistema a${filtro.countJoinSql || ''}${filtro.countWhereSql || ''}`;
 
-    let countQuery = `SELECT COUNT(*) as total FROM auditoria_sistema a${filtro.countJoinSql || ''}`;
-    const params = [...filtro.params];
-
-    query += filtro.whereSql;
-    countQuery += filtro.countWhereSql;
-
-    // LIMIT/OFFSET inline: MySQL en hosting compartido falla con LIMIT/OFFSET como parámetros preparados
-    query += ` ORDER BY a.fecha_evento DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
-
-    const { rows } = await pool.query(query, params);
-    const eventos = await Promise.all(rows.map((row) => enriquecerEvento(row)));
+    const { rows } = await pool.query(query, filtro.params);
+    const eventos = rows.map(formatearEvento);
 
     let total = eventos.length;
     if (skipCount !== '1' && skipCount !== 'true') {
@@ -253,28 +275,29 @@ const obtenerEventosPorEntidad = async (req, res) => {
     const offsetNum = Math.max(parseInt(offset) || 0, 0);
 
     const query = `
-      SELECT 
+      SELECT
         a.id,
         a.entidad,
         a.entidad_id,
         a.accion,
         a.usuario_id,
         a.descripcion,
-        a.datos_anteriores,
-        a.datos_nuevos,
         a.fecha_evento,
-        u.nombre as usuario_nombre,
-        u.email as usuario_email
-      FROM auditoria_sistema a
+        u.nombre AS usuario_nombre,
+        u.email AS usuario_email
+      FROM (
+        SELECT id FROM auditoria_sistema
+        WHERE entidad = $1
+        ORDER BY fecha_evento DESC
+        LIMIT ${limitNum} OFFSET ${offsetNum}
+      ) pag
+      JOIN auditoria_sistema a ON a.id = pag.id
       LEFT JOIN usuarios u ON a.usuario_id = u.id
-      WHERE a.entidad = $1
       ORDER BY a.fecha_evento DESC
-      LIMIT ${limitNum}
-      OFFSET ${offsetNum}
     `;
 
     const { rows } = await pool.query(query, [entidad]);
-    const eventos = await Promise.all(rows.map(enriquecerEvento));
+    const eventos = rows.map(formatearEvento);
 
     // Contar total
     const countQuery = 'SELECT COUNT(*) as total FROM auditoria_sistema WHERE entidad = $1';
@@ -306,28 +329,10 @@ const obtenerEventosRecientes = async (req, res) => {
     const alcance = resolverAlcanceAuditoria(req, empresa_id);
     const filtro = construirFiltroAuditoria(alcance, 1);
 
-    let query = `
-      SELECT 
-        a.id,
-        a.entidad,
-        a.entidad_id,
-        a.accion,
-        a.usuario_id,
-        a.descripcion,
-        a.datos_anteriores,
-        a.datos_nuevos,
-        a.fecha_evento,
-        u.nombre as usuario_nombre,
-        u.email as usuario_email
-      FROM auditoria_sistema a
-      LEFT JOIN usuarios u ON a.usuario_id = u.id
-    `;
-
-    query += filtro.whereSql;
-    query += ` ORDER BY a.fecha_evento DESC LIMIT ${limitNum}`;
+    const query = buildListadoEventosQuery(filtro, limitNum, 0);
 
     const { rows } = await pool.query(query, filtro.params);
-    const eventos = await Promise.all(rows.map(enriquecerEvento));
+    const eventos = rows.map(formatearEvento);
 
     return res.json({
       eventos,
@@ -350,28 +355,29 @@ const obtenerEventosPorEntidadId = async (req, res) => {
     const offsetNum = Math.max(parseInt(offset) || 0, 0);
 
     const query = `
-      SELECT 
+      SELECT
         a.id,
         a.entidad,
         a.entidad_id,
         a.accion,
         a.usuario_id,
         a.descripcion,
-        a.datos_anteriores,
-        a.datos_nuevos,
         a.fecha_evento,
-        u.nombre as usuario_nombre,
-        u.email as usuario_email
-      FROM auditoria_sistema a
+        u.nombre AS usuario_nombre,
+        u.email AS usuario_email
+      FROM (
+        SELECT id FROM auditoria_sistema
+        WHERE entidad = $1 AND entidad_id = $2
+        ORDER BY fecha_evento DESC
+        LIMIT ${limitNum} OFFSET ${offsetNum}
+      ) pag
+      JOIN auditoria_sistema a ON a.id = pag.id
       LEFT JOIN usuarios u ON a.usuario_id = u.id
-      WHERE a.entidad = $1 AND a.entidad_id = $2
       ORDER BY a.fecha_evento DESC
-      LIMIT ${limitNum}
-      OFFSET ${offsetNum}
     `;
 
     const { rows } = await pool.query(query, [entidad, entidad_id]);
-    const eventos = await Promise.all(rows.map(enriquecerEvento));
+    const eventos = rows.map(formatearEvento);
 
     // Contar total
     const countQuery = 'SELECT COUNT(*) as total FROM auditoria_sistema WHERE entidad = $1 AND entidad_id = $2';
