@@ -17,6 +17,24 @@ async function runMigrations() {
       console.log('✅ Columna lote_subida agregada');
     }
 
+    const [tokenColumns] = await mysqlPool.execute(
+      `SELECT COLUMN_NAME
+       FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'usuarios'
+         AND COLUMN_NAME = 'token_activacion'`
+    );
+
+    if (tokenColumns.length === 0) {
+      await mysqlPool.execute(
+        'ALTER TABLE usuarios ADD COLUMN token_activacion VARCHAR(64) NULL'
+      );
+      await mysqlPool.execute(
+        'ALTER TABLE usuarios ADD COLUMN token_expira DATETIME NULL'
+      );
+      console.log('✅ Columnas de invitación agregadas a usuarios');
+    }
+
     console.log('✅ Migraciones aplicadas');
   } catch (error) {
     console.error('❌ Error en migraciones:', error.message);

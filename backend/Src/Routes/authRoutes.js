@@ -35,4 +35,21 @@ router.post('/login', loginLimiter, loginValidation, (req, res, next) => {
 
 router.get('/me', authenticate, authController.me);
 
+router.get('/activar/:token', require('../Controllers/UsuarioController').verificarTokenActivacion);
+
+router.post(
+  '/activar-cuenta',
+  [
+    body('token').isString().notEmpty(),
+    body('password').isLength({ min: 6 })
+  ],
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    return require('../Controllers/UsuarioController').activarCuenta(req, res, next);
+  }
+);
+
 module.exports = router;

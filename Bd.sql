@@ -27,6 +27,8 @@ CREATE TABLE usuarios (
     rol ENUM('usuario', 'super_admin', 'auditor') DEFAULT 'usuario' NOT NULL,
     empresa_id INT,
     activo TINYINT(1) DEFAULT 1,
+    token_activacion VARCHAR(64) NULL,
+    token_expira DATETIME NULL,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_usuarios_empresa FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE

@@ -36,7 +36,7 @@ router.post(
   [
     body('nombre').isString().isLength({ min: 2 }),
     body('email').isEmail(),
-    body('password').isLength({ min: 6 })
+    body('password').optional().isLength({ min: 6 })
   ],
   handleValidation,
   controller.crearUsuario

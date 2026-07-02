@@ -144,12 +144,6 @@ document.getElementById('formCrearUsuario')
   .addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const password = document.getElementById('password').value;
-
-    if (password.length < 6) {
-      return alert('La contraseña debe tener al menos 6 caracteres.');
-    }
-
     if (!user.empresa_id) {
       return alert('Tu cuenta no tiene empresa asignada. Contacta al administrador.');
     }
@@ -157,7 +151,6 @@ document.getElementById('formCrearUsuario')
     const data = {
       nombre: document.getElementById('nombre').value.trim(),
       email: document.getElementById('email').value.trim(),
-      password,
       rol: 'usuario',
       empresa_id: user.empresa_id
     };
@@ -175,11 +168,11 @@ document.getElementById('formCrearUsuario')
       const result = await resp.json();
 
       if (!resp.ok) {
-        alert(window.Auth.parseApiError(result) || 'Error al crear usuario');
+        alert(window.Auth.parseApiError(result) || 'Error al enviar invitación');
         return;
       }
 
-      showAlert();
+      showAlert(result.message || 'Invitación enviada correctamente');
 
       modal.style.display = 'none';
       e.target.reset();

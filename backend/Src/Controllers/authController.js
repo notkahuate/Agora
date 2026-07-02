@@ -31,7 +31,7 @@ exports.login = async (req, res) => {
     }
 
     if (!user.activo) {
-      return res.status(403).json({ message: 'Cuenta desactivada' });
+      return res.status(403).json({ message: 'Cuenta pendiente de activación o desactivada. Revisa tu correo.' });
     }
 
     // comparar password (bcryptjs)

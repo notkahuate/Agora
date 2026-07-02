@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AGORA | Activar cuenta</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="auth-page">
+  <div class="auth-grid">
+    <div class="auth-card" style="max-width:520px;margin:40px auto;">
+      <div class="brand" style="gap:10px; align-items:center; display:flex;">
+        <div class="brand-mark" style="width:38px;height:38px;">SD</div>
+        <div style="font-weight:700;">AGORA</div>
+      </div>
+      <h2>Activar cuenta</h2>
+      <p id="activarDescripcion">Define tu contraseña para completar el registro.</p>
+
+      <div id="activarAlert" class="login-alert hidden" role="alert"></div>
+
+      <form id="activarForm" class="stacked">
+        <div class="form-group">
+          <label class="form-label" for="activarEmail">Correo</label>
+          <input type="email" id="activarEmail" class="form-control" readonly>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="activarPassword">Nueva contraseña</label>
+          <input type="password" id="activarPassword" class="form-control" minlength="6" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="activarPasswordConfirm">Confirmar contraseña</label>
+          <input type="password" id="activarPasswordConfirm" class="form-control" minlength="6" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;">Activar cuenta</button>
+      </form>
+
+      <p style="margin-top:16px;">
+        <a href="index.html">Volver al inicio de sesión</a>
+      </p>
+    </div>
+  </div>
+
+  <script src="./Js/ActivarCuenta.js"></script>
+</body>
+</html>

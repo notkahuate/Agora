@@ -613,7 +613,6 @@ function abrirModalCrearUsuario(empresaId, empresaNombre) {
   document.getElementById('usuarioEmpresaNombre').textContent = `Empresa: ${empresaNombre}`;
   document.getElementById('usuarioNombre').value = '';
   document.getElementById('usuarioEmail').value = '';
-  document.getElementById('usuarioPassword').value = '';
 
   document.getElementById('usuarioRoleGroup').style.display = 'block';
   document.getElementById('usuarioRol').value = 'usuario';
@@ -624,18 +623,14 @@ function abrirModalCrearUsuario(empresaId, empresaNombre) {
 async function crearUsuario() {
   const nombre = document.getElementById('usuarioNombre').value.trim();
   const email = document.getElementById('usuarioEmail').value.trim();
-  const password = document.getElementById('usuarioPassword').value.trim();
   const rolInput = document.getElementById('usuarioRol');
   const rol = rolInput ? rolInput.value : 'usuario';
 
   if (!selectedEmpresaId) {
     return alert('Selecciona una empresa primero.');
   }
-  if (!nombre || !email || !password) {
-    return alert('Nombre, email y contraseña son obligatorios.');
-  }
-  if (password.length < 6) {
-    return alert('La contraseña debe tener al menos 6 caracteres.');
+  if (!nombre || !email) {
+    return alert('Nombre y email son obligatorios.');
   }
 
   try {
@@ -645,15 +640,15 @@ async function crearUsuario() {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ nombre, email, password, rol, empresa_id: selectedEmpresaId })
+      body: JSON.stringify({ nombre, email, rol, empresa_id: selectedEmpresaId })
     });
 
     const data = await res.json();
     if (!res.ok) {
-      return alert(window.Auth.parseApiError(data) || 'Error creando usuario');
+      return alert(window.Auth.parseApiError(data) || 'Error enviando invitación');
     }
 
-    alert('Usuario creado correctamente');
+    alert(data.message || 'Invitación enviada correctamente');
     cerrarModal('modalCrearUsuario');
     cargarEmpresas();
     cargarColaPrioritaria();

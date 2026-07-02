@@ -1,10 +1,125 @@
 // src/controllers/usuarioController.js
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs'); // usar bcryptjs para consistencia
 const { validationResult } = require('express-validator');
 const Usuario = require('../Models/UsuarioModel'); // asegúrate del path y nombre
 const SALT_ROUNDS = parseInt(process.env.SALT_ROUNDS || '10', 10);
 const auditoria = require('../Helpers/auditoriaHelper');
+const { enviarInvitacionUsuario } = require('../Helpers/emailHelper');
 
+function esDuplicadoEmail(err) {
+  return err && (err.code === '23505' || err.code === 'ER_DUP_ENTRY' || err.errno === 1062);
+}
+
+async function crearUsuarioConInvitacion({ nombre, email, rol, empresa_id, requester }) {
+  const token = Usuario.generarTokenActivacion();
+  const tokenExpira = Usuario.calcularExpiracionToken();
+  const passwordTemporal = await bcrypt.hash(crypto.randomBytes(24).toString('hex'), SALT_ROUNDS);
+
+  const nuevoUsuario = await Usuario.crearUsuario({
+    nombre,
+    email,
+    password_hash: passwordTemporal,
+    rol,
+    empresa_id,
+    activo: false,
+    token_activacion: token,
+    token_expira: tokenExpira,
+  });
+
+  try {
+    await enviarInvitacionUsuario({ email, nombre, token });
+  } catch (error) {
+    await Usuario.eliminarUsuario(nuevoUsuario.id);
+    throw new Error('No se pudo enviar el correo de invitación. Verifica SMTP_HOST, SMTP_USER y SMTP_PASS.');
+  }
+
+  try {
+    await auditoria.registrar({
+      entidad: 'usuarios',
+      entidad_id: nuevoUsuario.id,
+      accion: 'invitar',
+      usuario_id: requester ? requester.id : null,
+      descripcion: `Invitación enviada a ${nuevoUsuario.email}`,
+      datos_nuevos: { ...nuevoUsuario, invitacion_enviada: true },
+      empresa_id: nuevoUsuario.empresa_id || null,
+    });
+  } catch (e) {
+    console.error('auditoria invitarUsuario error:', e.message);
+  }
+
+  return {
+    ...nuevoUsuario,
+    message: 'Invitación enviada por correo. El usuario debe activar su cuenta.',
+  };
+}
+
+
+exports.activarCuenta = async (req, res) => {
+  try {
+    const { token, password } = req.body || {};
+
+    if (!token || !password) {
+      return res.status(400).json({ message: 'token y password son requeridos' });
+    }
+
+    if (String(password).length < 6) {
+      return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
+    }
+
+    const pendiente = await Usuario.obtenerUsuarioPorToken(token);
+    if (!pendiente) {
+      return res.status(404).json({ message: 'Token inválido o expirado' });
+    }
+
+    if (pendiente.activo) {
+      return res.status(400).json({ message: 'Esta cuenta ya está activa' });
+    }
+
+    if (new Date(pendiente.token_expira).getTime() < Date.now()) {
+      return res.status(410).json({ message: 'El enlace de activación expiró. Solicita una nueva invitación.' });
+    }
+
+    const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
+    const activado = await Usuario.activarUsuarioConToken(token, password_hash);
+
+    if (!activado) {
+      return res.status(404).json({ message: 'Token inválido o expirado' });
+    }
+
+    return res.json({
+      message: 'Cuenta activada correctamente. Ya puedes iniciar sesión.',
+      user: activado,
+    });
+  } catch (err) {
+    console.error('activarCuenta error:', err);
+    return res.status(500).json({ message: 'Error al activar la cuenta' });
+  }
+};
+
+exports.verificarTokenActivacion = async (req, res) => {
+  try {
+    const token = req.params.token;
+    const pendiente = await Usuario.obtenerUsuarioPorToken(token);
+
+    if (!pendiente || pendiente.activo) {
+      return res.status(404).json({ valido: false, message: 'Token inválido' });
+    }
+
+    if (new Date(pendiente.token_expira).getTime() < Date.now()) {
+      return res.status(410).json({ valido: false, message: 'Token expirado' });
+    }
+
+    return res.json({
+      valido: true,
+      nombre: pendiente.nombre,
+      email: pendiente.email,
+    });
+  } catch (err) {
+    console.error('verificarTokenActivacion error:', err);
+    return res.status(500).json({ valido: false, message: 'Error al verificar token' });
+  }
+};
 
 exports.crearUsuarioPublico = async (req, res) => {
   try {
@@ -22,17 +137,14 @@ exports.crearUsuarioPublico = async (req, res) => {
       });
     }
 
-    // Verificar si ya existe email
     const existente = await Usuario.obtenerUsuarioPorEmail(email);
     if (existente) {
       return res.status(409).json({ message: 'El email ya está en uso' });
     }
 
-    // Valores forzados (seguridad)
     const rol = 'usuario';
     const activo = true;
     const empresa_id = bodyEmpresaId || null;
-
     const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
 
     const nuevo = await Usuario.crearUsuario({
@@ -44,10 +156,8 @@ exports.crearUsuarioPublico = async (req, res) => {
       activo
     });
 
-    // Nunca devolver el hash
     delete nuevo.password_hash;
 
-    // Registrar auditoría del registro público
     try {
       await auditoria.registrar({
         entidad: 'usuarios',
@@ -66,7 +176,7 @@ exports.crearUsuarioPublico = async (req, res) => {
   } catch (err) {
     console.error('crearUsuarioPublico error:', err);
 
-    if (err.code === '23505') {
+    if (esDuplicadoEmail(err)) {
       return res.status(409).json({ message: 'Email ya en uso' });
     }
 
@@ -76,6 +186,7 @@ exports.crearUsuarioPublico = async (req, res) => {
     });
   }
 };
+
 exports.crearUsuario = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -85,9 +196,9 @@ exports.crearUsuario = async (req, res) => {
 
     const { nombre, email, password, activo, empresa_id: bodyEmpresaId, rol: bodyRol } = req.body;
 
-    if (!nombre || !email || !password) {
+    if (!nombre || !email) {
       return res.status(400).json({
-        message: 'nombre, email y password son obligatorios'
+        message: 'nombre y email son obligatorios'
       });
     }
 
@@ -128,43 +239,54 @@ exports.crearUsuario = async (req, res) => {
     }
 
     const activoFinal = typeof activo === 'boolean' ? activo : true;
-    const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
 
-    const nuevoUsuario = await Usuario.crearUsuario({
-      nombre,
-      email,
-      password_hash,
-      rol,
-      empresa_id: empresaId,
-      activo: activoFinal
-    });
-
-    // Registrar auditoría: creación de usuario por admin/auditor
-    try {
-      await auditoria.registrar({
-        entidad: 'usuarios',
-        entidad_id: nuevoUsuario.id,
-        accion: 'crear',
-        usuario_id: requester ? requester.id : null,
-        descripcion: `Usuario creado: ${nuevoUsuario.email}`,
-        datos_nuevos: nuevoUsuario,
-        empresa_id: nuevoUsuario.empresa_id || null
+    if (password) {
+      const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
+      const nuevoUsuario = await Usuario.crearUsuario({
+        nombre,
+        email,
+        password_hash,
+        rol,
+        empresa_id: empresaId,
+        activo: activoFinal
       });
-    } catch (e) {
-      console.error('auditoria crearUsuario error:', e.message);
+
+      try {
+        await auditoria.registrar({
+          entidad: 'usuarios',
+          entidad_id: nuevoUsuario.id,
+          accion: 'crear',
+          usuario_id: requester ? requester.id : null,
+          descripcion: `Usuario creado: ${nuevoUsuario.email}`,
+          datos_nuevos: nuevoUsuario,
+          empresa_id: nuevoUsuario.empresa_id || null
+        });
+      } catch (e) {
+        console.error('auditoria crearUsuario error:', e.message);
+      }
+
+      return res.status(201).json(nuevoUsuario);
     }
 
-    return res.status(201).json(nuevoUsuario);
+    const invitacion = await crearUsuarioConInvitacion({
+      nombre,
+      email,
+      rol,
+      empresa_id: empresaId,
+      requester,
+    });
+
+    return res.status(201).json(invitacion);
 
   } catch (err) {
     console.error('crearUsuario error:', err);
 
-    if (err.code === '23505') {
+    if (esDuplicadoEmail(err)) {
       return res.status(409).json({ message: 'Email ya en uso' });
     }
 
     return res.status(500).json({
-      message: 'Error al crear usuario'
+      message: err.message || 'Error al crear usuario'
     });
   }
 };
@@ -231,7 +353,7 @@ exports.actualizarUsuario = async (req, res) => {
     return res.json(actualizado);
   } catch (err) {
     console.error(err);
-    if (err.code === '23505') { // unique_violation
+    if (esDuplicadoEmail(err)) { // unique_violation
       return res.status(409).json({ message: 'Email ya en uso' });
     }
     if (err.code === '23503') {
