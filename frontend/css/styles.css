@@ -530,6 +530,12 @@ tbody tr:hover {
 
 .table-historial {
   table-layout: fixed;
+  width: 100%;
+}
+
+.table-pendientes {
+  table-layout: fixed;
+  width: 100%;
 }
 
 .table-historial th,
@@ -539,28 +545,62 @@ tbody tr:hover {
 
 .table-historial th:nth-child(1),
 .table-historial td:nth-child(1) {
-  width: 32%;
+  width: 26%;
 }
 
 .table-historial th:nth-child(2),
 .table-historial td:nth-child(2) {
-  width: 14%;
+  width: 12%;
   white-space: nowrap;
 }
 
 .table-historial th:nth-child(3),
 .table-historial td:nth-child(3) {
-  width: 14%;
+  width: 12%;
 }
 
 .table-historial th:nth-child(4),
 .table-historial td:nth-child(4) {
-  width: 22%;
+  width: 18%;
 }
 
 .table-historial th.col-acciones,
 .table-historial td.table-actions-cell {
-  width: 18%;
+  width: 32%;
+  min-width: 300px;
+  text-align: right;
+}
+
+.table-pendientes th:nth-child(1),
+.table-pendientes td:nth-child(1) {
+  width: 24%;
+}
+
+.table-pendientes th:nth-child(2),
+.table-pendientes td:nth-child(2) {
+  width: 12%;
+}
+
+.table-pendientes th:nth-child(3),
+.table-pendientes td:nth-child(3) {
+  width: 14%;
+  white-space: nowrap;
+}
+
+.table-pendientes th:nth-child(4),
+.table-pendientes td:nth-child(4) {
+  width: 12%;
+}
+
+.table-pendientes th:nth-child(5),
+.table-pendientes td:nth-child(5) {
+  width: 12%;
+}
+
+.table-pendientes th:nth-child(6),
+.table-pendientes td.table-actions-cell {
+  width: 26%;
+  min-width: 260px;
   text-align: right;
 }
 
@@ -595,8 +635,26 @@ tbody tr:hover {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 8px;
+  flex-wrap: nowrap;
+  width: max-content;
+  max-width: 100%;
+  margin-left: auto;
+}
+
+.table-actions .btn-sm {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.table-pendientes td.table-actions-cell,
+.table-historial td.table-actions-cell {
+  white-space: nowrap;
+}
+
+.table-pendientes td.table-actions-cell .table-actions,
+.table-historial td.table-actions-cell .table-actions {
+  justify-content: flex-end;
 }
 
 .table-pendientes td:last-child .table-actions,
@@ -614,17 +672,24 @@ tbody tr:hover {
 }
 
 @media (max-width: 768px) {
-  .table-historial {
+  .table-historial,
+  .table-pendientes {
     table-layout: auto;
   }
 
   .table-historial th.col-acciones,
-  .table-historial td.table-actions-cell {
+  .table-historial td.table-actions-cell,
+  .table-pendientes td.table-actions-cell {
     text-align: left;
+    min-width: 240px;
   }
 
   .table-actions {
     justify-content: flex-start;
+    margin-left: 0;
+    overflow-x: auto;
+    max-width: 100%;
+    padding-bottom: 2px;
   }
 }
 

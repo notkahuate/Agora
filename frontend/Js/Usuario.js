@@ -6,6 +6,7 @@ let paginaHistorial = 1;
 const limiteHistorial = 7;
 let historialGlobal = [];
 let auditorMapHistorial = new Map();
+const observacionesRechazoMap = new Map();
 let actividadWidget = null;
 let ultimoEstadoDocumentos = new Map();
 let intervaloActualizacionUsuario = null;
@@ -163,7 +164,7 @@ function crearModalObservacionRechazo() {
     <div class="modal-content" style="max-width:420px;">
       <span id="cerrarModalObservacion" style="float:right;cursor:pointer;font-size:20px;">&times;</span>
       <h3 style="margin-top:6px;">Observación de rechazo</h3>
-      <p id="modalObservacionRechazoTexto" style="margin-top:12px;line-height:1.5;color:#334155;"></p>
+      <p id="modalObservacionRechazoTexto" style="margin-top:12px;line-height:1.5;color:#334155;white-space:pre-wrap;"></p>
     </div>
   `;
 
@@ -182,13 +183,42 @@ function abrirModalObservacionRechazo(texto) {
   const modal = document.getElementById('modalObservacionRechazo');
   const contenido = document.getElementById('modalObservacionRechazoTexto');
   if (!modal || !contenido) return;
-  contenido.innerHTML = escaparTexto(texto || 'No se registró una observación.');
+  const mensaje = String(texto || '').trim() || 'No se registró una observación.';
+  contenido.textContent = mensaje;
   modal.style.display = 'block';
 }
 
 function cerrarModalObservacionRechazo() {
   const modal = document.getElementById('modalObservacionRechazo');
   if (modal) modal.style.display = 'none';
+}
+
+function registrarObservacionRechazo(docId, texto) {
+  if (!docId) return;
+  observacionesRechazoMap.set(String(docId), String(texto || '').trim());
+}
+
+function sincronizarObservacionesRechazo(documentos) {
+  observacionesRechazoMap.clear();
+  (documentos || []).forEach((doc) => {
+    if (obtenerEstadoAsignado(doc) !== 'rechazado') return;
+    const docId = doc.id || doc.documento_subido_id;
+    if (!docId) return;
+    registrarObservacionRechazo(docId, doc.comentarios || doc.comentario || '');
+  });
+}
+
+function botonVerObservacionRechazo(doc) {
+  if (obtenerEstadoAsignado(doc) !== 'rechazado') return '';
+  const docId = doc.documento_subido_id || doc.id;
+  if (!docId) return '';
+  registrarObservacionRechazo(docId, doc.comentarios || doc.comentario || observacionesRechazoMap.get(String(docId)) || '');
+  return `<button type="button" class="btn btn-sm btn-secondary" onclick="abrirModalObservacionRechazoPorId('${docId}')">Ver observación</button>`;
+}
+
+function abrirModalObservacionRechazoPorId(docId) {
+  const texto = observacionesRechazoMap.get(String(docId)) || 'No se registró una observación.';
+  abrirModalObservacionRechazo(texto);
 }
 
 function obtenerNombreValidadorDesdeMapa(doc, auditorMap) {
@@ -310,6 +340,7 @@ async function loadDocumentos(silent = false) {
     });
     paginaHistorial = 1;
     auditorMapHistorial = new Map();
+    sincronizarObservacionesRechazo(subidos);
 
     // Start with assigned pendientes (include rejected)
     const pendientesMap = new Map();
@@ -345,8 +376,10 @@ async function loadDocumentos(silent = false) {
         fecha_limite: d.fecha_limite || d.fecha_subida || new Date().toISOString(),
         prioridad: d.prioridad || 'media',
         estado: 'rechazado',
+        estado_documento: 'rechazado',
         tipo_documento_id: d.tipo_documento_id,
         id: d.id,
+        documento_subido_id: d.id,
         comentarios: d.comentarios || null
       });
     });
@@ -420,10 +453,7 @@ async function loadDocumentos(silent = false) {
           : '';
         const comentarioHtml = '';
         const docSubidoId = doc.documento_subido_id || doc.id || null;
-        const observacionTexto = String(doc.comentarios || doc.comentario || 'No se registró una observación.').replace(/'/g, "\\'").replace(/\n/g, ' ');
-        const observacionButton = estadoInfo.texto === 'Rechazado'
-          ? `<button class="btn btn-sm btn-secondary" onclick="abrirModalObservacionRechazo('${observacionTexto}')">Ver observación</button>`
-          : '';
+        const observacionButton = botonVerObservacionRechazo(doc);
         let actionButton;
         if (estadoInfo.texto === 'Rechazado') {
           actionButton = `<button class="btn btn-sm btn-secondary" onclick="reuploadRejectedDocument(${doc.tipo_documento_id}, '${safeName}', ${docSubidoId || 'null'})">Volver a subir</button>`;
@@ -498,6 +528,7 @@ function renderHistorial(historial, auditorMap) {
       const nombreDoc = escaparTexto(doc.tipo_documento_nombre || doc.nombre_archivo || doc.nombre || 'Documento');
       const archivo = escaparTexto(doc.nombre_archivo || doc.nombre || 'Documento');
       const safeName = String(doc.nombre_archivo || doc.nombre || 'Documento').replace(/'/g, "\\'");
+      const observacionButton = botonVerObservacionRechazo(doc);
       const fechaSubida = doc.fecha_subida
         ? new Date(doc.fecha_subida).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
         : '—';
@@ -514,7 +545,7 @@ function renderHistorial(historial, auditorMap) {
         <td>${validado}</td>
         <td class="table-actions-cell">
           <div class="table-actions">
-            <button type="button" class="btn btn-sm btn-primary" onclick="abrirPreviewUsuario('${doc.id}', '${safeName}')">Ver</button>
+            ${observacionButton ? `${observacionButton} ` : ''}<button type="button" class="btn btn-sm btn-primary" onclick="abrirPreviewUsuario('${doc.id}', '${safeName}')">Ver</button>
             <button type="button" class="btn btn-sm btn-secondary" onclick="descargarDocumentoUsuario('${doc.id}', '${safeName}')">Descargar</button>
           </div>
         </td>
@@ -654,11 +685,7 @@ function initActividadUsuario() {
   actividadWidget = ActividadReciente.crearWidget({
     timelineId: 'timelineUsuario',
     paginacionId: 'paginacionActividadReciente',
-    buildUrl: (limit) => {
-      let url = `/api/auditoria?limit=${limit}&offset=0&skipCount=1`;
-      if (user?.empresa_id) url += `&empresa_id=${user.empresa_id}`;
-      return url;
-    },
+    buildUrl: (limit) => ActividadReciente.buildAuditoriaUrl(limit),
     mensajeVacio: 'Sin eventos recientes'
   });
   actividadWidget.init();
@@ -666,6 +693,8 @@ function initActividadUsuario() {
 
 window.reuploadRejectedDocument = reuploadRejectedDocument;
 window.uploadDocumentForPending = uploadDocumentForPending;
+window.abrirModalObservacionRechazo = abrirModalObservacionRechazo;
+window.abrirModalObservacionRechazoPorId = abrirModalObservacionRechazoPorId;
 
 window.abrirPreviewUsuario = function (id, nombre) {
   previewDocumento(id, nombre, {

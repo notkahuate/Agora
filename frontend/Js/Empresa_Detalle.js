@@ -102,7 +102,7 @@ async function cargarEmpresaDetalle() {
   }
 
   try {
-    const res = await fetch(`http://agorasst.com/api/empresas/${empresaId}`, {
+    const res = await fetch(`/api/empresas/${empresaId}`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -174,7 +174,7 @@ function esDocumentoCompletoEmpresa(doc) {
 
 async function cargarDocumentosRequeridosEmpresa() {
   try {
-    const res = await fetch(`http://agorasst.com/api/documentos-requeridos/empresa/${empresaId}`, {
+    const res = await fetch(`/api/documentos-requeridos/empresa/${empresaId}`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -200,7 +200,7 @@ async function loadUsuariosEmpresa() {
   const tablaUsuarios = document.getElementById('tablaUsuariosEmpresa');
 
   try {
-    const res = await fetch('http://agorasst.com/api/usuarios', {
+    const res = await fetch('/api/usuarios', {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -236,7 +236,7 @@ async function loadUsuariosEmpresa() {
 
 async function cargarTodosLosDocumentos() {
   try {
-    const res = await fetch('http://agorasst.com/api/documentos', {
+    const res = await fetch('/api/documentos', {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -259,7 +259,7 @@ async function cargarTodosLosDocumentos() {
 // ==============================
 async function cargarCumplimientoEmpresa() {
   try {
-    const resResumen = await fetch(`http://agorasst.com/api/documentos-requeridos/empresa/${empresaId}/resumen`, {
+    const resResumen = await fetch(`/api/documentos-requeridos/empresa/${empresaId}/resumen`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -530,7 +530,7 @@ window.cambiarPaginaUsuarios = function (direccion) {
 // ==============================
 async function loadDocumentosEmpresa() {
   try {
-    const res = await fetch('http://agorasst.com/api/documentos', {
+    const res = await fetch('/api/documentos', {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -662,7 +662,7 @@ function goBack() {
 
 async function cargarPendientesEmpresa(empresaId) {
   try {
-    const res = await fetch(`http://agorasst.com/api/documentos-requeridos/empresa/${empresaId}/pendientes`, {
+    const res = await fetch(`/api/documentos-requeridos/empresa/${empresaId}/pendientes`, {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
       }
@@ -1341,7 +1341,7 @@ window.descargarDocumento = async function (id, nombreArchivo) {
   }
 
   try {
-    const res = await fetch(`http://agorasst.com/api/documentos/${id}/descargar`, {
+    const res = await fetch(`/api/documentos/${id}/descargar`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -1381,7 +1381,7 @@ function initActividadEmpresa() {
     timelineId: 'timelineEmpresa',
     paginacionId: 'paginacionActividadEmpresa',
     limite: 7,
-    buildUrl: (limit) => `http://agorasst.com/api/auditoria?limit=${limit}&offset=0&skipCount=1&empresa_id=${empresaId}`,
+    buildUrl: (limit) => ActividadReciente.buildAuditoriaUrl(limit, { empresaId }),
     mensajeVacio: 'Sin actividad registrada para esta empresa'
   });
   actividadWidget.init();

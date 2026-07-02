@@ -7,7 +7,20 @@
     return window.Auth ? window.Auth.parseApiError(data) : (data?.message || 'Error desconocido');
   }
 
-function puedeEliminarDocumento(doc) {
+  async function apiFetch(path, options = {}) {
+    if (window.Auth && typeof window.Auth.apiFetch === 'function') {
+      return window.Auth.apiFetch(path, options);
+    }
+
+    const token = getToken();
+    const headers = { ...(options.headers || {}) };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const url = path.startsWith('/') ? path : `/${path}`;
+    return fetch(url, { ...options, headers });
+  }
+
+  function puedeEliminarDocumento(doc) {
     const user = window.Auth ? window.Auth.getUser() : null;
     if (!user) return false;
     if (['super_admin', 'auditor'].includes(user.rol)) return true;
@@ -23,6 +36,35 @@ function puedeEliminarDocumento(doc) {
     if (modal && modal.parentNode) modal.remove();
   }
 
+  async function descargarArchivo(id, nombre) {
+    const res = await apiFetch(`/api/documentos/${id}/descargar`);
+    if (!res.ok) throw new Error('Error al descargar');
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombre;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function obtenerBlobPreview(id, isPdf) {
+    const previewRes = await apiFetch(`/api/documentos/${id}/descargar`);
+    if (!previewRes.ok) {
+      throw new Error('No se pudo obtener el archivo para previsualizar');
+    }
+
+    let blob = await previewRes.blob();
+    if (isPdf && (!blob.type || blob.type === 'application/octet-stream')) {
+      blob = new Blob([await blob.arrayBuffer()], { type: 'application/pdf' });
+    }
+
+    return URL.createObjectURL(blob);
+  }
+
   async function eliminarDocumento(id) {
     if (!id) return false;
     if (!confirm('¿Eliminar este documento? Esta acción no se puede deshacer.')) {
@@ -30,10 +72,7 @@ function puedeEliminarDocumento(doc) {
     }
 
     try {
-      const res = await fetch(`http://agorasst.com/api/documentos/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${getToken()}` }
-      });
+      const res = await apiFetch(`/api/documentos/${id}`, { method: 'DELETE' });
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
@@ -54,8 +93,7 @@ function puedeEliminarDocumento(doc) {
     const { onDeleted } = options;
 
     try {
-      const headers = { Authorization: `Bearer ${getToken()}` };
-      const docRes = await fetch(`http://agorasst.com/api/documentos/${id}`, { method: 'GET', headers });
+      const docRes = await apiFetch(`/api/documentos/${id}`);
 
       if (!docRes.ok) {
         const errorData = await docRes.json().catch(() => ({}));
@@ -71,15 +109,7 @@ function puedeEliminarDocumento(doc) {
 
       let previewUrl = null;
       if (isImage || isPdf) {
-        const previewRes = await fetch(`http://agorasst.com/api/documentos/${id}/descargar`, {
-          method: 'GET',
-          headers
-        });
-        if (!previewRes.ok) {
-          throw new Error('No se pudo obtener el archivo para previsualizar');
-        }
-        const blob = await previewRes.blob();
-        previewUrl = URL.createObjectURL(blob);
+        previewUrl = await obtenerBlobPreview(id, isPdf);
       }
 
       const modal = document.createElement('div');
@@ -110,6 +140,7 @@ function puedeEliminarDocumento(doc) {
         const iframe = document.createElement('iframe');
         iframe.style.cssText = 'width: 100%; height: 65vh; border: none;';
         iframe.src = previewUrl;
+        iframe.title = nombre;
         content.appendChild(iframe);
       } else {
         const p = document.createElement('p');
@@ -125,25 +156,16 @@ function puedeEliminarDocumento(doc) {
       btnDescargar.className = 'btn btn-secondary';
       btnDescargar.textContent = 'Descargar';
       btnDescargar.onclick = async () => {
+        if (typeof window.descargarDocumentoUsuario === 'function') {
+          window.descargarDocumentoUsuario(id, nombre);
+          return;
+        }
         if (typeof window.descargarDocumento === 'function') {
           window.descargarDocumento(id, nombre);
           return;
         }
         try {
-          const res = await fetch(`http://agorasst.com/api/documentos/${id}/descargar`, {
-            method: 'GET',
-            headers: { Authorization: `Bearer ${getToken()}` }
-          });
-          if (!res.ok) throw new Error('Error al descargar');
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = nombre;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          URL.revokeObjectURL(url);
+          await descargarArchivo(id, nombre);
         } catch (err) {
           alert('Error al descargar el documento');
         }

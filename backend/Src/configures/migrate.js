@@ -35,6 +35,28 @@ async function runMigrations() {
       console.log('✅ Columnas de invitación agregadas a usuarios');
     }
 
+    const [auditoriaEmpresaCol] = await mysqlPool.execute(
+      `SELECT COLUMN_NAME
+       FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'auditoria_sistema'
+         AND COLUMN_NAME = 'empresa_id'`
+    );
+
+    if (auditoriaEmpresaCol.length === 0) {
+      await mysqlPool.execute(
+        'ALTER TABLE auditoria_sistema ADD COLUMN empresa_id INT NULL'
+      );
+      await mysqlPool.execute(
+        `ALTER TABLE auditoria_sistema
+         ADD CONSTRAINT fk_aud_empresa
+         FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE SET NULL`
+      ).catch(() => {
+        // Si ya existe la FK o falla en hosting, continuar
+      });
+      console.log('✅ Columna empresa_id agregada a auditoria_sistema');
+    }
+
     console.log('✅ Migraciones aplicadas');
   } catch (error) {
     console.error('❌ Error en migraciones:', error.message);

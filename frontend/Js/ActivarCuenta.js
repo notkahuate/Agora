@@ -65,7 +65,10 @@
       }
 
       form.style.display = 'none';
-      showAlert(data.message || 'Cuenta activada. Ya puedes iniciar sesión.', 'success');
+      showAlert(data.message || 'Cuenta activada. Redirigiendo al inicio de sesión...', 'success');
+      setTimeout(() => {
+        window.location.href = 'index.html?activado=1';
+      }, 900);
     } catch (err) {
       showAlert('Error de conexión al activar la cuenta.', 'error');
     }

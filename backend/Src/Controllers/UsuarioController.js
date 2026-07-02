@@ -5,7 +5,6 @@ const { validationResult } = require('express-validator');
 const Usuario = require('../Models/UsuarioModel'); // asegúrate del path y nombre
 const SALT_ROUNDS = parseInt(process.env.SALT_ROUNDS || '10', 10);
 const auditoria = require('../Helpers/auditoriaHelper');
-const { enviarInvitacionUsuario } = require('../Helpers/emailHelper');
 
 function esDuplicadoEmail(err) {
   return err && (err.code === '23505' || err.code === 'ER_DUP_ENTRY' || err.errno === 1062);
@@ -28,10 +27,12 @@ async function crearUsuarioConInvitacion({ nombre, email, rol, empresa_id, reque
   });
 
   try {
+    const { enviarInvitacionUsuario } = require('../Helpers/emailHelper');
     await enviarInvitacionUsuario({ email, nombre, token });
   } catch (error) {
+    console.error('Error enviando invitación SMTP:', error.message);
     await Usuario.eliminarUsuario(nuevoUsuario.id);
-    throw new Error('No se pudo enviar el correo de invitación. Verifica SMTP_HOST, SMTP_USER y SMTP_PASS.');
+    throw error;
   }
 
   try {
@@ -283,6 +284,10 @@ exports.crearUsuario = async (req, res) => {
 
     if (esDuplicadoEmail(err)) {
       return res.status(409).json({ message: 'Email ya en uso' });
+    }
+
+    if (String(err.message || '').includes('SMTP') || String(err.message || '').includes('nodemailer')) {
+      return res.status(502).json({ message: err.message });
     }
 
     return res.status(500).json({

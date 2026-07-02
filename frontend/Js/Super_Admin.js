@@ -986,11 +986,7 @@ function initActividadSuperAdmin() {
   actividadWidget = ActividadReciente.crearWidget({
     timelineId: 'timelineSuperAdmin',
     paginacionId: 'paginacionActividadReciente',
-    buildUrl: (limit) => {
-      let url = `/api/auditoria?limit=${limit}&offset=0&skipCount=1`;
-      if (user?.empresa_id) url += `&empresa_id=${user.empresa_id}`;
-      return url;
-    },
+    buildUrl: (limit) => ActividadReciente.buildAuditoriaUrl(limit),
     mensajeVacio: 'Sin eventos registrados'
   });
   actividadWidget.init();

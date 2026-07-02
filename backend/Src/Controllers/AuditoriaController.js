@@ -6,8 +6,18 @@ async function enriquecerEvento(evento) {
     return evento;
   }
 
-  const datosNuevos = evento.datos_nuevos || {};
-  const datosAnteriores = evento.datos_anteriores || {};
+  const parseJsonField = (value) => {
+    if (!value) return {};
+    if (typeof value === 'object') return value;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return {};
+    }
+  };
+
+  const datosNuevos = parseJsonField(evento.datos_nuevos);
+  const datosAnteriores = parseJsonField(evento.datos_anteriores);
   const entidad = evento.entidad;
   let descripcion = evento.descripcion || '';
 
@@ -87,23 +97,91 @@ async function enriquecerEvento(evento) {
   };
 }
 
+function parseEmpresaId(value) {
+  if (value == null || value === '') return null;
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Alcance de actividad reciente:
+ * - auditor: todas las empresas (o una empresa si viene empresa_id en query)
+ * - super_admin / usuario: solo su empresa
+ */
+function resolverAlcanceAuditoria(req, requestedEmpresaId) {
+  const rol = req.user?.rol;
+  const userEmpresaId = parseEmpresaId(req.user?.empresa_id);
+  const requested = parseEmpresaId(requestedEmpresaId);
+
+  if (rol === 'auditor') {
+    if (requested) {
+      return { tipo: 'empresa', params: [requested] };
+    }
+    return { tipo: 'todos', params: [] };
+  }
+
+  if (rol === 'super_admin' || rol === 'usuario') {
+    if (userEmpresaId) {
+      return { tipo: 'empresa', params: [userEmpresaId] };
+    }
+    if (rol === 'usuario' && req.user?.id) {
+      return { tipo: 'usuario', params: [req.user.id] };
+    }
+    return { tipo: 'vacio', params: [] };
+  }
+
+  return { tipo: 'todos', params: [] };
+}
+
+function construirFiltroAuditoria(alcance, paramIndex = 1) {
+  switch (alcance.tipo) {
+    case 'empresa':
+      return {
+        whereSql: ` WHERE COALESCE(a.empresa_id, u.empresa_id) = $${paramIndex}`,
+        countWhereSql: ` WHERE COALESCE(a.empresa_id, u.empresa_id) = $${paramIndex}`,
+        countJoinSql: ' LEFT JOIN usuarios u ON a.usuario_id = u.id',
+        params: [...alcance.params],
+        nextIndex: paramIndex + 1
+      };
+    case 'usuario':
+      return {
+        whereSql: ` WHERE a.usuario_id = $${paramIndex}`,
+        countWhereSql: ` WHERE a.usuario_id = $${paramIndex}`,
+        countJoinSql: '',
+        params: [...alcance.params],
+        nextIndex: paramIndex + 1
+      };
+    case 'vacio':
+      return {
+        whereSql: ' WHERE 1=0',
+        countWhereSql: ' WHERE 1=0',
+        countJoinSql: '',
+        params: [],
+        nextIndex: paramIndex
+      };
+    default:
+      return {
+        whereSql: '',
+        countWhereSql: '',
+        countJoinSql: '',
+        params: [],
+        nextIndex: paramIndex
+      };
+  }
+}
+
 /**
  * Obtener todos los eventos de auditoría con paginación
- * Query params: limit, offset, empresa_id (opcional)
+ * Query params: limit, offset, empresa_id (opcional, solo auditor en detalle de empresa)
  */
 const obtenerEventos = async (req, res) => {
   try {
     const { limit = 20, offset = 0, empresa_id, skipCount } = req.query;
     const limitNum = Math.min(parseInt(limit) || 20, 100); // Max 100
     const offsetNum = Math.max(parseInt(offset) || 0, 0);
-    const requestedEmpresaId = empresa_id ? parseInt(empresa_id) : null;
 
-    let empresaIdNum = null;
-    if (req.user && req.user.rol === 'usuario') {
-      empresaIdNum = req.user.empresa_id || null;
-    } else {
-      empresaIdNum = requestedEmpresaId;
-    }
+    const alcance = resolverAlcanceAuditoria(req, empresa_id);
+    const filtro = construirFiltroAuditoria(alcance, 1);
 
     let query = `
       SELECT 
@@ -123,22 +201,13 @@ const obtenerEventos = async (req, res) => {
       LEFT JOIN usuarios u ON a.usuario_id = u.id
     `;
 
-    let countQuery = 'SELECT COUNT(*) as total FROM auditoria_sistema a';
-    let params = [];
-    let paramIndex = 1;
+    let countQuery = `SELECT COUNT(*) as total FROM auditoria_sistema a${filtro.countJoinSql || ''}`;
+    const params = [...filtro.params];
 
-    // Usuarios solo ven su propia empresa; otros roles pueden filtrar opcionalmente
-    if (empresaIdNum) {
-      query += ` WHERE a.empresa_id = $${paramIndex}`;
-      countQuery += ` WHERE a.empresa_id = $1`;
-      params.push(empresaIdNum);
-      paramIndex++;
-    } else if (req.user && req.user.rol === 'usuario') {
-      // si el usuario no tiene empresa asignada, devolver vacío
-      return res.json({ eventos: [], total: 0, limit: limitNum, offset: offsetNum, hasMore: false });
-    }
+    query += filtro.whereSql;
+    countQuery += filtro.countWhereSql;
 
-    query += ` ORDER BY a.fecha_evento DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    query += ` ORDER BY a.fecha_evento DESC LIMIT $${filtro.nextIndex} OFFSET $${filtro.nextIndex + 1}`;
     params.push(limitNum, offsetNum);
 
     const { rows } = await pool.query(query, params);
@@ -146,9 +215,8 @@ const obtenerEventos = async (req, res) => {
 
     let total = eventos.length;
     if (skipCount !== '1' && skipCount !== 'true') {
-      const countParams = empresaIdNum ? [empresaIdNum] : [];
-      const countResult = await pool.query(countQuery, countParams);
-      total = parseInt(countResult.rows[0].total);
+      const countResult = await pool.query(countQuery, filtro.params);
+      total = parseInt(countResult.rows[0].total, 10) || 0;
     }
 
     return res.json({
@@ -162,7 +230,10 @@ const obtenerEventos = async (req, res) => {
     });
   } catch (err) {
     console.error('Error obteniendo eventos de auditoría:', err);
-    return res.status(500).json({ message: 'Error al obtener eventos de auditoría' });
+    return res.status(500).json({
+      message: 'Error al obtener eventos de auditoría',
+      error: process.env.ENV === 'local' ? err.message : undefined
+    });
   }
 };
 
@@ -227,17 +298,9 @@ const obtenerEventosRecientes = async (req, res) => {
     const { limit = 10, empresa_id } = req.query;
     const limitNum = Math.min(parseInt(limit) || 10, 50);
 
-    let empresaIdNum = null;
-    if (req.user && req.user.rol === 'usuario') {
-      empresaIdNum = req.user.empresa_id || null;
-      if (!empresaIdNum) {
-        return res.json({ eventos: [], limit: limitNum });
-      }
-    } else if (empresa_id) {
-      empresaIdNum = parseInt(empresa_id) || null;
-    }
+    const alcance = resolverAlcanceAuditoria(req, empresa_id);
+    const filtro = construirFiltroAuditoria(alcance, 1);
 
-    const params = [limitNum];
     let query = `
       SELECT 
         a.id,
@@ -255,14 +318,10 @@ const obtenerEventosRecientes = async (req, res) => {
       LEFT JOIN usuarios u ON a.usuario_id = u.id
     `;
 
-    if (empresaIdNum) {
-      query += ` WHERE a.empresa_id = $2`;
-      params.push(empresaIdNum);
-    }
+    query += filtro.whereSql;
+    query += ` ORDER BY a.fecha_evento DESC LIMIT ${limitNum}`;
 
-    query += ` ORDER BY a.fecha_evento DESC LIMIT $1`;
-
-    const { rows } = await pool.query(query, params);
+    const { rows } = await pool.query(query, filtro.params);
     const eventos = await Promise.all(rows.map(enriquecerEvento));
 
     return res.json({

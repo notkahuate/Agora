@@ -1203,7 +1203,7 @@ function initActividadAuditor() {
   actividadWidget = ActividadReciente.crearWidget({
     timelineId: 'timelineAuditor',
     paginacionId: 'paginacionActividadReciente',
-    buildUrl: (limit) => `/api/auditoria?limit=${limit}&offset=0&skipCount=1`,
+    buildUrl: (limit) => ActividadReciente.buildAuditoriaUrl(limit),
     mensajeVacio: 'Sin eventos registrados'
   });
   actividadWidget.init();

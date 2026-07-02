@@ -128,6 +128,17 @@ function redirectByRole(rol) {
 
 (async function checkExistingSession() {
     if (!window.Auth) return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('activado') === '1') {
+      mostrarAlertaLogin({
+        titulo: 'Cuenta activada',
+        mensaje: 'Tu cuenta está lista. Inicia sesión con tu correo y contraseña.',
+        tipo: 'info'
+      });
+      window.history.replaceState({}, document.title, 'index.html');
+    }
+
     const user = await window.Auth.validateSession();
     if (user) {
         redirectByRole(user.rol);

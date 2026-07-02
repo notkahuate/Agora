@@ -42,6 +42,24 @@ const ActividadReciente = (function () {
     return eventos.map(e => `${e.id}-${e.fecha_evento}`).join('|');
   }
 
+  function buildAuditoriaUrl(limit, options = {}) {
+    const safeLimit = Math.max(1, parseInt(limit, 10) || FETCH_LIMIT);
+    let url = `/api/auditoria?limit=${safeLimit}&offset=0&skipCount=1`;
+    if (options.empresaId != null && options.empresaId !== '') {
+      url += `&empresa_id=${encodeURIComponent(options.empresaId)}`;
+    }
+    return url;
+  }
+
+  function escaparHtml(texto) {
+    return String(texto ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function crearWidget(config) {
     const state = {
       timelineId: config.timelineId,
@@ -117,8 +135,8 @@ const ActividadReciente = (function () {
           <article class="timeline-entry">
             <div class="timeline-entry-icon" style="background:${color}20;color:${color}">${icono}</div>
             <div class="timeline-entry-body">
-              <p class="timeline-entry-title">${descripcion}</p>
-              <p class="timeline-entry-meta">${usuario} • ${formatearFecha(evento.fecha_evento)}</p>
+              <p class="timeline-entry-title">${escaparHtml(descripcion)}</p>
+              <p class="timeline-entry-meta">${escaparHtml(usuario)} • ${escaparHtml(formatearFecha(evento.fecha_evento))}</p>
             </div>
           </article>`;
       }).join('');
@@ -130,14 +148,26 @@ const ActividadReciente = (function () {
       if (state.abortController) state.abortController.abort();
       state.abortController = new AbortController();
 
-      const res = await fetch(state.buildUrl(FETCH_LIMIT), {
-        headers: { Authorization: `Bearer ${obtenerToken()}` },
-        signal: state.abortController.signal
-      });
+      const url = state.buildUrl(FETCH_LIMIT);
+      const options = { signal: state.abortController.signal };
+      let res;
 
-      if (!res.ok) throw new Error('Error cargando actividad');
+      if (window.Auth?.apiFetch) {
+        res = await window.Auth.apiFetch(url, options);
+      } else {
+        res = await fetch(url, {
+          ...options,
+          headers: { Authorization: `Bearer ${obtenerToken()}` }
+        });
+      }
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || data.error || 'Error cargando actividad');
+      }
+
       const data = await res.json();
-      return data.eventos || [];
+      return Array.isArray(data.eventos) ? data.eventos : (Array.isArray(data) ? data : []);
     }
 
     async function cargar(pagina = 1, forceFetch = false, silent = false) {
@@ -174,7 +204,7 @@ const ActividadReciente = (function () {
         if (err.name === 'AbortError') return;
         console.error('Error actividad reciente:', err);
         if (!state.inicializada) {
-          renderMensaje('No se pudo cargar la actividad reciente.', true);
+          renderMensaje(err.message || 'No se pudo cargar la actividad reciente.', true);
         }
         renderPaginacion();
       } finally {
@@ -275,6 +305,7 @@ const ActividadReciente = (function () {
   return {
     crearWidget,
     cambiarPagina,
+    buildAuditoriaUrl,
     iconoActividad,
     LIMITE_PAGINA
   };

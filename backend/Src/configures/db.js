@@ -33,21 +33,59 @@ function normalizeRows(rows) {
   });
 }
 
+function toSafeInt(value, fallback = 0) {
+  const num = Number.parseInt(value, 10);
+  if (!Number.isFinite(num) || num < 0) return fallback;
+  return num;
+}
+
+/**
+ * MySQL/MariaDB en hosting compartido suele fallar con LIMIT/OFFSET en prepared statements.
+ * Se insertan como enteros ya validados.
+ */
+function applyPaginationInlining(sql, params) {
+  let nextSql = convertPlaceholders(sql);
+  let nextParams = Array.isArray(params) ? [...params] : [];
+
+  const limitOffsetMatch = nextSql.match(/\bLIMIT\s+\?\s+OFFSET\s+\?/i);
+  if (limitOffsetMatch && nextParams.length >= 2) {
+    const offsetVal = toSafeInt(nextParams.pop());
+    const limitVal = toSafeInt(nextParams.pop(), 20);
+    nextSql = nextSql.replace(
+      /\bLIMIT\s+\?\s+OFFSET\s+\?/i,
+      `LIMIT ${limitVal} OFFSET ${offsetVal}`
+    );
+  }
+
+  const limitOnlyMatch = nextSql.match(/\bLIMIT\s+\?\s*;?\s*$/i);
+  if (limitOnlyMatch && nextParams.length >= 1) {
+    const limitVal = toSafeInt(nextParams.pop(), 20);
+    nextSql = nextSql.replace(/\bLIMIT\s+\?\s*;?\s*$/i, `LIMIT ${limitVal}`);
+  }
+
+  return { sql: nextSql, params: nextParams };
+}
+
+async function runQuery(sql, params = []) {
+  const { sql: finalSql, params: finalParams } = applyPaginationInlining(sql, params);
+  const [result] = await mysqlPool.query(finalSql, finalParams);
+  return result;
+}
+
 async function executeReturning(originalSql, params) {
   const returningMatch = originalSql.match(/\sRETURNING\s+([\s\S]+?)\s*;?\s*$/i);
   const returning = returningMatch ? returningMatch[1].trim() : '*';
   const baseSql = originalSql.replace(/\sRETURNING\s+[\s\S]+?\s*;?\s*$/i, '');
-  const sql = convertPlaceholders(baseSql);
   const upper = baseSql.trim().toUpperCase();
 
   if (upper.startsWith('INSERT')) {
-    const [header] = await mysqlPool.execute(sql, params);
+    const header = await runQuery(baseSql, params);
     const tableMatch = baseSql.match(/INSERT\s+INTO\s+[`"]?(\w+)[`"]?/i);
     const table = tableMatch ? tableMatch[1] : null;
     if (!table || !header.insertId) {
       return { rows: [], insertId: header.insertId || null };
     }
-    const [rows] = await mysqlPool.execute(
+    const rows = await runQuery(
       `SELECT ${returning} FROM \`${table}\` WHERE id = ?`,
       [header.insertId]
     );
@@ -64,13 +102,13 @@ async function executeReturning(originalSql, params) {
 
     let rows = [];
     if (table && id != null) {
-      [rows] = await mysqlPool.execute(
+      rows = await runQuery(
         `SELECT ${returning} FROM \`${table}\` WHERE id = ?`,
         [id]
       );
     }
 
-    const [header] = await mysqlPool.execute(sql, params);
+    const header = await runQuery(baseSql, params);
     return { rows: normalizeRows(rows), rowCount: header.affectedRows || 0 };
   }
 
@@ -83,8 +121,7 @@ async function query(text, params = []) {
       return executeReturning(text, params);
     }
 
-    const sql = convertPlaceholders(text);
-    const [result] = await mysqlPool.execute(sql, params);
+    const result = await runQuery(text, params);
 
     if (Array.isArray(result)) {
       return { rows: normalizeRows(result), rowCount: result.length };

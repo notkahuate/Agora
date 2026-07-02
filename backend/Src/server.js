@@ -1,8 +1,11 @@
-require('dotenv').config();
+const { loadEnv, getLoadedEnvPath } = require('./configures/env');
+loadEnv();
+
 const express = require("express");
 const path = require("path");
 const { testConnection } = require('./configures/db');
 const { runMigrations } = require('./configures/migrate');
+const { getSmtpResumen, verificarSmtp } = require('./Helpers/emailHelper');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -36,8 +39,23 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use(express.static(path.join(__dirname, "../../frontend")));
 
 (async () => {
+  const envPath = getLoadedEnvPath();
+  console.log(`📄 Variables cargadas desde: ${envPath || 'process.env'}`);
+
+  const smtp = getSmtpResumen();
+  console.log(
+    `📧 SMTP: host=${smtp.host}, port=${smtp.port}, user=${smtp.user}, password=${smtp.passConfigurada ? 'OK' : 'FALTA'}`
+  );
+
   await testConnection();
   await runMigrations();
+
+  try {
+    await verificarSmtp();
+    console.log('✅ Conexión SMTP verificada');
+  } catch (smtpError) {
+    console.warn('⚠️ SMTP no disponible al iniciar:', smtpError.message);
+  }
 })();
 
 app.get("/", (req, res) => {

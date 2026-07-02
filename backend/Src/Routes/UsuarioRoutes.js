@@ -3,7 +3,7 @@ const { body, param, validationResult } = require('express-validator');
 const router = express.Router();
 
 const controller = require('../Controllers/UsuarioController');
-const verifyToken = require('../milddlewares/verifytoken');
+const { authenticate } = require('../milddlewares/authMiddleware');
 
 const handleValidation = (req, res, next) => {
   const errors = validationResult(req);
@@ -32,7 +32,7 @@ router.post(
 // =======================
 router.post(
   '/',
-  verifyToken,
+  authenticate,
   [
     body('nombre').isString().isLength({ min: 2 }),
     body('email').isEmail(),
@@ -47,14 +47,14 @@ router.post(
 // =======================
 router.get(
   '/',
-  verifyToken,
+  authenticate,
   controller.listarUsuarios
 );
 
 // 👥 Usuarios de la misma empresa (menos el actual)
 router.get(
   '/empresa/mios',
-  verifyToken,
+  authenticate,
   controller.usuariosEmpresa
 );
 
@@ -63,7 +63,7 @@ router.get(
 // =======================
 router.get(
   '/:id',
-  verifyToken,
+  authenticate,
   param('id').isInt(),
   handleValidation,
   controller.obtenerUsuario
@@ -74,7 +74,7 @@ router.get(
 // =======================
 router.put(
   '/:id',
-  verifyToken,
+  authenticate,
   param('id').isInt(),
   handleValidation,
   controller.actualizarUsuario
@@ -85,7 +85,7 @@ router.put(
 // =======================
 router.delete(
   '/:id',
-  verifyToken,
+  authenticate,
   param('id').isInt(),
   handleValidation,
   controller.eliminarUsuario
