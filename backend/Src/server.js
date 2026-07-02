@@ -56,12 +56,12 @@ app.use(express.static(path.join(__dirname, "../../frontend")));
   } catch (smtpError) {
     console.warn('⚠️ SMTP no disponible al iniciar:', smtpError.message);
   }
+
+  app.listen(PORT, () => {
+    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  });
 })();
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "../../frontend/index.html"));
-});
-   
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });

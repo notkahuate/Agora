@@ -1071,7 +1071,7 @@ window.validarDocumento = async function(id, action) {
       });
 
       historialGlobal = [];
-      actividadWidget?.refrescarSilenciosa();
+      actividadWidget?.invalidarYRecargar();
       Promise.all([
         cargarDocumentos(),
         cargarPendientesAuditor()
@@ -1195,7 +1195,7 @@ window.revisarDocumentoCola = function (id, nombre) {
 
 
 function invalidarCacheActividad() {
-  actividadWidget?.refrescarSilenciosa();
+  actividadWidget?.invalidarYRecargar();
 }
 
 function initActividadAuditor() {
@@ -1213,9 +1213,9 @@ function initActividadAuditor() {
 // INIT
 // ==============================
 document.addEventListener('DOMContentLoaded', async () => {
+  initActividadAuditor();
   await cargarPendientesAuditor();
   cargarEmpresas();
-  initActividadAuditor();
   window.colaPrioritariaInterval = setInterval(cargarPendientesAuditor, 15000);
 
   document.querySelectorAll('.modal').forEach((modal) => {

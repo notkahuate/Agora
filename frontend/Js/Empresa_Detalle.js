@@ -1372,7 +1372,7 @@ window.descargarDocumento = async function (id, nombreArchivo) {
 // ACTIVIDAD RECIENTE (EMPRESA)
 // ==============================
 function invalidarCacheActividadEmpresa() {
-  actividadWidget?.refrescarSilenciosa();
+  actividadWidget?.invalidarYRecargar();
 }
 
 function initActividadEmpresa() {
@@ -1399,9 +1399,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     descargarDocumento(id, nombre);
   });
 
+  initActividadEmpresa();
   await cargarEmpresaDetalle();
   await cargarPendientesEmpresa(empresaId);
   initControlesAsignados();
-  initActividadEmpresa();
 });
 

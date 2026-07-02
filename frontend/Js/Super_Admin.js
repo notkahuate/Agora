@@ -978,7 +978,7 @@ async function cargarEmpresasMap() {
 }
 
 function invalidarCacheActividad() {
-  actividadWidget?.refrescarSilenciosa();
+  actividadWidget?.invalidarYRecargar();
 }
 
 function initActividadSuperAdmin() {
@@ -993,11 +993,11 @@ function initActividadSuperAdmin() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  initActividadSuperAdmin();
   initSaludNavegacion();
   await cargarEmpresasMap();
   cargarUsuariosEmpresa();
   cargarColaRevision();
   cargarKPIs();
   cargarDocumentos();
-  initActividadSuperAdmin();
 });

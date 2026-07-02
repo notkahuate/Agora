@@ -203,9 +203,7 @@ const ActividadReciente = (function () {
       } catch (err) {
         if (err.name === 'AbortError') return;
         console.error('Error actividad reciente:', err);
-        if (!state.inicializada) {
-          renderMensaje(err.message || 'No se pudo cargar la actividad reciente.', true);
-        }
+        renderMensaje(err.message || 'No se pudo cargar la actividad reciente.', true);
         renderPaginacion();
       } finally {
         state.cargando = false;
@@ -251,10 +249,12 @@ const ActividadReciente = (function () {
       state.eventos = [];
       state.lastHash = '';
       state.inicializada = false;
+      state.pagina = 1;
     }
 
     function invalidarYRecargar() {
-      return refrescarSilenciosa();
+      invalidar();
+      return cargar(1, true, true);
     }
 
     function iniciarAutoRefresh() {

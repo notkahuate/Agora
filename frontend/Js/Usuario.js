@@ -661,7 +661,7 @@ function uploadDocumentForPending(tipoDocumentoId, nombre, reemplazaId = null) {
         variante: 'upload'
       });
       loadDocumentos(true);
-      actividadWidget?.refrescarSilenciosa();
+      actividadWidget?.invalidarYRecargar();
     } catch (error) {
       console.error('Error al subir documento:', error);
       mostrarToastUsuario({
@@ -677,7 +677,7 @@ function uploadDocumentForPending(tipoDocumentoId, nombre, reemplazaId = null) {
 }
 
 function invalidarCacheActividad() {
-  actividadWidget?.refrescarSilenciosa();
+  actividadWidget?.invalidarYRecargar();
 }
 
 function initActividadUsuario() {

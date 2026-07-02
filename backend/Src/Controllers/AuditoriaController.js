@@ -1,100 +1,105 @@
 // src/controllers/AuditoriaController.js
 const { pool } = require('../configures/db');
 
+function parseJsonField(value) {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+}
+
 async function enriquecerEvento(evento) {
-  if (evento.descripcion && String(evento.descripcion).trim().length > 0) {
+  try {
+    if (evento.descripcion && String(evento.descripcion).trim().length > 0) {
+      return evento;
+    }
+
+    const datosNuevos = parseJsonField(evento.datos_nuevos);
+    const datosAnteriores = parseJsonField(evento.datos_anteriores);
+    const entidad = evento.entidad;
+    let descripcion = evento.descripcion || '';
+
+    const empresaId = datosNuevos.empresa_id || datosAnteriores.empresa_id || datosNuevos.empresaId || datosAnteriores.empresaId;
+    const tipoDocumentoId = datosNuevos.tipo_documento_id || datosAnteriores.tipo_documento_id || datosNuevos.tipoDocumentoId || datosAnteriores.tipoDocumentoId;
+    const nombreArchivo = datosNuevos.nombre_archivo || datosAnteriores.nombre_archivo || datosNuevos.nombreArchivo || datosAnteriores.nombreArchivo;
+    const documentoRequeridoId = datosNuevos.documento_requerido_id || datosAnteriores.documento_requerido_id || datosNuevos.documentoRequeridoId || datosAnteriores.documentoRequeridoId;
+
+    let empresaNombre;
+    let tipoDocumentoNombre;
+
+    try {
+      if (entidad === 'documento_responsables' && evento.entidad_id) {
+        const query = `
+          SELECT e.nombre AS empresa_nombre, td.nombre AS tipo_nombre
+          FROM documento_responsables dr
+          JOIN documentos_requeridos dreq ON dr.documento_requerido_id = dreq.id
+          JOIN empresas e ON dreq.empresa_id = e.id
+          JOIN tipos_documentos td ON dreq.tipo_documento_id = td.id
+          WHERE dr.id = $1
+        `;
+        const resultado = await pool.query(query, [evento.entidad_id]);
+        if (resultado.rows.length) {
+          empresaNombre = resultado.rows[0].empresa_nombre;
+          tipoDocumentoNombre = resultado.rows[0].tipo_nombre;
+        }
+      }
+
+      if ((entidad === 'documentos_requeridos' || entidad === 'documentos_subidos') && empresaId && tipoDocumentoId) {
+        const query = `
+          SELECT e.nombre AS empresa_nombre, td.nombre AS tipo_nombre
+          FROM empresas e
+          JOIN tipos_documentos td ON td.id = $2
+          WHERE e.id = $1
+        `;
+        const resultado = await pool.query(query, [empresaId, tipoDocumentoId]);
+        if (resultado.rows.length) {
+          empresaNombre = resultado.rows[0].empresa_nombre;
+          tipoDocumentoNombre = resultado.rows[0].tipo_nombre;
+        }
+      }
+    } catch (err) {
+      console.error('Error enriqueciendo evento de auditoría:', err.message);
+    }
+
+    if (entidad === 'documentos_requeridos' && evento.accion === 'asignar') {
+      descripcion = `Asignado documento requerido '${tipoDocumentoNombre || tipoDocumentoId}' a empresa '${empresaNombre || empresaId}'`;
+    } else if (entidad === 'documento_responsables' && evento.accion === 'asignar') {
+      descripcion = `Asignado documento '${tipoDocumentoNombre || documentoRequeridoId}' de la empresa '${empresaNombre || empresaId}'`;
+    } else if (entidad === 'documentos_subidos') {
+      const accion = evento.accion || 'actualizado';
+      const nombreDoc = nombreArchivo || tipoDocumentoNombre || tipoDocumentoId;
+      const empresaText = empresaNombre || empresaId;
+      if (accion === 'subir') {
+        descripcion = `Documento '${nombreDoc}' subido para empresa '${empresaText}'`;
+      } else if (accion === 'descargar') {
+        descripcion = `Descargado documento '${nombreDoc}' de empresa '${empresaText}'`;
+      } else if (accion === 'validar') {
+        descripcion = `Documento '${nombreDoc}' de empresa '${empresaText}' cambiado al estado ${datosNuevos.estado || datosAnteriores.estado || 'desconocido'}`;
+      } else if (accion === 'actualizar') {
+        descripcion = `Documento '${nombreDoc}' actualizado para empresa '${empresaText}'`;
+      } else if (accion === 'eliminar') {
+        descripcion = `Documento '${nombreDoc}' eliminado de empresa '${empresaText}'`;
+      }
+    }
+
+    if (!descripcion) {
+      descripcion = evento.descripcion || `${evento.accion || 'Evento'} en ${evento.entidad}`;
+      if (evento.entidad_id) {
+        descripcion += ` (#${evento.entidad_id})`;
+      }
+    }
+
+    return {
+      ...evento,
+      descripcion
+    };
+  } catch (err) {
+    console.error('Error procesando evento de auditoría:', err.message);
     return evento;
   }
-
-  const parseJsonField = (value) => {
-    if (!value) return {};
-    if (typeof value === 'object') return value;
-    try {
-      return JSON.parse(value);
-    } catch {
-      return {};
-    }
-  };
-
-  const datosNuevos = parseJsonField(evento.datos_nuevos);
-  const datosAnteriores = parseJsonField(evento.datos_anteriores);
-  const entidad = evento.entidad;
-  let descripcion = evento.descripcion || '';
-
-  const empresaId = datosNuevos.empresa_id || datosAnteriores.empresa_id || datosNuevos.empresaId || datosAnteriores.empresaId;
-  const tipoDocumentoId = datosNuevos.tipo_documento_id || datosAnteriores.tipo_documento_id || datosNuevos.tipoDocumentoId || datosAnteriores.tipoDocumentoId;
-  const nombreArchivo = datosNuevos.nombre_archivo || datosAnteriores.nombre_archivo || datosNuevos.nombreArchivo || datosAnteriores.nombreArchivo;
-  const documentoRequeridoId = datosNuevos.documento_requerido_id || datosAnteriores.documento_requerido_id || datosNuevos.documentoRequeridoId || datosAnteriores.documentoRequeridoId;
-
-  let empresaNombre;
-  let tipoDocumentoNombre;
-
-  try {
-    if (entidad === 'documento_responsables' && evento.entidad_id) {
-      const query = `
-        SELECT e.nombre AS empresa_nombre, td.nombre AS tipo_nombre
-        FROM documento_responsables dr
-        JOIN documentos_requeridos dreq ON dr.documento_requerido_id = dreq.id
-        JOIN empresas e ON dreq.empresa_id = e.id
-        JOIN tipos_documentos td ON dreq.tipo_documento_id = td.id
-        WHERE dr.id = $1
-      `;
-      const resultado = await pool.query(query, [evento.entidad_id]);
-      if (resultado.rows.length) {
-        empresaNombre = resultado.rows[0].empresa_nombre;
-        tipoDocumentoNombre = resultado.rows[0].tipo_nombre;
-      }
-    }
-
-    if ((entidad === 'documentos_requeridos' || entidad === 'documentos_subidos') && empresaId && tipoDocumentoId) {
-      const query = `
-        SELECT e.nombre AS empresa_nombre, td.nombre AS tipo_nombre
-        FROM empresas e
-        JOIN tipos_documentos td ON td.id = $2
-        WHERE e.id = $1
-      `;
-      const resultado = await pool.query(query, [empresaId, tipoDocumentoId]);
-      if (resultado.rows.length) {
-        empresaNombre = resultado.rows[0].empresa_nombre;
-        tipoDocumentoNombre = resultado.rows[0].tipo_nombre;
-      }
-    }
-  } catch (err) {
-    console.error('Error enriqueciendo evento de auditoría:', err);
-  }
-
-  if (entidad === 'documentos_requeridos' && evento.accion === 'asignar') {
-    descripcion = `Asignado documento requerido '${tipoDocumentoNombre || tipoDocumentoId}' a empresa '${empresaNombre || empresaId}'`;
-  } else if (entidad === 'documento_responsables' && evento.accion === 'asignar') {
-    descripcion = `Asignado documento '${tipoDocumentoNombre || documentoRequeridoId}' de la empresa '${empresaNombre || empresaId}'`;
-  } else if (entidad === 'documentos_subidos') {
-    const accion = evento.accion || 'actualizado';
-    const nombreDoc = nombreArchivo || tipoDocumentoNombre || tipoDocumentoId;
-    const empresaText = empresaNombre || empresaId;
-    if (accion === 'subir') {
-      descripcion = `Documento '${nombreDoc}' subido para empresa '${empresaText}'`;
-    } else if (accion === 'descargar') {
-      descripcion = `Descargado documento '${nombreDoc}' de empresa '${empresaText}'`;
-    } else if (accion === 'validar') {
-      descripcion = `Documento '${nombreDoc}' de empresa '${empresaText}' cambiado al estado ${evento.datos_nuevos?.estado || evento.datos_anteriores?.estado || 'desconocido'}`;
-    } else if (accion === 'actualizar') {
-      descripcion = `Documento '${nombreDoc}' actualizado para empresa '${empresaText}'`;
-    } else if (accion === 'eliminar') {
-      descripcion = `Documento '${nombreDoc}' eliminado de empresa '${empresaText}'`;
-    }
-  }
-
-  if (!descripcion) {
-    descripcion = evento.descripcion || `${evento.accion || 'Evento'} en ${evento.entidad}`;
-    if (evento.entidad_id) {
-      descripcion += ` (#${evento.entidad_id})`;
-    }
-  }
-
-  return {
-    ...evento,
-    descripcion
-  };
 }
 
 function parseEmpresaId(value) {
@@ -207,11 +212,11 @@ const obtenerEventos = async (req, res) => {
     query += filtro.whereSql;
     countQuery += filtro.countWhereSql;
 
-    query += ` ORDER BY a.fecha_evento DESC LIMIT $${filtro.nextIndex} OFFSET $${filtro.nextIndex + 1}`;
-    params.push(limitNum, offsetNum);
+    // LIMIT/OFFSET inline: MySQL en hosting compartido falla con LIMIT/OFFSET como parámetros preparados
+    query += ` ORDER BY a.fecha_evento DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
 
     const { rows } = await pool.query(query, params);
-    const eventos = await Promise.all(rows.map(enriquecerEvento));
+    const eventos = await Promise.all(rows.map((row) => enriquecerEvento(row)));
 
     let total = eventos.length;
     if (skipCount !== '1' && skipCount !== 'true') {
@@ -264,11 +269,11 @@ const obtenerEventosPorEntidad = async (req, res) => {
       LEFT JOIN usuarios u ON a.usuario_id = u.id
       WHERE a.entidad = $1
       ORDER BY a.fecha_evento DESC
-      LIMIT $2
-      OFFSET $3
+      LIMIT ${limitNum}
+      OFFSET ${offsetNum}
     `;
 
-    const { rows } = await pool.query(query, [entidad, limitNum, offsetNum]);
+    const { rows } = await pool.query(query, [entidad]);
     const eventos = await Promise.all(rows.map(enriquecerEvento));
 
     // Contar total
@@ -361,11 +366,11 @@ const obtenerEventosPorEntidadId = async (req, res) => {
       LEFT JOIN usuarios u ON a.usuario_id = u.id
       WHERE a.entidad = $1 AND a.entidad_id = $2
       ORDER BY a.fecha_evento DESC
-      LIMIT $3
-      OFFSET $4
+      LIMIT ${limitNum}
+      OFFSET ${offsetNum}
     `;
 
-    const { rows } = await pool.query(query, [entidad, entidad_id, limitNum, offsetNum]);
+    const { rows } = await pool.query(query, [entidad, entidad_id]);
     const eventos = await Promise.all(rows.map(enriquecerEvento));
 
     // Contar total
